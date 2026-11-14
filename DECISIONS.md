@@ -68,3 +68,13 @@
 - **Date:** 2026-11-14
 - **Decision:** Reuse graphic overlay instances via `overlay.removeAll()` in `AladinViewer.tsx`, split coverage footprint polygons across the 0°/360° RA meridian seam, and extract `.celestial` sub-WCS for 3D/spectral FITS cutouts before calling `reproject_interp`.
 - **Rationale:** Prevents catastrophic memory and rendering leaks in Aladin Lite WebGL scene graph from unbounded `addOverlay` calls on coordinate change. Splitting across the meridian avoids full-sky polygon tearing artifacts. Celestial sub-WCS extraction allows spectral cubes and 3D FITS cutouts to reproject seamlessly without throwing dimension errors.
+
+## ADR-015: On-The-Fly Spectrophotometric SED Reconstruction & 102-Channel Synthesis
+- **Date:** 2026-11-14
+- **Decision:** Implement `/api/science/spectrum` aggregating aperture photometry across all 6 SPHEREx detector arrays (D1: 0.75–1.12 µm to D6: 4.42–5.00 µm) with smooth physical continuum modeling and complete 102-channel synthesis.
+- **Rationale:** SPHEREx's defining astronomical capability is its 102 spectral channels. Enabling on-the-fly SED generation allows users to instantly determine spectral classification (e.g. cold brown dwarf with methane/water absorption peaking at 4.5 µm vs cool M-dwarf vs circumstellar dust infrared excess).
+
+## ADR-016: Celestial WCS Co-Addition & Multi-Frame Noise Suppression Engine
+- **Date:** 2026-11-14
+- **Decision:** Implement multi-frame image stacking endpoint (`/api/frames/stack`) supporting `mean`, `median`, and `sum` methods with `reproject_interp` registration, paired with a frontend operation mode switcher in `ComparisonView.tsx`.
+- **Rationale:** While temporal differencing ($I_2 - I_1$) is optimal for finding fast-moving objects and transients, it adds noise ($\sqrt{2}\sigma$). Conversely, co-addition ($I_1 + I_2$) suppresses noise by $\sim\sqrt{N}$ (+41.4% SNR gain for $N=2$), enabling discoveries of extremely faint static sources, brown dwarfs, and high-redshift infrared galaxies.

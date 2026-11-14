@@ -15,6 +15,7 @@ import {
   DemoPreset,
   CatalogSource,
   LightCurveSeries,
+  SpectrumResponse,
   DiscoveryReport,
 } from './types/astronomy';
 import {
@@ -25,6 +26,7 @@ import {
   fetchDemoPresets,
   fetchCatalogs,
   fetchPhotometry,
+  fetchSpectrum,
   computeMotion,
   generateDiscoveryReport,
 } from './services/api';
@@ -55,6 +57,8 @@ export const App: React.FC = () => {
   const [showCatalog, setShowCatalog] = useState(false);
   const [lightCurve, setLightCurve] = useState<LightCurveSeries | null>(null);
   const [loadingPhotometry, setLoadingPhotometry] = useState(false);
+  const [spectrum, setSpectrum] = useState<SpectrumResponse | null>(null);
+  const [loadingSpectrum, setLoadingSpectrum] = useState(false);
 
   // Modals & Share State
   const [isTourOpen, setIsTourOpen] = useState(false);
@@ -146,6 +150,13 @@ export const App: React.FC = () => {
           .then(setLightCurve)
           .catch(() => setLightCurve(null))
           .finally(() => setLoadingPhotometry(false));
+
+        // Fetch Infrared Spectrum SED in background
+        setLoadingSpectrum(true);
+        fetchSpectrum(searchRa, searchDec, searchColl, searchFov)
+          .then(setSpectrum)
+          .catch(() => setSpectrum(null))
+          .finally(() => setLoadingSpectrum(false));
 
       } catch (err: any) {
         setErrorMessage(err.message || 'Observation discovery failed');
@@ -369,6 +380,8 @@ export const App: React.FC = () => {
               frame={currentFrame}
               lightCurve={lightCurve}
               loadingPhotometry={loadingPhotometry}
+              spectrum={spectrum}
+              loadingSpectrum={loadingSpectrum}
               onSelectObsId={(obsId) => {
                 const idx = observations.findIndex((o) => o.obs_id === obsId);
                 if (idx >= 0) handleSelectIndex(idx);

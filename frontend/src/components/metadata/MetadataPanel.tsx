@@ -1,12 +1,15 @@
-import React from 'react';
-import { ExternalLink, Info, Activity, ShieldCheck, Tag, FileText, Download } from 'lucide-react';
-import { FrameResponse, LightCurveSeries } from '../../types/astronomy';
+import React, { useState } from 'react';
+import { ExternalLink, Info, Activity, ShieldCheck, Tag, FileText, Download, Layers } from 'lucide-react';
+import { FrameResponse, LightCurveSeries, SpectrumResponse } from '../../types/astronomy';
 import { LightCurveChart } from '../science/LightCurveChart';
+import { SpectrumChart } from '../science/SpectrumChart';
 
 interface MetadataPanelProps {
   frame: FrameResponse | null;
   lightCurve?: LightCurveSeries | null;
   loadingPhotometry?: boolean;
+  spectrum?: SpectrumResponse | null;
+  loadingSpectrum?: boolean;
   onSelectObsId?: (obsId: string) => void;
   onOpenDiscoveryReport?: () => void;
 }
@@ -15,9 +18,13 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({
   frame,
   lightCurve = null,
   loadingPhotometry = false,
+  spectrum = null,
+  loadingSpectrum = false,
   onSelectObsId,
   onOpenDiscoveryReport,
 }) => {
+  const [telemetryTab, setTelemetryTab] = useState<'lightcurve' | 'spectrum'>('spectrum');
+
   if (!frame) {
     return (
       <div className="w-80 bg-slate-900/60 border-l border-slate-800 p-4 text-xs text-slate-500 flex flex-col items-center justify-center text-center">
@@ -31,13 +38,43 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({
 
   return (
     <div className="w-80 bg-slate-900/60 border-l border-slate-800 p-4 flex flex-col gap-4 overflow-y-auto text-xs">
-      {/* Light Curve Telemetry Dock */}
-      <LightCurveChart
-        series={lightCurve}
-        loading={loadingPhotometry}
-        selectedObsId={frame.obs_id}
-        onSelectObsId={onSelectObsId}
-      />
+      {/* Telemetry Mode Tabs Switcher */}
+      <div className="flex bg-slate-950/90 p-1 rounded-lg border border-slate-800 gap-1 text-[11px] font-mono">
+        <button
+          onClick={() => setTelemetryTab('spectrum')}
+          className={`flex-1 py-1.5 px-2 rounded flex items-center justify-center gap-1.5 transition ${
+            telemetryTab === 'spectrum'
+              ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 font-semibold'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Layers className="w-3.5 h-3.5 text-indigo-400" />
+          <span>Infrared SED</span>
+        </button>
+        <button
+          onClick={() => setTelemetryTab('lightcurve')}
+          className={`flex-1 py-1.5 px-2 rounded flex items-center justify-center gap-1.5 transition ${
+            telemetryTab === 'lightcurve'
+              ? 'bg-cyan-600/30 text-cyan-300 border border-cyan-500/40 font-semibold'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Activity className="w-3.5 h-3.5 text-cyan-400" />
+          <span>Light Curve</span>
+        </button>
+      </div>
+
+      {/* Switchable Science Telemetry Chart */}
+      {telemetryTab === 'spectrum' ? (
+        <SpectrumChart spectrum={spectrum} loading={loadingSpectrum} />
+      ) : (
+        <LightCurveChart
+          series={lightCurve}
+          loading={loadingPhotometry}
+          selectedObsId={frame.obs_id}
+          onSelectObsId={onSelectObsId}
+        />
+      )}
 
       <div>
         <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 mb-2">

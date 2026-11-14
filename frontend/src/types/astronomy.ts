@@ -158,3 +158,71 @@ export interface DiscoveryReport {
   markdown_report: string;
   irsa_doi: string;
 }
+
+export interface SpectrumBandPoint {
+  detector: string;
+  band_idx: number;
+  wavelength_um: number;
+  wavelength_min_um: number;
+  wavelength_max_um: number;
+  color: string;
+  flux_mjy_sr: number;
+  flux_density_mjy: number;
+  peak_flux_mjy_sr: number;
+  flux_err_mjy_sr: number;
+  snr: number;
+  is_observed: boolean;
+  obs_id?: string | null;
+}
+
+export interface SpectralChannel {
+  channel_index: number;
+  detector: string;
+  color: string;
+  wavelength_um: number;
+  flux_mjy_sr: number;
+  flux_density_mjy: number;
+  is_observed_band: boolean;
+}
+
+export interface SpectrumSummary {
+  peak_wavelength_um: number;
+  peak_detector: string;
+  peak_flux_mjy_sr: number;
+  estimated_temperature_k: number;
+  spectral_class: string;
+  integrated_flux_mjy_sr_um: number;
+  total_channels: number;
+}
+
+export interface SpectrumResponse {
+  target: {
+    ra: number;
+    dec: number;
+  };
+  total_observed_bands: number;
+  bands: SpectrumBandPoint[];
+  channels_102: SpectralChannel[];
+  continuum_curve: Array<{ wavelength_um: number; flux_mjy_sr: number }>;
+  summary: SpectrumSummary;
+}
+
+export interface StackResult {
+  success: boolean;
+  method: 'mean' | 'median' | 'sum';
+  frame_count: number;
+  frame_ids: string[];
+  dimensions: [number, number];
+  snr_improvement_factor: number;
+  theoretical_snr_gain: number;
+  noise_stats: {
+    reference_noise_sigma: number;
+    stacked_noise_sigma: number;
+    mean_flux_mjy_sr: number;
+    max_flux_mjy_sr: number;
+    min_flux_mjy_sr: number;
+  };
+  alignment_method: string;
+  image_base64: string;
+}
+

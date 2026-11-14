@@ -13,7 +13,7 @@
 - [x] `P1-002` | COMPLETED | Display contrast scaling engines (`asinh`, `zscale`, `linear`)
 - [x] `P1-003` | COMPLETED | Data quality flag bitmask evaluation (`flags_processing.py`, `MetadataPanel.tsx`)
 - [x] `P1-004` | COMPLETED | Local caching of 22 verified real FITS cutouts for judging demo reliability (`data/cache`)
-- [x] `P1-005` | COMPLETED | Full automated test suite (48 pytest tests passing)
+- [x] `P1-005` | COMPLETED | Full automated test suite (52 pytest tests passing)
 - [x] `P1-006` | COMPLETED | Offline / archive downtime resilience with automatic demo manifest fallback (`demo_service.py`, `irsa_client.py`)
 - [x] `P1-007` | COMPLETED | Spherical RA 0°/360° boundary wrapping and NaN-safe differencing (`comparison.py`)
 - [x] `P1-008` | COMPLETED | Sub-pixel 2D FFT image translation estimator (`image_registration.py`)
@@ -39,3 +39,10 @@
 - [x] `P3-006` | COMPLETED | Added `reproject`, `pyvo`, and `astroquery` to `backend/requirements.txt`
 - [x] `P3-007` | COMPLETED | Polished shadcn/ui-inspired glassmorphic cards, telemetry pills, and alignment method indicators
 - [x] `P3-008` | COMPLETED | Fixed CanvasViewer unmount/remount blank redraw bug (`viewerMode` dependency), Aladin Lite overlay layer reuse/memory leak prevention, 0°/360° RA seam crossing handling, and 3D spectral WCS celestial extraction in reprojection
+
+## P4: Potential Considerations & Advanced Science Discoveries (ALL COMPLETED)
+- [x] `P4-001` | COMPLETED | On-the-fly spectra generation endpoint (`GET /api/science/spectrum`) gathering aperture fluxes across the 6 SPHEREx detector arrays (D1: 0.75–1.12 µm, D2: 1.12–1.68 µm, D3: 1.68–2.42 µm, D4: 2.42–3.82 µm, D5: 3.82–4.42 µm, D6: 4.42–5.00 µm) (`spectrum.py`)
+- [x] `P4-002` | COMPLETED | Interactive 102-channel spectrophotometric SED chart (`SpectrumChart.tsx`) with detector band color-coding, smooth continuum modeling, and physical classification (Brown Dwarfs, M-Dwarfs, IR Excess) integrated into `MetadataPanel.tsx` telemetry tabs
+- [x] `P4-003` | COMPLETED | Astronomical image co-addition & stacking endpoint (`POST /api/frames/stack`) supporting `mean`, `median`, and `sum` with celestial WCS registration via `reproject_interp` (`stacking.py`, `frames.py`)
+- [x] `P4-004` | COMPLETED | Operation mode switcher in `ComparisonView.tsx`: "Difference ($I_2 - I_1$)" (reveals moving sources/dipoles and transients) vs "Co-Add Stack ($I_1 + I_2$)" (reveals faint static infrared sources and brown dwarfs) with $\sim\sqrt{N}$ SNR gain badge and noise suppression telemetry
+- [x] `P4-005` | COMPLETED | Comprehensive automated test suite expansion with 12 new tests in `test_stacking_and_spectrum.py`, bringing total passing backend tests to 64 (0 failures)

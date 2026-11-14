@@ -7,6 +7,8 @@ import {
   LightCurveSeries,
   AstrometricMotion,
   DiscoveryReport,
+  SpectrumResponse,
+  StackResult,
 } from '../types/astronomy';
 
 const API_BASE = '/api';
@@ -180,6 +182,51 @@ export async function generateDiscoveryReport(data: {
   });
   if (!resp.ok) {
     throw new Error('Failed to generate discovery report');
+  }
+  return resp.json();
+}
+
+export async function fetchSpectrum(
+  ra: number | string,
+  dec: number | string,
+  collection?: string,
+  fov: number = 0.04
+): Promise<SpectrumResponse> {
+  const params = new URLSearchParams({
+    ra: String(ra),
+    dec: String(dec),
+    fov: String(fov),
+  });
+  if (collection && collection !== 'ALL') {
+    params.set('collection', collection);
+  }
+  const resp = await fetch(`${API_BASE}/science/spectrum?${params.toString()}`);
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({ detail: 'Failed to load spectrum' }));
+    throw new Error(err.detail || 'Failed to load spectrum');
+  }
+  return resp.json();
+}
+
+export async function stackFrames(
+  frameIds: string[],
+  method: 'mean' | 'median' | 'sum' = 'mean',
+  format: string = 'png',
+  stretch: string = 'asinh'
+): Promise<StackResult> {
+  const resp = await fetch(`${API_BASE}/frames/stack`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      frame_ids: frameIds,
+      method,
+      format,
+      stretch,
+    }),
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({ detail: 'Failed to stack frames' }));
+    throw new Error(err.detail || 'Failed to stack frames');
   }
   return resp.json();
 }

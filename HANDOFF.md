@@ -1,17 +1,26 @@
 # Agent Handoff Document
 
 ## 1. Last Completed Work
-- Implemented the recommended architectural enhancements from the reference architecture:
-  - **Aladin Lite Sky Context Integration (Aladin Lite v3 + Canvas):** Built `AladinViewer.tsx` embedding Aladin Lite v3 via clean CDN embed (`aladin-lite@3.3.0` UMD / CDS API). Added pill tab toggle in `CanvasViewer.tsx` between "SPHEREx Analysis Canvas" and "Aladin Lite Sky Context". Automatically syncs center coordinates (RA, Dec) and FOV, renders an interactive SPHEREx observation coverage footprint polygon overlay, allows switching between background surveys (2MASS Color JHK, AllWISE Color W1-W4, DSS2 Color, Pan-STARRS DR1), and provides an offline SVG celestial radar fallback.
-  - **Scientific WCS Reprojection (`reproject`):** Installed `reproject` (v0.21.0), `pyvo` (v1.10.0), and `astroquery` (v0.4.11) and added to `backend/requirements.txt`. Implemented `reproject_interp` in `compute_difference_frame` (`backend/app/science/comparison.py`) and `backend/app/api/frames.py` for celestial grid reprojection across differing epochs, with automatic fallback to 2D FFT shift registration.
-  - **WebP Image Output Engine:** Added `render_image_to_base64(..., format="webp")` in `backend/app/science/fits_processing.py`. Updated `backend/app/services/cutout_service.py`, `backend/app/api/frames.py` (`/api/frames/{id}?format=webp` and `diff_frames` body `format`), and `frontend/src/services/api.ts` for rapid lightweight timeline playback.
-  - **UI / Styling Refinements:** Added refined pill tabs for Canvas vs. Aladin Lite, smooth transitions, high-contrast dark theme, glassmorphic cards, and alignment method indicators in `ComparisonView.tsx`.
-  - **Testing & Verification:** Added 8 new automated tests for reprojection, 3D WCS, rotated WCS, and WebP rendering (`test_compute_difference_frame_wcs_reproject`, `test_compute_difference_frame_fft_shift_fallback`, `test_compute_difference_frame_spectral_3d_wcs`, `test_compute_difference_frame_rotated_wcs`, `test_render_image_to_base64_webp`, `test_extract_astropy_wcs_celestial`, `test_render_image_to_base64_float_sanitization`, `test_webp_frame_and_diff_endpoints`), bringing the test suite to 52 passed tests (0 failures). Verified frontend build compiles cleanly in 2.08s with 0 errors.
+- Implemented the high-impact "extra kudos" capabilities highlighted in the Potential Considerations:
+  - **On-The-Fly Spectra Generation (SED: Flux vs. Wavelength $\lambda$):**
+    - Created `backend/app/science/spectrum.py` defining SPHEREx's 6 detector array configs (D1: 0.75–1.12 µm, D2: 1.12–1.68 µm, D3: 1.68–2.42 µm, D4: 2.42–3.82 µm, D5: 3.82–4.42 µm, D6: 4.42–5.00 µm) and all 102 spectroscopic channels.
+    - Added endpoint `GET /api/science/spectrum` accepting `ra`, `dec`, optional `collection`, `fov`.
+    - Computes point-source circular aperture photometry across available observations, fits physical continuum profiles, classifies targets (Cold Brown Dwarfs, M-Dwarfs, Infrared Excesses), and synthesizes 102 channel values with error bounds.
+    - Built `SpectrumChart.tsx` integrated into `MetadataPanel.tsx` telemetry dock tabs (switchable between "Infrared SED (102 Bands)" and "Light Curve"), with interactive band tooltips, 102 channel inspection toggle, and physical diagnostic pills.
+  - **Astronomical Image Co-Addition & Stacking (Add vs. Subtract Modes):**
+    - Created `backend/app/science/stacking.py` implementing `compute_coadd_stack` with `reproject_interp` celestial WCS registration and FFT shift fallback.
+    - Added endpoint `POST /api/frames/stack` supporting `mean`, `median`, and `sum` methods with output contrast stretching and PNG/WebP formatting.
+    - Calculates empirical background noise suppression, SNR improvement factor, and theoretical $\sim\sqrt{N}$ SNR gain badge (+41.4% gain for $N=2$).
+    - Integrated into `ComparisonView.tsx` with a dual-mode operation switcher: "Difference ($I_2 - I_1$)" (reveals moving sources/dipoles and transients) vs "Co-Add Stack ($I_1 + I_2$)" (reveals faint static infrared sources and brown dwarfs).
+  - **Testing & Verification:**
+    - Created `backend/tests/test_stacking_and_spectrum.py` adding 12 automated unit and integration tests for stacking methods, outlier rejection, NaN handling, WCS reprojection, 102 channels, sexagesimal coordinate queries, and format options.
+    - All 64 backend tests pass in 5.28s (`python -m pytest -v`).
+    - Frontend compiles cleanly with `npm run build` in 2.24s (0 errors, 0 warnings).
 
 ## 2. Current Working State
-- **Backend:** Starts cleanly with `python -m uvicorn app.main:app --port 8000`. All 52 tests pass in 2.48s.
-- **Frontend:** Builds cleanly with `npm run build` in 2.08s (0 type errors, 0 warnings).
-- **Demo Mode:** Instantaneous local caching of 22 real FITS cutouts enables immediate offline presentation and judging with circuit breaker fallback on remote outages.
+- **Backend:** Starts cleanly with `python -m uvicorn app.main:app --port 8000`. All 64 tests pass.
+- **Frontend:** Builds cleanly with `npm run build` in 2.24s (0 type errors, 0 warnings).
+- **Demo Mode:** Local caching of 22 verified FITS cutouts enables immediate offline presentation and judging with circuit breaker fallback on remote outages.
 
 ## 3. Current Blocker
 - None. System is complete, verified end-to-end, and resilient.
@@ -24,7 +33,7 @@ python scripts/verify_environment.py
 # 2. Demonstration Assets Verification
 python scripts/verify_demo.py
 
-# 3. Backend Test Suite (52 tests)
+# 3. Backend Test Suite (64 tests)
 cd backend
 python -m pytest -v
 

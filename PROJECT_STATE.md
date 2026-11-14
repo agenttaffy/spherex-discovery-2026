@@ -1,11 +1,24 @@
 # SPHEREx Discovery — Project State
 
-**Last Updated:** 2026-11-14T17:35:00Z  
-**Current Implementation Stage:** Phase 4 Complete (Recommended Architecture Enhancements: Aladin Lite v3 Sky Context, Astropy/Reproject Celestial Grid Alignment, WebP High-Efficiency Output, PyVO & Astroquery Data Retrieval Dependencies, Shadcn/UI-inspired Glassmorphic Controls, 48 Passing Pytest Tests).
+**Last Updated:** 2026-11-14T18:05:00Z  
+**Current Implementation Stage:** Phase 5 Complete (On-The-Fly Spectra Generation SED: Flux vs. Wavelength $\lambda$ across 6 Detector Arrays & 102 Channels, Astronomical Image Co-Addition & Stacking with $\sim\sqrt{N}$ SNR Improvement, Operation Mode Switcher in ComparisonView, 64 Passing Pytest Tests, Clean Production Build).
 
 ---
 
 ## 1. Verified Working Features
+- **On-The-Fly Spectra Generation (`/api/science/spectrum`, `spectrum.py`, `SpectrumChart.tsx`):**
+  - Instantaneous calibrated Spectral Energy Distribution (SED: Flux vs. Wavelength $\lambda$) from 0.75 µm to 5.00 µm.
+  - Queries and aggregates multi-epoch circular aperture photometry across all 6 SPHEREx detector arrays (D1: 0.75–1.12 µm, D2: 1.12–1.68 µm, D3: 1.68–2.42 µm, D4: 2.42–3.82 µm, D5: 3.82–4.42 µm, D6: 4.42–5.00 µm).
+  - Synthesizes all 102 individual spectroscopic channels (17 channels per detector array) with color-coded band visualization.
+  - Interactive SVG plotting with detector band boundary shading, photometric error bars, and smooth continuum curves.
+  - Physical spectral classification engine detecting Cold Sub-stellar Brown Dwarfs (peaking in D5/D6, e.g. WISE 0855), Cool Stellar Atmospheres (M-Dwarfs, e.g. Barnard's Star), and Infrared Excesses (circumstellar dust disks, e.g. RW Aurigae).
+  - Telemetry dock tab switcher in `MetadataPanel.tsx` toggling between "Infrared SED (102 Bands)" and "Light Curve".
+- **Astronomical Image Co-Addition & Stacking (`/api/frames/stack`, `stacking.py`, `ComparisonView.tsx`):**
+  - Multi-frame image stacking across observation epochs or detector arrays on a shared celestial grid.
+  - Supports `mean` (maximum SNR), `median` (outlier & cosmic ray rejection), and `sum` (total flux integration) stacking methods.
+  - Aligns frames using `reproject_interp` celestial WCS reprojection with sub-pixel 2D FFT shift fallback.
+  - Automatically calculates single-frame vs stacked background noise ($\sigma_{ref}$, $\sigma_{stack}$), empirical SNR improvement factor, and theoretical $\sim\sqrt{N}$ SNR gain badge (+41.4% for 2 frames).
+  - Operation mode switcher in `ComparisonView.tsx`: "Difference ($I_2 - I_1$)" (reveals moving sources, dipoles, and transients) vs "Co-Add Stack ($I_1 + I_2$)" (reveals faint static infrared sources, brown dwarfs, and deep background galaxies).
 - **Aladin Lite v3 Sky Context Integration (`AladinViewer.tsx` & `CanvasViewer.tsx`):**
   - Seamless pill tab toggle between "SPHEREx Analysis Canvas" and "Aladin Lite Sky Context".
   - Embedded Aladin Lite v3 (HiPS WebGL) with dynamic CDN loading and official CDS API compatibility.
@@ -22,12 +35,10 @@
   - Added `render_image_to_base64` supporting `format: Literal["png", "webp"] = "png"`.
   - Smaller payload footprints for rapid multi-epoch timeline scrubbing and Blink comparator playback.
   - Query parameter support (`/api/frames/{id}?format=webp`) and diff body formatting (`format: "webp"`).
-- **Data Retrieval Dependencies (`backend/requirements.txt`):**
-  - Installed and verified `reproject>=0.13.0`, `pyvo>=1.5.0`, and `astroquery>=0.4.7`.
-- **NASA/IPAC IRSA SIA2 Client:** Live programmatic queries against `spherex_dr1` and `spherex_qr3` collections with resilient fallback.
-- **Offline / Low-Latency Resilience:** Automatically uses verified demonstration observations from `data/manifests/demo_dataset.json` when IRSA times out, returns HTTP 502/503, or is unreachable, guaranteeing flawless judge demonstrations.
-- **NASA/IPAC IRSA IBE Cutout Pipeline:** Live sub-array slicing using `?center=<ra>,<dec>&size=<deg>`, downloading ~4 MB FITS cutouts instead of 70 MB full frames.
-- **Multi-Extension FITS Parser:** Astropy-based extraction of `IMAGE` (MJy/sr), `FLAGS` (int32 bitmask), `VARIANCE`, and celestial `WCS`.
+- **NASA/IPAC IRSA SIA2 Client & Resilient Offline Demo Architecture:**
+  - Live programmatic queries against `spherex_dr1` and `spherex_qr3` collections.
+  - 22 verified demonstration cutouts cached locally in `data/cache/` covering all 5 official competition targets across DR1 and QR3.
+  - Automatic circuit breaker fallback on remote archive latency or HTTP 502/503.
 - **Display-Only Contrast Scaling:** `asinh` (arcsinh), `zscale`, and `linear` stretching engines with grayscale and `inferno` colormaps.
 - **Differential Image Engine:**
   - Robust against non-finite values (NaN/Inf) with finite stats calculation and mid-gray (128) baseline for missing pixels.
@@ -48,27 +59,24 @@
   - "Share URL" button with instant clipboard feedback.
 - **Exportable Scientific Discovery Reports (`/api/science/report`, `DiscoveryReportModal.tsx`):**
   - Formatted J2000 sexagesimal target reports with astrometric vectors, light curve stats, and verified IRSA DOI 10.26131/IRSA678 citations.
-  - One-click download as Markdown (.md) or JSON (.json).
 - **Guided Educational Tour Modal (`GuidedTourModal.tsx`):**
   - 4-step interactive walkthrough explaining SPHEREx LVF optics, dipole vs monopole signatures, official targets, and judging criteria alignment.
-- **22 Verified Demonstration Cutouts:** Cached locally in `data/cache/` covering all 5 official competition targets across DR1 and QR3.
-- **CI/CD & Multi-Container Cloud Deployment:**
-  - `.github/workflows/ci.yml` running pytest and frontend build.
-  - Docker configurations (`backend/Dockerfile`, `frontend/Dockerfile`, `docker-compose.yml`, `frontend/nginx.conf`).
-  - Cloud configurations (`render.yaml`, `frontend/vercel.json`).
-- **Comprehensive Automated Test Suite:** 52 passing pytest tests covering unit, science, 3D WCS reprojection, rotated WCS alignment, WebP, offline resilience, and integration flows.
+- **Comprehensive Automated Test Suite:** 64 passing pytest tests covering unit, science, 3D WCS reprojection, rotated WCS alignment, WebP, co-addition/stacking, 102-channel SED, offline resilience, and integration flows.
 
 ---
 
 ## 2. Architecture Summary
 - **Backend:** FastAPI (Python 3.11) with Astropy, Reproject, NumPy, SciPy, Pillow, Astroquery, PyVO.
-- **Endpoints:** `/api/health`, `/api/observations`, `/api/frames/{id}`, `/api/frames/diff`, `/api/demo`, `/api/demo/manifest`, `/api/science/catalogs`, `/api/science/photometry`, `/api/science/motion`, `/api/science/report`.
-- **Frontend:** Next.js / Vite + React 18 + TypeScript + Tailwind CSS + shadcn/ui-inspired styling.
-- **Viewers:** Dual-mode astronomical viewer: Interactive HTML5 Canvas (sub-pixel analysis) + Aladin Lite v3 (HiPS full-sky context).
+- **Endpoints:** `/api/health`, `/api/observations`, `/api/frames/{id}`, `/api/frames/diff`, `/api/frames/stack`, `/api/demo`, `/api/demo/manifest`, `/api/science/catalogs`, `/api/science/photometry`, `/api/science/spectrum`, `/api/science/motion`, `/api/science/report`.
+- **Frontend:** Vite + React 18 + TypeScript + Tailwind CSS + Lucide Icons + Canvas + SVG.
+- **Viewers:**
+  - Canvas Viewer (sub-pixel photometric & astrometric inspection).
+  - Aladin Lite v3 (HiPS full-sky context).
+  - Comparison View (Difference $I_2 - I_1$ vs Co-Add Stack $I_1 + I_2$).
 - **Data:** Direct NASA IRSA SIA2/IBE protocols with disk-backed cache in `data/cache/` and manifest in `data/manifests/`.
 
 ---
 
 ## 3. Latest Build & Test Status
-- **Backend pytest:** 52 passed in 2.48s (0 failures).
-- **Frontend build:** `npm run build` succeeded in 2.08s (0 type errors, 0 warnings).
+- **Backend pytest:** 64 passed in 5.28s (0 failures).
+- **Frontend build:** `npm run build` succeeded in 2.24s (0 type errors, 0 warnings).

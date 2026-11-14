@@ -10,6 +10,7 @@ from app.science.fits_processing import load_fits_cutout, extract_primary_image
 from app.science.motion import measure_astrometric_motion
 from app.science.photometry import build_lightcurve_series
 from app.science.report import generate_discovery_report
+from app.science.spectrum import generate_spectrum_for_target
 
 router = APIRouter()
 
@@ -130,6 +131,66 @@ async def get_photometry(
     series = build_lightcurve_series(epoch_frames)
     series["target"] = {"ra": ra_deg, "dec": dec_deg}
     return series
+
+@router.get("/science/spectrum")
+async def get_spectrum(
+    ra: str = Query(..., description="Right Ascension in decimal degrees or sexagesimal"),
+    dec: str = Query(..., description="Declination in decimal degrees or sexagesimal"),
+    collection: Optional[str] = Query(None, description="SPHEREx collection (or None/ALL for all surveys)"),
+    fov: float = Query(0.04, description="Cutout radius in degrees"),
+):
+    """
+    Computes on-the-fly calibrated Spectral Energy Distribution (SED: Flux vs. Wavelength)
+    across the 6 SPHEREx detector arrays (0.75 - 5.00 µm) and all 102 spectroscopic channels.
+    """
+    try:
+        ra_deg, dec_deg = parse_coordinates(ra, dec)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    coll_filter = None if (not collection or collection.lower() in ("all", "none")) else collection
+
+    observations = await irsa_client.query_observations(
+        ra=ra_deg,
+        dec=dec_deg,
+        radius_deg=max(fov, 0.08),
+        collection=coll_filter,
+        limit=50,
+    )
+
+    if not observations and coll_filter is not None:
+        observations = await irsa_client.query_observations(
+            ra=ra_deg,
+            dec=dec_deg,
+            radius_deg=max(fov, 0.08),
+            collection=None,
+            limit=50,
+        )
+
+    # Preload cutouts for observations if accessible
+    for obs in observations:
+        reg_item = OBSERVATION_REGISTRY.get(obs.id)
+        has_cached = False
+        if reg_item and "cached_cutout_url" in reg_item:
+            from app.services.cache_service import cache_service
+            has_cached = cache_service.get(reg_item["cached_cutout_url"]) is not None
+        if not has_cached and obs.access_url:
+            from app.services.demo_service import demo_service
+            has_cached = demo_service.get_cached_cutout_for_url(obs.access_url) is not None
+        if not has_cached and obs.access_url:
+            try:
+                await cutout_service.fetch_cutout_fits(obs.access_url, obs.ra, obs.dec, fov_deg=fov)
+            except Exception:
+                pass
+
+    spectrum = generate_spectrum_for_target(
+        ra=ra_deg,
+        dec=dec_deg,
+        observations=observations,
+        cutout_fetcher=cutout_service,
+        fov_deg=fov,
+    )
+    return spectrum
 
 @router.post("/science/motion")
 async def compute_astrometric_motion(req: MotionRequest = Body(...)):
