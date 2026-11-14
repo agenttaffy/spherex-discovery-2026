@@ -142,7 +142,7 @@ class CutoutService:
 
         # Parse FITS
         hdul = load_fits_cutout(fits_bytes)
-        img_array, header = extract_primary_image(hdul)
+        img_array, header = extract_primary_image(hdul, preserve_nan=True)
         wcs_dict = extract_wcs_info(header)
         flags_dict = evaluate_quality_flags(hdul)
         stats_dict = calculate_pixel_stats(img_array)

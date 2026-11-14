@@ -598,3 +598,225 @@ def test_priority_1_lightcurve_source_mask_background_exclusion():
     assert pts[1]["snr"] > pts[0]["snr"]
     assert pts[1]["net_flux_mjy_sr"] > 0.0
 
+
+def test_audit_photometry_target_wcs_failure_returns_unavailable():
+    """
+    Scientific Truthfulness Audit Pass 1:
+    When target_coord is supplied but WCS projection fails/returns non-finite,
+    compute_aperture_photometry must return unavailable/invalid measurement with a clear reason,
+    NEVER silently substitute the image center or brightest peak.
+    """
+    # Image with bright source at image center (10, 10)
+    img = np.ones((21, 21), dtype=np.float32) * 2.0
+    img[10, 10] = 500.0  # Bright center source
+
+    # Case A: target_coord supplied with no WCS
+    phot_no_wcs = compute_aperture_photometry(
+        image=img,
+        target_coord=(120.5, 45.0),
+        wcs=None,
+    )
+    assert phot_no_wcs["status"] == "unavailable"
+    assert phot_no_wcs["valid"] is False
+    assert phot_no_wcs["net_flux"] is None
+    assert "could not be projected" in phot_no_wcs["reason"]
+
+    # Case B: target_coord supplied with non-finite / failing projection
+    bad_hdr = fits.Header()
+    bad_hdr["CRVAL1"] = 0.0
+    bad_hdr["CRVAL2"] = 0.0
+    bad_hdr["CRPIX1"] = 10.0
+    bad_hdr["CRPIX2"] = 10.0
+    # Missing CDELT/CTYPE so world_to_pixel fails
+    phot_bad_wcs = compute_aperture_photometry(
+        image=img,
+        target_coord=(180.0, 90.0),
+        wcs=bad_hdr,
+    )
+    assert phot_bad_wcs["status"] == "unavailable"
+    assert phot_bad_wcs["valid"] is False
+    assert phot_bad_wcs["net_flux"] is None
+
+    # Case C: build_lightcurve_series surfaces unavailable state
+    frame_fail = {
+        "obs_id": "OBS_FAIL",
+        "mjd": 60500.0,
+        "detector": "SPHEREx-D1",
+        "image": img,
+        "wcs": None,
+    }
+    lc = build_lightcurve_series([frame_fail], target_ra=120.5, target_dec=45.0)
+    assert len(lc["points"]) == 1
+    pt = lc["points"][0]
+    assert pt["status"] == "unavailable"
+    assert pt["valid"] is False
+    assert pt["net_flux_mjy_sr"] is None
+    # Center bright source (500 MJy) must NOT contaminate the lightcurve mean flux
+    assert lc["mean_flux_mjy_sr"] == 0.0
+
+
+def test_audit_fits_processing_wavelength_and_mask_semantics():
+    """
+    Scientific Truthfulness Audit Pass 2:
+    - extract_calibrated_wavelength returns unavailable (None) when target_coord fails projection,
+      and only evaluates center when target_coord is explicitly None.
+    - extract_fatal_quality_mask preserves an explicit unknown/missing quality state (None)
+      when mask metadata (MSKN cards) are absent, unless allow_legacy_synthetic=True.
+    """
+    from app.science.fits_processing import extract_calibrated_wavelength, extract_fatal_quality_mask
+
+    # 1. WCS-WAVE tabular HDU
+    x_col = fits.Column(name="X", format="9J", dim="(9)", array=np.array([[1, 256, 511, 766, 1021, 1275, 1530, 1785, 2040]]))
+    y_col = fits.Column(name="Y", format="9J", dim="(9)", array=np.array([[1, 256, 511, 766, 1021, 1275, 1530, 1785, 2040]]))
+    vals = np.zeros((1, 9, 9, 2), dtype=np.float32)
+    vals[0, :, :, 0] = 3.12
+    vals[0, :, :, 1] = 0.02
+    v_col = fits.Column(name="VALUES", format="162E", dim="(2,9,9)", array=vals)
+    wave_hdu = fits.BinTableHDU.from_columns([x_col, y_col, v_col], name="WCS-WAVE")
+
+    img_hdr = fits.Header()
+    img_hdr["NAXIS1"] = 20
+    img_hdr["NAXIS2"] = 20
+    img_hdu = fits.ImageHDU(data=np.ones((20, 20), dtype=np.float32), header=img_hdr, name="IMAGE")
+    hdul = fits.HDUList([fits.PrimaryHDU(), img_hdu, wave_hdu])
+
+    # Target coord requested without celestial WCS projection capability -> returns None (unavailable)
+    wave_target_fail = extract_calibrated_wavelength(hdul, target_coord=(100.0, 20.0))
+    assert wave_target_fail is None
+
+    # Target coord explicitly None -> measures center
+    wave_center = extract_calibrated_wavelength(hdul, target_coord=None)
+    assert wave_center is not None
+    assert wave_center["wavelength_um"] == pytest.approx(3.12, rel=1e-3)
+
+    # 2. FLAGS extension with missing mask metadata
+    flags_data = np.array([[1, 2], [4, 8]], dtype=np.int32)
+    flags_hdr = fits.Header()  # No MSKN cards!
+    flags_hdu = fits.ImageHDU(data=flags_data, header=flags_hdr, name="FLAGS")
+    hdul_flags = fits.HDUList([fits.PrimaryHDU(), img_hdu, flags_hdu])
+
+    # Default call must preserve explicit unknown/missing quality state (None)
+    mask_default = extract_fatal_quality_mask(hdul_flags)
+    assert mask_default is None
+
+    # Fixture-only explicit call allows legacy synthetic bits
+    mask_synthetic = extract_fatal_quality_mask(hdul_flags, allow_legacy_synthetic=True)
+    assert mask_synthetic is not None
+    assert np.all(mask_synthetic)
+
+
+def test_audit_spectrum_truthfulness_and_documented_bb_fit():
+    """
+    Scientific Truthfulness Audit Pass 3:
+    Remove unsupported physical claims (e.g. hardcoded 260K, 3150K temperatures or preset identity heuristics).
+    Return documented blackbody fit with inputs, uncertainty, and limitations when >= 2 bands exist,
+    or None when < 2 bands exist. 102 channels must be labeled as illustrative estimated continuum.
+    """
+    from app.science.spectrum import fit_blackbody_continuum, generate_spectrum_for_target
+
+    # 1. Fit with insufficient bands (< 2)
+    fit_single = fit_blackbody_continuum([
+        {"detector": "SPHEREx-D1", "wavelength_um": 0.935, "flux_mjy_sr": 10.0, "flux_err_mjy_sr": 0.5}
+    ])
+    assert fit_single["status"] == "unavailable"
+    assert fit_single["temperature_k"] is None
+    assert "minimum of 2 observed detector bands" in fit_single["limitations"]
+
+    # 2. Fit with 2 observed bands (e.g. cool star rising at ~1.5 - 2.5 um)
+    fit_two = fit_blackbody_continuum([
+        {"detector": "SPHEREx-D1", "wavelength_um": 0.935, "flux_mjy_sr": 5.0, "flux_err_mjy_sr": 0.2},
+        {"detector": "SPHEREx-D3", "wavelength_um": 2.050, "flux_mjy_sr": 15.0, "flux_err_mjy_sr": 0.5},
+    ])
+    assert fit_two["status"] == "converged"
+    assert fit_two["temperature_k"] is not None
+    assert fit_two["reduced_chi2"] is not None
+    assert len(fit_two["inputs"]) == 2
+    assert "Broadband continuum approximation" in fit_two["limitations"]
+
+    # 3. generate_spectrum_for_target at arbitrary coordinates
+    spec = generate_spectrum_for_target(ra=150.0, dec=20.0, observations=[], cutout_fetcher=None)
+    # When no observations, temperature must be None (no unbacked claims!)
+    assert spec["summary"]["estimated_temperature_k"] is None
+    # Channels 102 must be labeled as illustrative estimated continuum
+    for ch in spec["channels_102"]:
+        assert ch["is_interpolated"] is True
+        assert ch["is_observed"] is False
+        assert "Estimated Continuum Model (Interpolated)" in ch["model_label"]
+        assert "Never Observed Resolution" in ch["model_label"]
+
+
+def test_audit_stacking_snr_improvement_uncensored():
+    """
+    Scientific Truthfulness Audit Pass 4:
+    Empirical snr_improvement_factor must NOT be clamped to an arbitrary interval around sqrt(N).
+    The actual uncensored estimator or unavailable must be reported, with theoretical sqrt(N) separate.
+    """
+    # Case A: Two identical frames co-added with mean.
+    # Noise does not reduce when identical frames are averaged; measured gain is 1.0!
+    np.random.seed(99)
+    noise = np.random.normal(0, 1.0, (30, 30)).astype(np.float32)
+    stacked_ident, stats_ident = compute_coadd_stack([noise, noise.copy()], method="mean")
+    assert stats_ident["snr_improvement_factor"] == pytest.approx(1.0, rel=0.05)
+    assert stats_ident["snr_gain_status"] == "measured"
+    assert stats_ident["theoretical_snr_gain"] == pytest.approx(1.414, rel=1e-2)
+    assert stats_ident["theoretical_gain_model"] == "sqrt(N) ideal Gaussian noise reduction"
+
+    # Case B: Two independent noise frames with an aligned source co-added with mean.
+    noise1 = np.random.normal(0, 1.0, (50, 50)).astype(np.float32)
+    noise2 = np.random.normal(0, 1.0, (50, 50)).astype(np.float32)
+    noise1[25, 25] += 50.0
+    noise2[25, 25] += 50.0
+    stacked_indep, stats_indep = compute_coadd_stack([noise1, noise2], method="mean")
+    assert stats_indep["snr_improvement_factor"] == pytest.approx(1.414, rel=0.10)
+    assert stats_indep["theoretical_snr_gain"] == pytest.approx(1.414, rel=1e-2)
+
+
+def test_audit_nan_inf_preserved_as_masks_not_fabricated():
+    """
+    Scientific Truthfulness Audit Pass 5:
+    Preserve invalid pixels (NaN/Inf) as masks; do NOT let fabricated fill values enter
+    photometry, comparisons, stacks, spectra, or motion.
+    """
+    from app.science.fits_processing import extract_primary_image
+    from app.science.motion import _find_brightest_centroid, _find_local_centroid
+
+    # 1. extract_primary_image preserves NaNs in preserve_nan mode
+    pri = fits.PrimaryHDU()
+    img_data = np.array([[1.0, np.nan], [np.inf, 4.0]], dtype=np.float32)
+    img_hdu = fits.ImageHDU(data=img_data, name="IMAGE")
+    hdul = fits.HDUList([pri, img_hdu])
+
+    data_sci, _ = extract_primary_image(hdul, preserve_nan=True)
+    assert np.isnan(data_sci[0, 1])
+    assert np.isnan(data_sci[1, 0])  # inf converted to nan mask, not fabricated min_finite!
+
+    # 2. Stacking preserves NaNs as masks and does not overwrite with background median
+    f1 = np.ones((10, 10), dtype=np.float32) * 2.0
+    f1[2, 2] = np.nan
+    f2 = np.ones((10, 10), dtype=np.float32) * 2.0
+    f2[2, 2] = np.nan
+
+    stacked, stats = compute_coadd_stack([f1, f2], method="mean")
+    # Pixel (2, 2) was invalid in all frames -> must remain NaN, not replaced with bg_fill!
+    assert np.isnan(stacked[2, 2])
+
+    # 3. Motion centroiding: NaNs/Infs are never selected as brightest peak
+    arr_with_nan = np.ones((20, 20), dtype=np.float32) * 1.0
+    arr_with_nan[10, 10] = 50.0  # Real peak
+    arr_with_nan[0, 0] = np.nan
+    arr_with_nan[0, 1] = np.inf
+
+    cen = _find_brightest_centroid(arr_with_nan)
+    assert cen is not None
+    y_c, x_c, _ = cen
+    assert abs(y_c - 10.0) < 0.5
+    assert abs(x_c - 10.0) < 0.5
+
+    # 4. Photometry: input image is not mutated
+    clean_copy = f1.copy()
+    phot = compute_aperture_photometry(f1, center_y=5.0, center_x=5.0)
+    assert phot["valid"] is True
+    # Verify original array unchanged
+    assert np.isnan(f1[2, 2])
+
+

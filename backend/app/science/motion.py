@@ -8,36 +8,39 @@ NOMINAL_PIXEL_SCALE_ARCSEC = 6.2
 def _find_brightest_centroid(img: np.ndarray) -> Optional[Tuple[float, float, float]]:
     """
     Locates sub-pixel centroid (y, x) of the brightest peak in the image.
-    Returns (y_cen, x_cen, peak_snr) or None if flat.
+    Returns (y_cen, x_cen, peak_snr) or None if flat or non-finite.
+    Preserves invalid pixels as masks; does not substitute fabricated fill values.
     """
     finite_mask = np.isfinite(img)
     if not np.any(finite_mask):
         return None
     
-    clean_img = img.copy()
-    bg_median = float(np.median(clean_img[finite_mask]))
-    bg_std = float(np.std(clean_img[finite_mask]))
+    bg_median = float(np.median(img[finite_mask]))
+    bg_std = float(np.std(img[finite_mask]))
     if bg_std < 1e-6:
         bg_std = 1.0
 
-    clean_img[~finite_mask] = bg_median
-    
-    # 3x3 max filter or argmax
-    y_max, x_max = np.unravel_index(np.argmax(clean_img), clean_img.shape)
-    peak_val = float(clean_img[y_max, x_max])
+    # Mask non-finite pixels with -infinity during peak location
+    masked_for_peak = np.where(finite_mask, img, -np.inf)
+    y_max, x_max = np.unravel_index(np.argmax(masked_for_peak), img.shape)
+    if not finite_mask[y_max, x_max]:
+        return None
+
+    peak_val = float(img[y_max, x_max])
     snr = (peak_val - bg_median) / bg_std
 
     if snr < 2.5:
         return None
 
-    # Local 5x5 window centroid around peak
-    h, w = clean_img.shape
+    # Local 5x5 window centroid around peak (mask invalid pixels to zero excess flux)
+    h, w = img.shape
     y_min, y_high = max(0, y_max - 2), min(h, y_max + 3)
     x_min, x_high = max(0, x_max - 2), min(w, x_max + 3)
 
-    sub = clean_img[y_min:y_high, x_min:x_high] - bg_median
-    sub = np.maximum(sub, 0.0)
-    total_flux = np.sum(sub)
+    patch_mask = finite_mask[y_min:y_high, x_min:x_high]
+    patch_vals = img[y_min:y_high, x_min:x_high]
+    sub = np.where(patch_mask, np.maximum(patch_vals - bg_median, 0.0), 0.0)
+    total_flux = float(np.sum(sub))
     if total_flux <= 0:
         return float(y_max), float(x_max), snr
 
@@ -56,19 +59,18 @@ def _find_local_centroid(
     """
     Locates sub-pixel centroid (y, x) in a local neighborhood centered around an expected
     celestial position (expected_y, expected_x). Prevents wandering off to an unrelated brighter star.
+    Preserves invalid pixels as masks; does not substitute fabricated fill values.
     """
     finite_mask = np.isfinite(img)
     if not np.any(finite_mask):
         return None
 
-    clean_img = img.copy()
-    bg_median = float(np.median(clean_img[finite_mask]))
-    bg_std = float(np.std(clean_img[finite_mask]))
+    bg_median = float(np.median(img[finite_mask]))
+    bg_std = float(np.std(img[finite_mask]))
     if bg_std < 1e-6:
         bg_std = 1.0
-    clean_img[~finite_mask] = bg_median
 
-    h, w = clean_img.shape
+    h, w = img.shape
     int_y = int(round(expected_y))
     int_x = int(round(expected_x))
 
@@ -78,24 +80,36 @@ def _find_local_centroid(
     y_min, y_high = max(0, int_y - search_radius), min(h, int_y + search_radius + 1)
     x_min, x_high = max(0, int_x - search_radius), min(w, int_x + search_radius + 1)
 
-    local_patch = clean_img[y_min:y_high, x_min:x_high]
-    if local_patch.size == 0:
+    local_patch = img[y_min:y_high, x_min:x_high]
+    local_mask = finite_mask[y_min:y_high, x_min:x_high]
+    if local_patch.size == 0 or not np.any(local_mask):
         return None
 
-    loc_y_max, loc_x_max = np.unravel_index(np.argmax(local_patch), local_patch.shape)
+    masked_patch = np.where(local_mask, local_patch, -np.inf)
+    loc_y_max, loc_x_max = np.unravel_index(np.argmax(masked_patch), local_patch.shape)
+    if not local_mask[loc_y_max, loc_x_max]:
+        return None
+
     peak_y = y_min + loc_y_max
     peak_x = x_min + loc_x_max
-    peak_val = float(clean_img[peak_y, peak_x])
+    peak_val = float(img[peak_y, peak_x])
     snr = (peak_val - bg_median) / bg_std
 
     # Sub-pixel center of mass in 5x5 box around local peak
     box_y_min, box_y_max = max(0, peak_y - 2), min(h, peak_y + 3)
     box_x_min, box_x_max = max(0, peak_x - 2), min(w, peak_x + 3)
-    sub = clean_img[box_y_min:box_y_max, box_x_min:box_x_max] - bg_median
-    sub = np.maximum(sub, 0.0)
-    total_flux = np.sum(sub)
+    box_mask = finite_mask[box_y_min:box_y_max, box_x_min:box_x_max]
+    box_vals = img[box_y_min:box_y_max, box_x_min:box_x_max]
+    sub = np.where(box_mask, np.maximum(box_vals - bg_median, 0.0), 0.0)
+    total_flux = float(np.sum(sub))
     if total_flux <= 0:
         return float(peak_y), float(peak_x), snr
+
+    yy, xx = np.indices(sub.shape)
+    cen_y = box_y_min + np.sum(yy * sub) / total_flux
+    cen_x = box_x_min + np.sum(xx * sub) / total_flux
+
+    return float(cen_y), float(cen_x), snr
 
     yy, xx = np.indices(sub.shape)
     cen_y = box_y_min + np.sum(yy * sub) / total_flux

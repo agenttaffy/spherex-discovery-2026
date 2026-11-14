@@ -125,7 +125,7 @@ async def get_photometry(
         if b:
             try:
                 hd = load_fits_cutout(b)
-                img, hdr = extract_primary_image(hd)
+                img, hdr = extract_primary_image(hd, preserve_nan=True)
                 from app.science.fits_processing import (
                     extract_variance_data,
                     extract_fatal_quality_mask,
@@ -247,8 +247,8 @@ async def compute_astrometric_motion(req: MotionRequest = Body(...)):
     if not b2:
         b2 = await cutout_service.fetch_cutout_fits(meta2["access_url"], meta2["ra"], meta2["dec"])
 
-    i1, h1 = extract_primary_image(load_fits_cutout(b1))
-    i2, h2 = extract_primary_image(load_fits_cutout(b2))
+    i1, h1 = extract_primary_image(load_fits_cutout(b1), preserve_nan=True)
+    i2, h2 = extract_primary_image(load_fits_cutout(b2), preserve_nan=True)
 
     tgt_coord = None
     if req.target_ra is not None and req.target_dec is not None:

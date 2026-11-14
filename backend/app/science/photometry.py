@@ -28,40 +28,57 @@ def compute_aperture_photometry(
     h, w = image.shape
 
     # 1. Coordinate transformation from celestial (RA, Dec) via WCS if provided
-    if target_coord is not None and wcs is not None:
-        try:
-            from app.science.fits_processing import extract_astropy_wcs
-            w_obj = wcs if isinstance(wcs, WCS) else extract_astropy_wcs(wcs)
-            if w_obj is not None:
-                from astropy.coordinates import SkyCoord
-                import astropy.units as u
-                sc = SkyCoord(target_coord[0] * u.deg, target_coord[1] * u.deg, frame="icrs")
-                px, py = w_obj.world_to_pixel(sc)
-                if np.isfinite(px) and np.isfinite(py):
-                    center_x, center_y = float(px), float(py)
-        except Exception:
+    if target_coord is not None:
+        target_projected = False
+        if wcs is not None:
             try:
-                px, py = w_obj.all_world2pix(target_coord[0], target_coord[1], 0)
-                if np.isfinite(px) and np.isfinite(py):
-                    center_x, center_y = float(px), float(py)
+                from app.science.fits_processing import extract_astropy_wcs
+                w_obj = wcs if isinstance(wcs, WCS) else extract_astropy_wcs(wcs)
+                if w_obj is not None:
+                    from astropy.coordinates import SkyCoord
+                    import astropy.units as u
+                    sc = SkyCoord(target_coord[0] * u.deg, target_coord[1] * u.deg, frame="icrs")
+                    px, py = w_obj.world_to_pixel(sc)
+                    if np.isfinite(px) and np.isfinite(py):
+                        center_x, center_y = float(px), float(py)
+                        target_projected = True
             except Exception:
-                pass
+                try:
+                    px, py = w_obj.all_world2pix(target_coord[0], target_coord[1], 0)
+                    if np.isfinite(px) and np.isfinite(py):
+                        center_x, center_y = float(px), float(py)
+                        target_projected = True
+                except Exception:
+                    pass
 
-    if center_y is None or center_x is None:
-        if target_coord is not None:
-            # Celestial target was requested but WCS failed to project to valid pixels;
-            # remain at frame center without wandering off to arbitrary brightest field stars
+        if not target_projected or center_x is None or center_y is None or not np.isfinite(center_x) or not np.isfinite(center_y):
+            # Target coordinates were provided but WCS projection failed or returned non-finite coordinates.
+            # Never silently measure image center or substitute brightest source.
+            return {
+                "status": "unavailable",
+                "valid": False,
+                "reason": "Target coordinates could not be projected via WCS (missing WCS or non-finite projection)",
+                "aperture_flux_sum": None,
+                "aperture_mean": None,
+                "background_median": None,
+                "background_std": None,
+                "net_flux": None,
+                "flux_err": None,
+                "peak_flux": None,
+                "snr": None,
+                "coverage_fraction": 0.0,
+                "aperture_area_pixels": 0,
+                "valid_pixel_count": 0,
+            }
+    elif center_y is None or center_x is None:
+        # Blind peak-seeking only when NO target coordinates were specified
+        from app.science.motion import _find_brightest_centroid
+        cen = _find_brightest_centroid(image)
+        if cen is not None:
+            center_y, center_x, _ = cen
+        else:
             center_y = (h - 1) / 2.0
             center_x = (w - 1) / 2.0
-        else:
-            # Blind peak-seeking only when no target coordinates were specified
-            from app.science.motion import _find_brightest_centroid
-            cen = _find_brightest_centroid(image)
-            if cen is not None:
-                center_y, center_x, _ = cen
-            else:
-                center_y = (h - 1) / 2.0
-                center_x = (w - 1) / 2.0
 
     y_indices, x_indices = np.indices((h, w))
     dist_sq = (y_indices - center_y) ** 2 + (x_indices - center_x) ** 2
@@ -74,33 +91,31 @@ def compute_aperture_photometry(
 
     if not np.any(valid_mask):
         return {
-            "aperture_flux_sum": 0.0,
-            "aperture_mean": 0.0,
-            "background_median": 0.0,
-            "background_std": 0.0,
-            "net_flux": 0.0,
-            "flux_err": 0.0,
-            "peak_flux": 0.0,
-            "snr": 0.0,
+            "status": "unavailable",
+            "valid": False,
+            "reason": "No finite, unmasked pixels available in image",
+            "aperture_flux_sum": None,
+            "aperture_mean": None,
+            "background_median": None,
+            "background_std": None,
+            "net_flux": None,
+            "flux_err": None,
+            "peak_flux": None,
+            "snr": None,
             "coverage_fraction": 0.0,
             "aperture_area_pixels": 0,
             "valid_pixel_count": 0,
         }
-
-    # Clean array for safe evaluation
-    clean_img = image.copy()
-    fill_val = float(np.median(image[valid_mask]))
-    clean_img[~valid_mask] = fill_val
 
     # Theoretical full circular aperture area
     r_int = int(np.ceil(aperture_radius))
     dy_grid, dx_grid = np.ogrid[-r_int:r_int+1, -r_int:r_int+1]
     n_geom = int(np.sum(dy_grid**2 + dx_grid**2 <= aperture_radius**2))
 
-    # Aperture mask on image pixels
+    # Aperture mask on image pixels (directly slice image without fabricating fill values)
     geom_ap_mask = dist <= aperture_radius
     ap_mask = geom_ap_mask & valid_mask
-    ap_pixels = clean_img[ap_mask]
+    ap_pixels = image[ap_mask]
     n_ap = int(np.sum(ap_mask))
     coverage_fraction = float(n_ap / max(1, n_geom))
 
@@ -110,58 +125,70 @@ def compute_aperture_photometry(
         pure_bg_mask = ann_mask & (~source_mask)
         if np.any(pure_bg_mask):
             ann_mask = pure_bg_mask
-    ann_pixels = clean_img[ann_mask]
+    ann_pixels = image[ann_mask]
     n_ann = int(np.sum(ann_mask))
 
     if n_ann > 0:
         bg_med = float(np.median(ann_pixels))
         bg_std = float(np.std(ann_pixels))
     else:
-        bg_med = fill_val
-        bg_std = float(np.std(clean_img[valid_mask]))
+        bg_med = float(np.median(image[valid_mask]))
+        bg_std = float(np.std(image[valid_mask]))
 
     if bg_std < 1e-6:
         bg_std = 1.0
 
-    if n_ap > 0:
-        ap_sum = float(np.sum(ap_pixels))
-        ap_mean = float(np.mean(ap_pixels))
-        peak_val = float(np.max(ap_pixels))
-        # Net flux = aperture sum minus background contribution
-        raw_net_flux = float(ap_sum - (bg_med * n_ap))
+    if n_ap == 0:
+        return {
+            "status": "unavailable",
+            "valid": False,
+            "reason": "Target aperture contains zero valid, unmasked pixels within the frame",
+            "aperture_flux_sum": 0.0,
+            "aperture_mean": 0.0,
+            "background_median": round(bg_med, 4),
+            "background_std": round(bg_std, 4),
+            "net_flux": None,
+            "flux_err": None,
+            "peak_flux": None,
+            "snr": None,
+            "coverage_fraction": 0.0,
+            "aperture_area_pixels": n_geom,
+            "valid_pixel_count": 0,
+        }
 
-        # Real Photometric Flux Uncertainty Propagation (sigma_F = sqrt(sum(sigma_i^2)))
-        if variance is not None and variance.shape == image.shape:
-            # Clean variance
-            var_clean = np.where(np.isfinite(variance) & (variance >= 0), variance, 0.0)
-            ap_var_sum = float(np.sum(var_clean[ap_mask]))
-            ann_var_mean = float(np.mean(var_clean[ann_mask])) if n_ann > 0 else (bg_std ** 2)
-            bg_var_contrib = (n_ap ** 2 / max(1, n_ann)) * ann_var_mean
-            raw_flux_err = float(np.sqrt(max(0.0, ap_var_sum + bg_var_contrib)))
-        else:
-            # Poisson + background uncertainty estimate
-            raw_flux_err = float(np.sqrt(n_ap * (bg_std ** 2) + (n_ap ** 2 / max(1, n_ann)) * (bg_std ** 2)))
+    ap_sum = float(np.sum(ap_pixels))
+    ap_mean = float(np.mean(ap_pixels))
+    peak_val = float(np.max(ap_pixels))
+    # Net flux = aperture sum minus background contribution
+    raw_net_flux = float(ap_sum - (bg_med * n_ap))
 
-        # Astronomical aperture boundary clipping correction:
-        # If the target is located near the frame border or has masked pixels within the aperture,
-        # scale the net flux and error by the aperture coverage fraction (1 / f_cov)
-        if coverage_fraction >= 0.15:
-            net_flux = float(raw_net_flux / coverage_fraction)
-            flux_err = float(raw_flux_err / coverage_fraction)
-        else:
-            net_flux = raw_net_flux
-            flux_err = raw_flux_err
-
-        snr = float(net_flux / flux_err) if flux_err > 1e-6 else float((peak_val - bg_med) / bg_std)
+    # Real Photometric Flux Uncertainty Propagation (sigma_F = sqrt(sum(sigma_i^2)))
+    if variance is not None and variance.shape == image.shape:
+        var_clean = np.where(np.isfinite(variance) & (variance >= 0), variance, 0.0)
+        ap_var_sum = float(np.sum(var_clean[ap_mask]))
+        ann_var_mean = float(np.mean(var_clean[ann_mask])) if n_ann > 0 else (bg_std ** 2)
+        bg_var_contrib = (n_ap ** 2 / max(1, n_ann)) * ann_var_mean
+        raw_flux_err = float(np.sqrt(max(0.0, ap_var_sum + bg_var_contrib)))
     else:
-        ap_sum = 0.0
-        ap_mean = 0.0
-        peak_val = 0.0
-        net_flux = 0.0
-        flux_err = 0.0
-        snr = 0.0
+        # Poisson + background uncertainty estimate
+        raw_flux_err = float(np.sqrt(n_ap * (bg_std ** 2) + (n_ap ** 2 / max(1, n_ann)) * (bg_std ** 2)))
+
+    # Astronomical aperture boundary clipping correction:
+    # If the target is located near the frame border or has masked pixels within the aperture,
+    # scale the net flux and error by the aperture coverage fraction (1 / f_cov)
+    if coverage_fraction >= 0.15:
+        net_flux = float(raw_net_flux / coverage_fraction)
+        flux_err = float(raw_flux_err / coverage_fraction)
+    else:
+        net_flux = raw_net_flux
+        flux_err = raw_flux_err
+
+    snr = float(net_flux / flux_err) if flux_err > 1e-6 else float((peak_val - bg_med) / bg_std)
 
     return {
+        "status": "measured",
+        "valid": True,
+        "reason": None,
         "aperture_flux_sum": round(ap_sum, 4),
         "aperture_mean": round(ap_mean, 4),
         "background_median": round(bg_med, 4),
@@ -219,19 +246,27 @@ def build_lightcurve_series(
             "utc_date": item.get("utc_date"),
             "detector": item.get("detector", "SPHEREx"),
             "collection": item.get("collection", "spherex_dr1"),
+            "status": phot.get("status", "measured"),
+            "valid": phot.get("valid", True),
+            "reason": phot.get("reason"),
             "net_flux_mjy_sr": phot["net_flux"],
             "flux_err_mjy_sr": phot["flux_err"],
             "peak_flux_mjy_sr": phot["peak_flux"],
             "aperture_flux_sum": phot["aperture_flux_sum"],
             "background_median": phot["background_median"],
             "snr": phot["snr"],
+            "coverage_fraction": phot.get("coverage_fraction", 0.0),
         })
 
     # Sort chronologically by MJD
     points.sort(key=lambda p: p["mjd"] or 0.0)
 
-    # Overall series statistics
-    net_fluxes = [p["net_flux_mjy_sr"] for p in points if p["net_flux_mjy_sr"] is not None]
+    # Overall series statistics (only include valid measurements with non-None flux)
+    net_fluxes = [
+        p["net_flux_mjy_sr"]
+        for p in points
+        if p.get("valid", True) and p["net_flux_mjy_sr"] is not None
+    ]
     if net_fluxes:
         mean_flux = float(np.mean(net_fluxes))
         std_flux = float(np.std(net_fluxes))
@@ -245,7 +280,7 @@ def build_lightcurve_series(
     from collections import defaultdict
     by_detector = defaultdict(list)
     for p in points:
-        if p["net_flux_mjy_sr"] is not None:
+        if p.get("valid", True) and p["net_flux_mjy_sr"] is not None:
             by_detector[p.get("detector", "SPHEREx")].append(p["net_flux_mjy_sr"])
 
     is_variable = False

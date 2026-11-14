@@ -40,6 +40,15 @@
 - [x] `P3-007` | COMPLETED | Polished shadcn/ui-inspired glassmorphic cards, telemetry pills, and alignment method indicators
 - [x] `P3-008` | COMPLETED | Fixed CanvasViewer unmount/remount blank redraw bug (`viewerMode` dependency), Aladin Lite overlay layer reuse/memory leak prevention, 0°/360° RA seam crossing handling, and 3D spectral WCS celestial extraction in reprojection
 
+## P5: Scientific Truthfulness & Uncensored Estimators Pass (ALL COMPLETED)
+- [x] `P5-001` | COMPLETED | Explicit unavailable photometry state (`status: "unavailable"`, `valid: False`, `net_flux: None`) on WCS projection failure (`photometry.py`)
+- [x] `P5-002` | COMPLETED | Missing quality mask state preserved (`None`) without guessing SPHEREx flag semantics from raw bits (`fits_processing.py`)
+- [x] `P5-003` | COMPLETED | WCS-WAVE calibrated wavelength extraction returns unavailable (`None`) when target coordinate projection fails (`fits_processing.py`)
+- [x] `P5-004` | COMPLETED | Removed all preset coordinates/names and hardcoded temperatures from spectrum SED; added documented Planck blackbody fit with inputs, uncertainty, and limitations (`spectrum.py`)
+- [x] `P5-005` | COMPLETED | Uncensored empirical SNR improvement estimator in image stacking, removing arbitrary `[0.5, 2.5 * sqrt(N)]` clamping (`stacking.py`)
+- [x] `P5-006` | COMPLETED | Preserved invalid pixels (NaN/Inf) as masks without fabricated fill values across image loading, photometry, stacking, and motion (`fits_processing.py`, `photometry.py`, `stacking.py`, `motion.py`)
+- [x] `P5-007` | COMPLETED | Comprehensive regression tests for all 5 audit issues (total 91 pytest tests passing) (`test_scientific_audit_regression.py`)
+
 ## P4: Potential Considerations & Advanced Science Discoveries (ALL COMPLETED)
 - [x] `P4-001` | COMPLETED | On-the-fly spectra generation endpoint (`GET /api/science/spectrum`) gathering aperture fluxes across the 6 SPHEREx detector arrays (D1: 0.75–1.12 µm, D2: 1.12–1.68 µm, D3: 1.68–2.42 µm, D4: 2.42–3.82 µm, D5: 3.82–4.42 µm, D6: 4.42–5.00 µm) (`spectrum.py`)
 - [x] `P4-002` | COMPLETED | Interactive 102-channel spectrophotometric SED chart (`SpectrumChart.tsx`) with detector band color-coding, smooth continuum modeling, and physical classification (Brown Dwarfs, M-Dwarfs, IR Excess) integrated into `MetadataPanel.tsx` telemetry tabs

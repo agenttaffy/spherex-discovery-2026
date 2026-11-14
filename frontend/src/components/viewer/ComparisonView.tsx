@@ -421,7 +421,9 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations }) 
                     <span>Co-Add Stack ({stackResult.method.toUpperCase()})</span>
                   </span>
                   <span className="text-emerald-400 font-bold bg-emerald-950/80 px-1.5 py-0.5 rounded border border-emerald-800/60 text-[10px]">
-                    +{((stackResult.snr_improvement_factor - 1) * 100).toFixed(0)}% SNR (~{stackResult.snr_improvement_factor}×)
+                    {stackResult.snr_improvement_factor != null
+                      ? `+${((stackResult.snr_improvement_factor - 1) * 100).toFixed(0)}% SNR (~${stackResult.snr_improvement_factor}×)`
+                      : `Theory: ~${stackResult.theoretical_snr_gain}×`}
                   </span>
                 </div>
                 <div className="w-full aspect-square bg-black rounded-lg border border-slate-700 overflow-hidden flex items-center justify-center relative">
@@ -556,7 +558,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations }) 
                 <div className="p-3 bg-slate-950 rounded-lg border border-slate-800">
                   <span className="text-slate-400 text-[11px] block">SNR Improvement</span>
                   <span className="text-emerald-400 font-bold text-base">
-                    {stackResult.snr_improvement_factor}×
+                    {stackResult.snr_improvement_factor != null ? `${stackResult.snr_improvement_factor}×` : 'Unavailable'}
                   </span>
                   <span className="text-[10px] text-slate-500 block">(Theory: √N = {stackResult.theoretical_snr_gain}×)</span>
                 </div>
@@ -663,7 +665,9 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations }) 
                     <>
                       <tr className="hover:bg-slate-900/60 transition">
                         <td className="py-1 px-1.5 font-medium text-slate-200">SNR Improvement</td>
-                        <td className="py-1 px-1.5 text-right font-mono text-emerald-400 font-bold">{stackResult.snr_improvement_factor}×</td>
+                        <td className="py-1 px-1.5 text-right font-mono text-emerald-400 font-bold">
+                          {stackResult.snr_improvement_factor != null ? `${stackResult.snr_improvement_factor}×` : 'N/A'}
+                        </td>
                         <td className="py-1 px-1.5 pl-3 text-slate-400">Empirical gain (Theoretical √N = {stackResult.theoretical_snr_gain}×)</td>
                       </tr>
                       <tr className="hover:bg-slate-900/60 transition">

@@ -104,11 +104,16 @@ export interface PhotometryPoint {
   utc_date?: string | null;
   detector: string;
   collection: string;
-  net_flux_mjy_sr: number;
-  peak_flux_mjy_sr: number;
-  aperture_flux_sum: number;
-  background_median: number;
-  snr: number;
+  status?: string;
+  valid?: boolean;
+  reason?: string | null;
+  net_flux_mjy_sr: number | null;
+  flux_err_mjy_sr?: number | null;
+  peak_flux_mjy_sr: number | null;
+  aperture_flux_sum: number | null;
+  background_median: number | null;
+  snr: number | null;
+  coverage_fraction?: number;
 }
 
 export interface LightCurveSeries {
@@ -194,10 +199,12 @@ export interface SpectrumSummary {
   peak_wavelength_um: number;
   peak_detector: string;
   peak_flux_mjy_sr: number;
-  estimated_temperature_k: number;
+  estimated_temperature_k?: number | null;
   spectral_class: string;
+  spectral_class_limitations?: string;
   integrated_flux_mjy_sr_um: number;
   total_channels: number;
+  temperature_fit?: any;
 }
 
 export interface SpectrumResponse {
@@ -218,8 +225,10 @@ export interface StackResult {
   frame_count: number;
   frame_ids: string[];
   dimensions: [number, number];
-  snr_improvement_factor: number;
+  snr_improvement_factor: number | null;
+  snr_gain_status?: string;
   theoretical_snr_gain: number;
+  theoretical_gain_model?: string;
   noise_stats: {
     reference_noise_sigma: number;
     stacked_noise_sigma: number;
@@ -228,6 +237,6 @@ export interface StackResult {
     min_flux_mjy_sr: number;
   };
   alignment_method: string;
-  image_base64: string;
+  image_base64?: string;
 }
 

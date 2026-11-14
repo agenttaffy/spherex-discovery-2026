@@ -50,9 +50,15 @@ SPHEREX_ARTIFACT_FLAG_NAMES = {
     "HALO",
 }
 
-def extract_primary_image(hdul: fits.HDUList) -> Tuple[np.ndarray, fits.Header]:
+def extract_primary_image(
+    hdul: fits.HDUList,
+    preserve_nan: bool = False,
+) -> Tuple[np.ndarray, fits.Header]:
     """
     Extracts the calibrated IMAGE extension (surface brightness in MJy/sr).
+    When preserve_nan=True (scientific analysis mode), preserves invalid non-finite (NaN, Inf)
+    pixels as NaN rather than substituting fabricated fill values.
+    When preserve_nan=False (legacy mode), sanitizes non-finite values for backward compatibility.
     """
     if "IMAGE" in hdul:
         hdu = hdul["IMAGE"]
@@ -64,11 +70,15 @@ def extract_primary_image(hdul: fits.HDUList) -> Tuple[np.ndarray, fits.Header]:
         raise ValueError("No valid image data extension found in FITS HDUList.")
 
     data = hdu.data.astype(np.float32)
-    # Sanitize non-finite values (NaN, Inf)
     finite_mask = np.isfinite(data)
-    if not np.all(finite_mask):
-        min_finite = np.min(data[finite_mask]) if np.any(finite_mask) else 0.0
-        data[~finite_mask] = min_finite
+    if preserve_nan:
+        # Preserve invalid pixels as masks; convert Inf to NaN to prevent arithmetic overflow
+        data[~finite_mask] = np.nan
+    else:
+        # Sanitize non-finite values (NaN, Inf)
+        if not np.all(finite_mask):
+            min_finite = np.min(data[finite_mask]) if np.any(finite_mask) else 0.0
+            data[~finite_mask] = min_finite
 
     return data, hdu.header
 
@@ -105,11 +115,17 @@ def parse_spherex_mask_planes(flags_header: Optional[fits.Header]) -> Dict[str, 
                     pass
     return planes
 
-def extract_fatal_quality_mask(hdul: fits.HDUList) -> Optional[np.ndarray]:
+def extract_fatal_quality_mask(
+    hdul: fits.HDUList,
+    allow_legacy_synthetic: bool = False,
+) -> Optional[np.ndarray]:
     """
     Returns a boolean 2D numpy array where True indicates a fatal defect (unusable pixel).
     Distinguishes nominal astronomical source detections from bad pixels.
-    Returns None if no FLAGS extension is present.
+    Returns None if no FLAGS extension is present or if mask metadata (MSKNxxxx/MSKMxxxx cards)
+    are absent, preserving an explicit unknown/missing quality state without guessing
+    SPHEREx flag semantics from undocumented raw bits.
+    Legacy synthetic bit checking (1|2|4|8) is confined strictly to tests/fixtures via allow_legacy_synthetic=True.
     """
     if "FLAGS" not in hdul or hdul["FLAGS"].data is None:
         return None
@@ -124,16 +140,22 @@ def extract_fatal_quality_mask(hdul: fits.HDUList) -> Optional[np.ndarray]:
             if name in planes:
                 fatal_mask_val |= planes[name]
         return (flags & fatal_mask_val) != 0
-    else:
-        # Fallback for synthetic / mock FITS where bits 1, 2, 4, 8 are used
+    elif allow_legacy_synthetic:
+        # Confined strictly to explicit synthetic fixture/test path
         legacy_fatal_bits = 1 | 2 | 4 | 8
         return (flags & legacy_fatal_bits) != 0
+    else:
+        # Preserve explicit unknown/missing quality state
+        return None
 
-def extract_source_mask(hdul: fits.HDUList) -> Optional[np.ndarray]:
+def extract_source_mask(
+    hdul: fits.HDUList,
+    allow_legacy_synthetic: bool = False,
+) -> Optional[np.ndarray]:
     """
     Returns a boolean 2D numpy array where True indicates a nominal astronomical source detection
     (e.g. SOURCE mask plane or FULLSAMPLE) rather than a fatal defect.
-    Returns None if no FLAGS extension is present.
+    Returns None if no FLAGS extension is present or if mask metadata are absent.
     """
     if "FLAGS" not in hdul or hdul["FLAGS"].data is None:
         return None
@@ -148,9 +170,11 @@ def extract_source_mask(hdul: fits.HDUList) -> Optional[np.ndarray]:
             if name in planes:
                 source_bitmask |= planes[name]
         return (flags & source_bitmask) != 0
-    else:
+    elif allow_legacy_synthetic:
         # Default mock: bit 32 for source detection if present
         return (flags & 32) != 0
+    else:
+        return None
 
 def extract_calibrated_wavelength(
     hdul: fits.HDUList,
@@ -160,6 +184,8 @@ def extract_calibrated_wavelength(
     Extracts calibrated wavelength and bandwidth from the official SPHEREx WCS-WAVE
     tabular extension. Evaluates the 2D dispersion calibration at the target's celestial
     coordinates (or image center) on the detector focal plane.
+    If target_coord was provided but could not be projected via WCS, returns None (unavailable).
+    Only measures at image center when target_coord is explicitly None.
     """
     if "WCS-WAVE" not in hdul or hdul["WCS-WAVE"].data is None:
         return None
@@ -175,13 +201,18 @@ def extract_calibrated_wavelength(
         w = extract_astropy_wcs(img_hdr)
 
         px, py = None, None
-        if target_coord is not None and w is not None:
-            try:
-                px, py = w.world_to_pixel_values(target_coord[0], target_coord[1])
-            except Exception:
-                pass
-
-        if px is None or not np.isfinite(px) or py is None or not np.isfinite(py):
+        if target_coord is not None:
+            if w is not None and getattr(w, "is_celestial", False):
+                try:
+                    px, py = w.world_to_pixel_values(target_coord[0], target_coord[1])
+                except Exception:
+                    pass
+            if px is None or not np.isfinite(px) or py is None or not np.isfinite(py):
+                # Target coordinates were requested but could not be projected via celestial WCS.
+                # Never fall back to center or substitute an arbitrary position.
+                return None
+        else:
+            # Caller explicitly requested center measurement (no target_coord provided)
             naxis1 = img_hdr.get("NAXIS1", 12)
             naxis2 = img_hdr.get("NAXIS2", 12)
             px = (naxis1 - 1.0) / 2.0
@@ -305,9 +336,14 @@ def apply_asinh_stretch(
     """
     Applies display-only arcsinh stretch for optimal astronomical contrast.
     Does not modify underlying scientific measurements.
+    Safely handles non-finite (NaN, Inf) pixels without throwing or propagating NaNs.
     """
-    vmin = np.percentile(image, lower_pct)
-    vmax = np.percentile(image, upper_pct)
+    finite = image[np.isfinite(image)]
+    if len(finite) == 0:
+        return np.zeros(image.shape, dtype=np.uint8)
+
+    vmin = float(np.percentile(finite, lower_pct))
+    vmax = float(np.percentile(finite, upper_pct))
     if vmax <= vmin:
         vmax = vmin + 1e-5
 
@@ -315,22 +351,29 @@ def apply_asinh_stretch(
     factor = max(non_linear_factor, 1e-4)
     stretched = np.arcsinh(norm / factor) / np.arcsinh(1.0 / factor)
     stretched = np.clip(stretched, 0.0, 1.0)
+    stretched[~np.isfinite(image)] = 0.0
     return (stretched * 255.0).astype(np.uint8)
 
 def apply_zscale_stretch(image: np.ndarray) -> np.ndarray:
     """
     Applies standard IRAF/Astropy ZScale contrast stretch.
+    Safely handles non-finite (NaN, Inf) pixels.
     """
+    finite = image[np.isfinite(image)]
+    if len(finite) == 0:
+        return np.zeros(image.shape, dtype=np.uint8)
+
     zscale = ZScaleInterval()
     try:
-        vmin, vmax = zscale.get_limits(image)
+        vmin, vmax = zscale.get_limits(finite)
     except Exception:
-        vmin, vmax = np.percentile(image, 1.0), np.percentile(image, 99.0)
+        vmin, vmax = float(np.percentile(finite, 1.0)), float(np.percentile(finite, 99.0))
 
     if vmax <= vmin:
         vmax = vmin + 1e-5
 
     norm = np.clip((image - vmin) / (vmax - vmin), 0.0, 1.0)
+    norm[~np.isfinite(image)] = 0.0
     return (norm * 255.0).astype(np.uint8)
 
 def apply_stretch(image: np.ndarray, method: str = "asinh") -> np.ndarray:

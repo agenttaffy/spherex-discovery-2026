@@ -86,8 +86,8 @@ async def diff_frames(req: DiffRequest = Body(...)):
         
         hd1 = load_fits_cutout(b1)
         hd2 = load_fits_cutout(b2)
-        i1, h1 = extract_primary_image(hd1)
-        i2, h2 = extract_primary_image(hd2)
+        i1, h1 = extract_primary_image(hd1, preserve_nan=True)
+        i2, h2 = extract_primary_image(hd2, preserve_nan=True)
 
         from app.science.fits_processing import extract_fatal_quality_mask
         mask1 = extract_fatal_quality_mask(hd1)
@@ -169,7 +169,7 @@ async def stack_frames(req: StackRequest = Body(...)):
 
         try:
             hd = load_fits_cutout(b)
-            img, hdr = extract_primary_image(hd)
+            img, hdr = extract_primary_image(hd, preserve_nan=True)
             from app.science.fits_processing import extract_variance_data, extract_fatal_quality_mask
             var = extract_variance_data(hd)
             mask = extract_fatal_quality_mask(hd)

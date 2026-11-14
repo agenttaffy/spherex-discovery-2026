@@ -242,27 +242,31 @@ def compute_coadd_stack(
     propagated_mask_any = np.any(mask_cube, axis=0)
     propagated_mask_all = np.all(mask_cube, axis=0)
 
-    # Replace remaining NaNs with background median
-    finite_mask = np.isfinite(stacked)
-    if np.any(finite_mask):
-        bg_fill = float(np.nanmedian(stacked[finite_mask]))
-        stacked[~finite_mask] = bg_fill
-    else:
-        stacked = np.zeros(ref_img.shape, dtype=np.float32)
+    # Preserve invalid pixels as masks; do NOT fabricate background fill values in stacked data
+    # (stacked pixels that are non-finite remain NaN)
 
-    # Compute stacked noise statistics using robust sigma clipping
+    # Compute stacked noise statistics using robust sigma clipping on finite pixels
     stacked_sigma = compute_robust_noise_sigma(stacked)
 
     theoretical_gain = float(np.sqrt(n_frames))
     
-    # Measured SNR improvement
-    if method == "sum":
-        measured_snr_gain = (n_frames * ref_sigma) / max(1e-6, stacked_sigma)
+    # Actual uncensored empirical SNR improvement estimator
+    finite_stacked = stacked[np.isfinite(stacked)]
+    if len(finite_stacked) < 4 or ref_sigma <= 1e-6 or stacked_sigma <= 1e-6:
+        measured_snr_gain = None
+        snr_gain_status = "unavailable"
     else:
-        measured_snr_gain = ref_sigma / max(1e-6, stacked_sigma)
+        if method == "sum":
+            raw_gain = (n_frames * ref_sigma) / stacked_sigma
+        else:
+            raw_gain = ref_sigma / stacked_sigma
 
-    # Bound measured gain reasonably around theoretical gain
-    measured_snr_gain = float(np.clip(measured_snr_gain, 0.5, theoretical_gain * 2.5))
+        if np.isfinite(raw_gain) and raw_gain > 0:
+            measured_snr_gain = round(float(raw_gain), 3)
+            snr_gain_status = "measured"
+        else:
+            measured_snr_gain = None
+            snr_gain_status = "unavailable"
 
     primary_alignment = "wcs_reproject" if "wcs_reproject" in alignment_methods_used else (
         "fft_shift" if "fft_shift" in alignment_methods_used else "direct"
@@ -271,14 +275,16 @@ def compute_coadd_stack(
     stats = {
         "method": method,
         "frame_count": n_frames,
-        "snr_improvement_factor": round(measured_snr_gain, 3),
+        "snr_improvement_factor": measured_snr_gain,
+        "snr_gain_status": snr_gain_status,
         "theoretical_snr_gain": round(theoretical_gain, 3),
+        "theoretical_gain_model": "sqrt(N) ideal Gaussian noise reduction",
         "reference_noise_sigma": round(ref_sigma, 4),
         "stacked_noise_sigma": round(stacked_sigma, 4),
         "propagated_noise_sigma": round(propagated_sigma, 4),
-        "mean_flux_mjy_sr": round(float(np.nanmean(stacked)), 4),
-        "max_flux_mjy_sr": round(float(np.nanmax(stacked)), 4),
-        "min_flux_mjy_sr": round(float(np.nanmin(stacked)), 4),
+        "mean_flux_mjy_sr": round(float(np.nanmean(stacked)), 4) if len(finite_stacked) > 0 else 0.0,
+        "max_flux_mjy_sr": round(float(np.nanmax(stacked)), 4) if len(finite_stacked) > 0 else 0.0,
+        "min_flux_mjy_sr": round(float(np.nanmin(stacked)), 4) if len(finite_stacked) > 0 else 0.0,
         "alignment_method": primary_alignment,
         "flagged_pixels_count": int(np.count_nonzero(propagated_mask_any)),
         "unusable_pixels_count": int(np.count_nonzero(propagated_mask_all)),

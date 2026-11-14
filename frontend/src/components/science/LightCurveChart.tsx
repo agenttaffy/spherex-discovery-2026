@@ -48,9 +48,14 @@ export const LightCurveChart: React.FC<LightCurveChartProps> = ({
   const plotW = width - padLeft - padRight;
   const plotH = height - padTop - padBottom;
 
-  const paddingFlux = Math.max(0.5, (max_flux_mjy_sr - min_flux_mjy_sr) * 0.1);
-  const yMin = min_flux_mjy_sr - paddingFlux;
-  const yMax = max_flux_mjy_sr + paddingFlux;
+  const validPoints = points.filter((p) => p.net_flux_mjy_sr != null && (p.valid ?? true));
+  const validFluxes = validPoints.map((p) => p.net_flux_mjy_sr as number);
+  const minVal = validFluxes.length > 0 ? Math.min(...validFluxes) : min_flux_mjy_sr;
+  const maxVal = validFluxes.length > 0 ? Math.max(...validFluxes) : max_flux_mjy_sr;
+
+  const paddingFlux = Math.max(0.5, (maxVal - minVal) * 0.1);
+  const yMin = minVal - paddingFlux;
+  const yMax = maxVal + paddingFlux;
   const yRange = Math.max(1e-4, yMax - yMin);
 
   const xCoords = points.map((_, i) => {
@@ -58,14 +63,18 @@ export const LightCurveChart: React.FC<LightCurveChartProps> = ({
   });
 
   const yCoords = points.map((p) => {
-    const norm = (p.net_flux_mjy_sr - yMin) / yRange;
+    const fluxVal = p.net_flux_mjy_sr != null ? p.net_flux_mjy_sr : (minVal + maxVal) / 2.0;
+    const norm = (fluxVal - yMin) / yRange;
     return padTop + plotH - norm * plotH;
   });
 
   const meanY = padTop + plotH - ((mean_flux_mjy_sr - yMin) / yRange) * plotH;
 
-  // SVG Polyline Path
-  const polyPoints = points.map((_, i) => `${xCoords[i]},${yCoords[i]}`).join(' ');
+  // SVG Polyline Path connecting valid data points
+  const polyPoints = points
+    .map((p, i) => (p.net_flux_mjy_sr != null && (p.valid ?? true) ? `${xCoords[i]},${yCoords[i]}` : null))
+    .filter((pt): pt is string => pt !== null)
+    .join(' ');
 
   return (
     <div className="bg-slate-950/90 border border-slate-800 rounded-lg p-3 space-y-2">
@@ -139,13 +148,17 @@ export const LightCurveChart: React.FC<LightCurveChartProps> = ({
           {points.map((p, i) => {
             const isSelected = selectedObsId === p.obs_id;
             const isHovered = hoveredPoint?.obs_id === p.obs_id;
+            const isValid = p.net_flux_mjy_sr != null && (p.valid ?? true);
+            const netLabel = isValid
+              ? `net flux ${p.net_flux_mjy_sr!.toFixed(2)} MegaJanskys per steradian`
+              : `measurement unavailable (${p.reason || 'unprojectable'})`;
             return (
               <g
                 key={p.obs_id + i}
                 className="cursor-pointer"
                 tabIndex={0}
                 role="button"
-                aria-label={`Epoch ${i + 1}, observation ${p.obs_id}, date ${p.utc_date?.slice(0, 10) || 'N/A'}, net flux ${p.net_flux_mjy_sr.toFixed(2)} MegaJanskys per steradian`}
+                aria-label={`Epoch ${i + 1}, observation ${p.obs_id}, date ${p.utc_date?.slice(0, 10) || 'N/A'}, ${netLabel}`}
                 onMouseEnter={() => setHoveredPoint(p)}
                 onMouseLeave={() => setHoveredPoint(null)}
                 onFocus={() => setHoveredPoint(p)}
@@ -161,9 +174,10 @@ export const LightCurveChart: React.FC<LightCurveChartProps> = ({
                   cx={xCoords[i]}
                   cy={yCoords[i]}
                   r={isSelected ? 5.5 : isHovered ? 4.5 : 3.5}
-                  fill={isSelected ? '#38bdf8' : is_variable ? '#fbbf24' : '#22d3ee'}
-                  stroke="#0f172a"
-                  strokeWidth="1.5"
+                  fill={isValid ? (isSelected ? '#38bdf8' : is_variable ? '#fbbf24' : '#22d3ee') : 'none'}
+                  stroke={isValid ? '#0f172a' : '#94a3b8'}
+                  strokeWidth={isValid ? '1.5' : '1.2'}
+                  strokeDasharray={isValid ? undefined : '2,2'}
                 />
               </g>
             );
@@ -175,7 +189,12 @@ export const LightCurveChart: React.FC<LightCurveChartProps> = ({
           <div className="absolute top-1 right-2 bg-slate-900 border border-slate-700 rounded p-1.5 text-[10px] text-slate-200 pointer-events-none shadow-lg z-10 font-mono">
             <div><span className="text-cyan-400">Obs:</span> {hoveredPoint.obs_id}</div>
             <div><span className="text-slate-400">Date:</span> {hoveredPoint.utc_date?.slice(0, 10) || 'N/A'}</div>
-            <div><span className="text-slate-400">Net:</span> {hoveredPoint.net_flux_mjy_sr.toFixed(2)} MJy/sr</div>
+            <div>
+              <span className="text-slate-400">Net:</span>{' '}
+              {hoveredPoint.net_flux_mjy_sr != null
+                ? `${hoveredPoint.net_flux_mjy_sr.toFixed(2)} MJy/sr`
+                : `Unavailable (${hoveredPoint.reason || 'N/A'})`}
+            </div>
             <div><span className="text-slate-400">Band:</span> {hoveredPoint.detector}</div>
           </div>
         )}
@@ -224,8 +243,12 @@ export const LightCurveChart: React.FC<LightCurveChartProps> = ({
                   </td>
                   <td className="py-1 px-1.5 text-slate-300 font-mono">{p.utc_date?.slice(0, 10) || 'N/A'}</td>
                   <td className="py-1 px-1.5 text-indigo-300 font-mono">{p.detector}</td>
-                  <td className="py-1 px-1.5 text-right font-medium text-slate-100 font-mono">{p.net_flux_mjy_sr.toFixed(2)}</td>
-                  <td className="py-1 px-1.5 text-right text-cyan-300 font-mono font-semibold">{p.snr.toFixed(1)}σ</td>
+                  <td className="py-1 px-1.5 text-right font-medium text-slate-100 font-mono">
+                    {p.net_flux_mjy_sr != null ? p.net_flux_mjy_sr.toFixed(2) : (p.status || 'Unavailable')}
+                  </td>
+                  <td className="py-1 px-1.5 text-right text-cyan-300 font-mono font-semibold">
+                    {p.snr != null ? `${p.snr.toFixed(1)}σ` : '—'}
+                  </td>
                 </tr>
               ))}
             </tbody>
