@@ -58,4 +58,5 @@ npm run build
 ```
 
 ## 8. Latest Git Commit & Uncommitted Work
-- Commit: pending commit of Phase 2 hardening and resilience fixes.
+- Commit: `69af8ee` ("fix: harden scientific differencing, offline demo resilience, and frontend rendering performance")
+- Uncommitted work: None (working tree clean).
