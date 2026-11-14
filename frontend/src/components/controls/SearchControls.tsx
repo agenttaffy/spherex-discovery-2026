@@ -146,32 +146,45 @@ export const SearchControls: React.FC<SearchControlsProps> = ({
           <label className="text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5 block">
             Survey Release
           </label>
-          <div className="grid grid-cols-2 gap-1.5" role="group" aria-label="Survey release data version">
+          <div className="grid grid-cols-3 gap-1" role="group" aria-label="Survey release data version">
             <button
               type="button"
               onClick={() => setCollection('spherex_dr1')}
               aria-pressed={collection === 'spherex_dr1'}
-              aria-label="Data Release 1 (Surveys 1 & 2)"
-              className={`py-1.5 px-2 text-xs rounded-md border transition text-center focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${
+              aria-label="Data Release 1 (Surveys 1 and 2)"
+              className={`py-1.5 px-1.5 text-[11px] rounded-md border transition text-center focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${
                 collection === 'spherex_dr1'
                   ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300 font-semibold'
                   : 'bg-slate-950 border-slate-800 text-slate-300 hover:text-white'
               }`}
             >
-              DR1 (Surveys 1 & 2)
+              DR1
             </button>
             <button
               type="button"
               onClick={() => setCollection('spherex_qr3')}
               aria-pressed={collection === 'spherex_qr3'}
-              aria-label="Quick Release 3 (Surveys 3 & 4)"
-              className={`py-1.5 px-2 text-xs rounded-md border transition text-center focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${
+              aria-label="Quick Release 3 (Surveys 3 and 4)"
+              className={`py-1.5 px-1.5 text-[11px] rounded-md border transition text-center focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${
                 collection === 'spherex_qr3'
                   ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300 font-semibold'
                   : 'bg-slate-950 border-slate-800 text-slate-300 hover:text-white'
               }`}
             >
-              QR3 (Surveys 3 & 4)
+              QR3
+            </button>
+            <button
+              type="button"
+              onClick={() => setCollection('ALL')}
+              aria-pressed={collection === 'ALL'}
+              aria-label="All Surveys Multi-Epoch (DR1 and QR3)"
+              className={`py-1.5 px-1.5 text-[11px] rounded-md border transition text-center focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${
+                collection === 'ALL'
+                  ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300 font-semibold'
+                  : 'bg-slate-950 border-slate-800 text-slate-300 hover:text-white'
+              }`}
+            >
+              All (Multi-Epoch)
             </button>
           </div>
         </div>

@@ -361,6 +361,39 @@ def apply_inferno_colormap(grayscale_u8: np.ndarray) -> np.ndarray:
     palette = np.stack([r * 255, g * 255, b * 255], axis=-1).astype(np.uint8)
     return palette[grayscale_u8]
 
+def apply_diverging_colormap(grayscale_u8: np.ndarray) -> np.ndarray:
+    """
+    Perceptually balanced diverging colormap (Cool-Warm: Blue -> Light Neutral -> Crimson Red)
+    centered exactly at 128 (zero net flux residual).
+    Complies with NASA Data Visualization guidelines for differential / residual imagery.
+    """
+    # 256 RGB values
+    x = np.linspace(-1.0, 1.0, 256)
+    r = np.zeros(256, dtype=np.float32)
+    g = np.zeros(256, dtype=np.float32)
+    b = np.zeros(256, dtype=np.float32)
+
+    # Negative side (indices 0..127): Blue to light neutral
+    neg_mask = x < 0
+    t_neg = x[neg_mask] + 1.0  # 0.0 at x=-1 (idx 0), approaching 1.0
+    r[neg_mask] = 0.08 + 0.85 * (t_neg ** 1.3)
+    g[neg_mask] = 0.28 + 0.66 * (t_neg ** 1.1)
+    b[neg_mask] = 0.75 + 0.22 * (t_neg ** 0.8)
+
+    # Positive side (indices 128..255): light neutral to Crimson Red
+    pos_mask = x >= 0
+    t_pos = x[pos_mask]        # 0.0 at idx 128, 1.0 at idx 255
+    r[pos_mask] = 0.94 - 0.12 * (t_pos ** 2.0)
+    g[pos_mask] = 0.94 - 0.84 * (t_pos ** 1.1)
+    b[pos_mask] = 0.97 - 0.84 * (t_pos ** 1.1)
+
+    palette = np.stack([
+        np.clip(r * 255, 0, 255),
+        np.clip(g * 255, 0, 255),
+        np.clip(b * 255, 0, 255),
+    ], axis=-1).astype(np.uint8)
+    return palette[grayscale_u8]
+
 def extract_astropy_wcs(header: fits.Header) -> Optional[WCS]:
     """
     Constructs an Astropy WCS instance from FITS header if celestial keywords are present.
@@ -390,6 +423,9 @@ def render_image_to_base64(
     
     if colormap == "inferno":
         rgb = apply_inferno_colormap(flipped)
+        pil_img = Image.fromarray(rgb, mode="RGB")
+    elif colormap in ("diverging", "coolwarm"):
+        rgb = apply_diverging_colormap(flipped)
         pil_img = Image.fromarray(rgb, mode="RGB")
     else:
         pil_img = Image.fromarray(flipped, mode="L")

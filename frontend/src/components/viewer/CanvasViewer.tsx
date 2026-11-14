@@ -59,23 +59,39 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
     const panStep = 40;
     if (e.key === 'ArrowUp') {
       e.preventDefault();
-      setOffset((prev) => ({ ...prev, y: prev.y + panStep }));
-      setAnnouncement('Panned up');
+      setOffset((prev) => {
+        const nextY = prev.y + panStep;
+        setAnnouncement(`Panned up [Offset: X=${prev.x}, Y=${nextY}]`);
+        return { ...prev, y: nextY };
+      });
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setOffset((prev) => ({ ...prev, y: prev.y - panStep }));
-      setAnnouncement('Panned down');
+      setOffset((prev) => {
+        const nextY = prev.y - panStep;
+        setAnnouncement(`Panned down [Offset: X=${prev.x}, Y=${nextY}]`);
+        return { ...prev, y: nextY };
+      });
     } else if (e.key === 'ArrowLeft') {
       e.preventDefault();
-      setOffset((prev) => ({ ...prev, x: prev.x + panStep }));
-      setAnnouncement('Panned left');
+      setOffset((prev) => {
+        const nextX = prev.x + panStep;
+        setAnnouncement(`Panned left [Offset: X=${nextX}, Y=${prev.y}]`);
+        return { ...prev, x: nextX };
+      });
     } else if (e.key === 'ArrowRight') {
       e.preventDefault();
-      setOffset((prev) => ({ ...prev, x: prev.x - panStep }));
-      setAnnouncement('Panned right');
+      setOffset((prev) => {
+        const nextX = prev.x - panStep;
+        setAnnouncement(`Panned right [Offset: X=${nextX}, Y=${prev.y}]`);
+        return { ...prev, x: nextX };
+      });
     } else if (e.key === '+' || e.key === '=') {
       e.preventDefault();
       setZoom((prev) => {
+        if (prev >= 7.9) {
+          setAnnouncement('Maximum zoom limit reached (800%)');
+          return 8.0;
+        }
         const next = Math.min(prev * 1.25, 8.0);
         setAnnouncement(`Zoomed in to ${Math.round(next * 100)}%`);
         return next;
@@ -83,14 +99,18 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
     } else if (e.key === '-' || e.key === '_') {
       e.preventDefault();
       setZoom((prev) => {
+        if (prev <= 0.41) {
+          setAnnouncement('Minimum zoom limit reached (40%)');
+          return 0.4;
+        }
         const next = Math.max(prev * 0.8, 0.4);
         setAnnouncement(`Zoomed out to ${Math.round(next * 100)}%`);
         return next;
       });
-    } else if (e.key === '0') {
+    } else if (e.key === '0' || e.key === 'Home') {
       e.preventDefault();
       resetView();
-      setAnnouncement('View reset to default 100% zoom and center position');
+      setAnnouncement('View reset to default 100% zoom and center position (0, 0)');
     }
   };
 

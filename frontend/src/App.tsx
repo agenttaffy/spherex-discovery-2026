@@ -89,13 +89,18 @@ export const App: React.FC = () => {
         if (p.length > 0) {
           // Check URL query parameters
           const params = new URLSearchParams(window.location.search);
+          const urlTab = params.get('tab');
           const urlRa = params.get('ra');
           const urlDec = params.get('dec');
           const urlFov = params.get('fov');
           const urlStretch = params.get('stretch');
           const urlColormap = params.get('colormap');
           const urlTarget = params.get('target');
+          const urlObs = params.get('obs');
 
+          if (urlTab && ['explorer', 'blink', 'diff', 'about'].includes(urlTab)) {
+            setActiveTab(urlTab as any);
+          }
           if (urlStretch) setStretch(urlStretch);
           if (urlColormap) setColormap(urlColormap);
 
@@ -105,14 +110,14 @@ export const App: React.FC = () => {
             setRa(String(targetPreset.ra));
             setDec(String(targetPreset.dec));
             setCollection(targetPreset.default_collection);
-            searchWithCoords(targetPreset.ra, targetPreset.dec, 0.04, targetPreset.default_collection);
+            searchWithCoords(targetPreset.ra, targetPreset.dec, 0.04, targetPreset.default_collection, urlObs);
           } else if (urlRa && urlDec) {
             setRa(urlRa);
             setDec(urlDec);
             const searchColl = params.get('collection') || 'spherex_dr1';
             setCollection(searchColl);
             if (urlFov) setFov(Number(urlFov));
-            searchWithCoords(urlRa, urlDec, urlFov ? Number(urlFov) : 0.04, searchColl);
+            searchWithCoords(urlRa, urlDec, urlFov ? Number(urlFov) : 0.04, searchColl, urlObs);
           } else {
             // Load default preset (Barnard's Star)
             const def = p[0];
@@ -120,7 +125,7 @@ export const App: React.FC = () => {
             setRa(String(def.ra));
             setDec(String(def.dec));
             setCollection(def.default_collection);
-            searchWithCoords(def.ra, def.dec, 0.04, def.default_collection);
+            searchWithCoords(def.ra, def.dec, 0.04, def.default_collection, urlObs);
           }
         }
       })
@@ -128,15 +133,26 @@ export const App: React.FC = () => {
   }, []);
 
   const searchWithCoords = useCallback(
-    async (searchRa: number | string, searchDec: number | string, searchFov: number, searchColl: string) => {
+    async (
+      searchRa: number | string,
+      searchDec: number | string,
+      searchFov: number,
+      searchColl: string,
+      targetObsId?: string | null
+    ) => {
       setLoadingObs(true);
       setErrorMessage(null);
       try {
         const res = await fetchObservations(searchRa, searchDec, searchFov, searchColl, detector);
         setObservations(res.observations);
-        setCurrentIndex(0);
+        let startIdx = 0;
+        if (targetObsId && res.observations.length > 0) {
+          const matchIdx = res.observations.findIndex((o) => o.id === targetObsId || o.obs_id === targetObsId);
+          if (matchIdx >= 0) startIdx = matchIdx;
+        }
+        setCurrentIndex(startIdx);
         if (res.observations.length > 0) {
-          loadFrame(res.observations[0].id, stretch, searchFov);
+          loadFrame(res.observations[startIdx].id, stretch, searchFov);
         } else {
           setCurrentFrame(null);
         }
@@ -190,6 +206,11 @@ export const App: React.FC = () => {
     const obs = observations[idx];
     if (obs) {
       loadFrame(obs.id, stretch, fov);
+      // Synchronize active observation with URL search params
+      const url = new URL(window.location.href);
+      url.searchParams.set('obs', obs.id);
+      window.history.replaceState({}, '', url.toString());
+
       // Prefetch adjacent frames for smooth playback and blink comparison
       if (idx + 1 < observations.length) {
         prefetchFrame(observations[idx + 1].id, stretch, fov);
@@ -240,12 +261,20 @@ export const App: React.FC = () => {
   // Share URL Deep Link
   const handleCopyShareLink = () => {
     const url = new URL(window.location.href);
+    if (activeTab !== 'explorer') {
+      url.searchParams.set('tab', activeTab);
+    } else {
+      url.searchParams.delete('tab');
+    }
     url.searchParams.set('ra', ra);
     url.searchParams.set('dec', dec);
     url.searchParams.set('fov', String(fov));
     url.searchParams.set('collection', collection);
     url.searchParams.set('stretch', stretch);
     url.searchParams.set('colormap', colormap);
+    if (observations[currentIndex]) {
+      url.searchParams.set('obs', observations[currentIndex].id);
+    }
     window.history.replaceState({}, '', url.toString());
 
     navigator.clipboard.writeText(url.toString());

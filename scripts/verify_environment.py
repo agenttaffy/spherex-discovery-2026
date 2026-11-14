@@ -16,7 +16,7 @@ def check_command(cmd, name):
     path = shutil.which(cmd)
     if path:
         try:
-            res = subprocess.run([cmd, "--version"], capture_output=True, text=True, check=True)
+            res = subprocess.run([cmd, "--version"], capture_output=True, text=True, check=True, shell=(sys.platform == "win32"))
             ver = res.stdout.strip().split("\n")[0]
             print(f"[OK] {name}: {ver} ({path})")
             return True, ver

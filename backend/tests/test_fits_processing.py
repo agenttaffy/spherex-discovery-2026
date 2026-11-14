@@ -170,4 +170,21 @@ def test_spherex_documented_flags_distinguish_source_mask():
     assert var is not None
     assert var.shape == (2, 2)
 
+def test_apply_diverging_colormap():
+    from app.science.fits_processing import apply_diverging_colormap
+    u8_arr = np.array([[0, 64], [128, 255]], dtype=np.uint8)
+    rgb = apply_diverging_colormap(u8_arr)
+    assert rgb.shape == (2, 2, 3)
+    # Check blue dominance at 0 (negative residual)
+    assert rgb[0, 0, 2] > rgb[0, 0, 0]  # Blue > Red
+    # Check neutral near 128 (zero residual)
+    assert abs(int(rgb[1, 0, 0]) - int(rgb[1, 0, 1])) < 15
+    assert abs(int(rgb[1, 0, 1]) - int(rgb[1, 0, 2])) < 15
+    # Check red dominance at 255 (positive residual)
+    assert rgb[1, 1, 0] > rgb[1, 1, 2]  # Red > Blue
+
+    # Test Base64 output
+    b64 = render_image_to_base64(u8_arr, colormap="diverging", format="png")
+    assert b64.startswith("data:image/png;base64,")
+
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ObservationRecord, DiffResult, FrameResponse, AstrometricMotion, StackResult } from '../../types/astronomy';
 import { computeDiff, fetchFrame, computeMotion, stackFrames } from '../../services/api';
-import { ArrowRight, Sparkles, Loader2, AlertCircle, Move, Layers, Plus, Minus, TrendingUp } from 'lucide-react';
+import { ArrowRight, Sparkles, Loader2, AlertCircle, Move, Layers, Plus, Minus, TrendingUp, Palette, Table } from 'lucide-react';
 
 interface ComparisonViewProps {
   observations: ObservationRecord[];
@@ -11,6 +11,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations }) 
   const [index1, setIndex1] = useState(0);
   const [index2, setIndex2] = useState(1);
   const [opMode, setOpMode] = useState<'diff' | 'stack'>('diff');
+  const [diffColormap, setDiffColormap] = useState<'coolwarm' | 'grayscale'>('coolwarm');
   const [stackMethod, setStackMethod] = useState<'mean' | 'median' | 'sum'>('mean');
   const [stackScope, setStackScope] = useState<'pair' | 'all'>('pair');
 
@@ -28,6 +29,19 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations }) 
 
   const obs1 = observations[safeIndex1];
   const obs2 = observations[safeIndex2];
+
+  // Auto-select a compatible second epoch with matching detector band when available
+  useEffect(() => {
+    if (observations.length >= 2) {
+      const d1 = observations[safeIndex1]?.detector;
+      if (d1 && observations[safeIndex2]?.detector !== d1) {
+        const matchIdx = observations.findIndex((o, idx) => idx !== safeIndex1 && o.detector === d1);
+        if (matchIdx >= 0) {
+          setIndex2(matchIdx);
+        }
+      }
+    }
+  }, [observations, safeIndex1]);
 
   // Load preview thumbnails for both epochs
   useEffect(() => {
@@ -259,6 +273,15 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations }) 
         </div>
       </div>
 
+      {obs1 && obs2 && obs1.detector !== obs2.detector && (
+        <div className="mt-4 p-3 bg-amber-950/40 border border-amber-800/60 rounded-lg text-xs text-amber-300 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0 text-amber-400" />
+          <span>
+            Notice: Selected epochs belong to different detector bands ({obs1.detector} vs {obs2.detector}). SPHEREx Linear Variable Filters (LVF) disperse distinct wavelength ranges per band; differencing across incompatible detectors is rejected for scientific validity.
+          </span>
+        </div>
+      )}
+
       {error && (
         <div className="mt-4 p-3 bg-amber-950/40 border border-amber-800/60 rounded-lg text-xs text-amber-300 flex items-center gap-2">
           <AlertCircle className="w-4 h-4 shrink-0 text-amber-400" />
@@ -327,11 +350,23 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations }) 
               <div className="bg-slate-900/60 border border-amber-800/40 rounded-xl p-3 flex flex-col items-center shadow-lg shadow-amber-950/20">
                 <div className="w-full flex items-center justify-between text-[11px] font-mono mb-2">
                   <span className="text-amber-300 font-semibold">Difference (I₂ − I₁)</span>
+                  {/* Palette toggle */}
+                  {diffResult.colormapped_base64 && (
+                    <button
+                      type="button"
+                      onClick={() => setDiffColormap(diffColormap === 'coolwarm' ? 'grayscale' : 'coolwarm')}
+                      aria-label={`Toggle difference colormap. Current: ${diffColormap === 'coolwarm' ? 'Diverging Cool-Warm' : 'Grayscale'}`}
+                      className="px-2 py-0.5 rounded text-[10px] bg-slate-800 border border-slate-700 hover:text-white flex items-center gap-1 focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none text-slate-300 transition"
+                    >
+                      <Palette className="w-3 h-3 text-cyan-400" />
+                      <span>{diffColormap === 'coolwarm' ? 'Diverging' : 'Grayscale'}</span>
+                    </button>
+                  )}
                   <span className="text-slate-400">RMS: {diffResult.diff_stats.rms_diff_mjy_sr}</span>
                 </div>
                 <div className="w-full aspect-square bg-black rounded-lg border border-slate-700 overflow-hidden flex items-center justify-center relative">
                   <img
-                    src={diffResult.image_base64}
+                    src={diffColormap === 'coolwarm' && diffResult.colormapped_base64 ? diffResult.colormapped_base64 : diffResult.image_base64}
                     alt="Difference Frame"
                     className="w-full h-full object-contain [image-rendering:pixelated]"
                   />
@@ -366,9 +401,17 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations }) 
                     </div>
                   )}
                 </div>
-                <span className="text-[10px] text-slate-400 font-mono mt-2">
-                  {motionResult?.displacement_pixels ? `Displacement: ${motionResult.displacement_pixels} px` : 'Mid-gray = 0 residual'}
-                </span>
+                <div className="w-full flex flex-col items-center gap-1 mt-2">
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    {motionResult?.displacement_pixels ? `Displacement: ${motionResult.displacement_pixels} px` : 'Mid-scale = 0 residual'}
+                  </span>
+                  {/* Diverging palette colorbar legend */}
+                  <div className="w-full flex items-center justify-between text-[9px] font-mono text-slate-400 px-1 pt-1 border-t border-slate-800/60">
+                    <span className="text-blue-400 font-semibold">◄ Dimmed (−ΔF)</span>
+                    <span className="text-slate-300">0 Residual</span>
+                    <span className="text-rose-400 font-semibold">Brightened (+ΔF) ►</span>
+                  </div>
+                </div>
               </div>
             ) : stackResult ? (
               <div className="bg-slate-900/60 border border-cyan-800/40 rounded-xl p-3 flex flex-col items-center shadow-lg shadow-cyan-950/20">
@@ -551,6 +594,94 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations }) 
               </div>
             </div>
           )}
+
+          {/* Accessible Tabular Data View for Screen Readers & Keyboard Users */}
+          <details className="text-[10px] font-mono group border border-slate-800 rounded bg-slate-950/70 p-2.5">
+            <summary className="cursor-pointer text-slate-300 hover:text-cyan-300 font-sans font-medium flex items-center justify-between select-none focus-visible:ring-2 focus-visible:ring-cyan-400 rounded px-1 py-0.5 outline-none">
+              <span className="flex items-center gap-1.5">
+                <Table className="w-3.5 h-3.5 text-cyan-400" />
+                <span>View Accessible Comparison Metrics Table</span>
+              </span>
+              <span className="text-[9px] text-slate-400 font-mono">
+                {opMode === 'diff' ? 'Differential Residuals & Proper Motion' : 'Co-Addition SNR & Stacking Telemetry'}
+              </span>
+            </summary>
+            <div className="mt-2.5 overflow-x-auto max-h-48 overflow-y-auto">
+              <table className="w-full text-left border-collapse" role="table" aria-label="SPHEREx Comparison Quantitative Metrics">
+                <caption className="sr-only">SPHEREx quantitative comparison and astrometric motion metrics</caption>
+                <thead>
+                  <tr className="border-b border-slate-800 text-slate-400 text-[9px] uppercase tracking-wider">
+                    <th scope="col" className="py-1 px-1.5 font-semibold">Metric</th>
+                    <th scope="col" className="py-1 px-1.5 font-semibold text-right">Value</th>
+                    <th scope="col" className="py-1 px-1.5 font-semibold text-left pl-3">Units / Meaning</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 text-slate-300">
+                  {opMode === 'diff' && diffResult ? (
+                    <>
+                      <tr className="hover:bg-slate-900/60 transition">
+                        <td className="py-1 px-1.5 font-medium text-slate-200">RMS Difference</td>
+                        <td className="py-1 px-1.5 text-right font-mono text-cyan-300">{diffResult.diff_stats.rms_diff_mjy_sr}</td>
+                        <td className="py-1 px-1.5 pl-3 text-slate-400">MJy/sr (Root mean square residual)</td>
+                      </tr>
+                      <tr className="hover:bg-slate-900/60 transition">
+                        <td className="py-1 px-1.5 font-medium text-slate-200">Peak Positive Flux</td>
+                        <td className="py-1 px-1.5 text-right font-mono text-emerald-400">+{diffResult.diff_stats.peak_positive_flux}</td>
+                        <td className="py-1 px-1.5 pl-3 text-slate-400">MJy/sr (Maximum brightened pixel)</td>
+                      </tr>
+                      <tr className="hover:bg-slate-900/60 transition">
+                        <td className="py-1 px-1.5 font-medium text-slate-200">Peak Negative Flux</td>
+                        <td className="py-1 px-1.5 text-right font-mono text-rose-400">{diffResult.diff_stats.peak_negative_flux}</td>
+                        <td className="py-1 px-1.5 pl-3 text-slate-400">MJy/sr (Maximum dimmed pixel)</td>
+                      </tr>
+                      <tr className="hover:bg-slate-900/60 transition">
+                        <td className="py-1 px-1.5 font-medium text-slate-200">Noise Level (σ)</td>
+                        <td className="py-1 px-1.5 text-right font-mono text-slate-200">±{diffResult.diff_stats.sigma_mjy_sr}</td>
+                        <td className="py-1 px-1.5 pl-3 text-slate-400">MJy/sr (1-sigma background dispersion)</td>
+                      </tr>
+                      {motionResult && (
+                        <>
+                          <tr className="hover:bg-slate-900/60 transition">
+                            <td className="py-1 px-1.5 font-medium text-slate-200">Annual Proper Motion (μ)</td>
+                            <td className="py-1 px-1.5 text-right font-mono text-cyan-300 font-bold">{motionResult.proper_motion_arcsec_yr}″/yr</td>
+                            <td className="py-1 px-1.5 pl-3 text-slate-400">{motionResult.proper_motion_mas_yr} mas/yr ({motionResult.motion_class})</td>
+                          </tr>
+                          <tr className="hover:bg-slate-900/60 transition">
+                            <td className="py-1 px-1.5 font-medium text-slate-200">Position Angle (PA)</td>
+                            <td className="py-1 px-1.5 text-right font-mono text-amber-300">{motionResult.position_angle_deg}°</td>
+                            <td className="py-1 px-1.5 pl-3 text-slate-400">Degrees (North through East)</td>
+                          </tr>
+                          <tr className="hover:bg-slate-900/60 transition">
+                            <td className="py-1 px-1.5 font-medium text-slate-200">Net Angular Shift</td>
+                            <td className="py-1 px-1.5 text-right font-mono text-slate-200">{motionResult.displacement_arcsec}″</td>
+                            <td className="py-1 px-1.5 pl-3 text-slate-400">{motionResult.displacement_pixels} pixels across baseline</td>
+                          </tr>
+                        </>
+                      )}
+                    </>
+                  ) : stackResult ? (
+                    <>
+                      <tr className="hover:bg-slate-900/60 transition">
+                        <td className="py-1 px-1.5 font-medium text-slate-200">SNR Improvement</td>
+                        <td className="py-1 px-1.5 text-right font-mono text-emerald-400 font-bold">{stackResult.snr_improvement_factor}×</td>
+                        <td className="py-1 px-1.5 pl-3 text-slate-400">Empirical gain (Theoretical √N = {stackResult.theoretical_snr_gain}×)</td>
+                      </tr>
+                      <tr className="hover:bg-slate-900/60 transition">
+                        <td className="py-1 px-1.5 font-medium text-slate-200">Co-Added Frames (N)</td>
+                        <td className="py-1 px-1.5 text-right font-mono text-cyan-300">{stackResult.frame_count}</td>
+                        <td className="py-1 px-1.5 pl-3 text-slate-400">Method: {stackResult.method.toUpperCase()}</td>
+                      </tr>
+                      <tr className="hover:bg-slate-900/60 transition">
+                        <td className="py-1 px-1.5 font-medium text-slate-200">Stacked Noise (σ)</td>
+                        <td className="py-1 px-1.5 text-right font-mono text-slate-200">±{stackResult.noise_stats.stacked_noise_sigma}</td>
+                        <td className="py-1 px-1.5 pl-3 text-slate-400">MJy/sr (vs input σ = {stackResult.noise_stats.reference_noise_sigma})</td>
+                      </tr>
+                    </>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+          </details>
         </div>
       )}
     </div>

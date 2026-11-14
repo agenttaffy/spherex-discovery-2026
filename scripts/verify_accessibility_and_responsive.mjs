@@ -76,16 +76,29 @@ const metadataPanel = fs.readFileSync(path.join(FRONTEND_SRC, 'components', 'met
 assert(searchControls.includes('w-full lg:w-80'), 'SearchControls uses responsive full width on mobile and 320px on desktop');
 assert(metadataPanel.includes('w-full lg:w-80'), 'MetadataPanel uses responsive full width on mobile and 320px on desktop');
 
-// 8. Check ComparisonView for Mode Switcher role="tablist"
+// 8. Check ComparisonView for Mode Switcher role="tablist", Diverging colormap, and Accessible Data Table
 const comparisonView = fs.readFileSync(path.join(FRONTEND_SRC, 'components', 'viewer', 'ComparisonView.tsx'), 'utf-8');
 assert(comparisonView.includes('role="tablist"'), 'ComparisonView operation mode switcher uses role="tablist"');
 assert(comparisonView.includes('role="tab"'), 'ComparisonView operation mode buttons use role="tab"');
+assert(comparisonView.includes('View Accessible Comparison Metrics Table'), 'ComparisonView includes accessible metrics table disclosure');
+assert(comparisonView.includes('diffColormap'), 'ComparisonView supports diverging colormap toggle for difference frames');
 
 // 9. Check GuidedTourModal and DiscoveryReportModal for Dialog accessibility
 const tourModal = fs.readFileSync(path.join(FRONTEND_SRC, 'components', 'layout', 'GuidedTourModal.tsx'), 'utf-8');
 const reportModal = fs.readFileSync(path.join(FRONTEND_SRC, 'components', 'science', 'DiscoveryReportModal.tsx'), 'utf-8');
 assert(tourModal.includes('role="dialog"') && tourModal.includes('aria-modal="true"'), 'GuidedTourModal has role="dialog" and aria-modal="true"');
 assert(reportModal.includes('role="dialog"') && reportModal.includes('aria-modal="true"'), 'DiscoveryReportModal has role="dialog" and aria-modal="true"');
+
+// 10. Check SpectrumChart for 102-Channel accessible table support
+assert(spectrumChart.includes('102-Channel Model'), 'SpectrumChart includes 102-channel spectrophotometric continuum accessible table toggle');
+assert(spectrumChart.includes('tableDataset'), 'SpectrumChart manages accessible table dataset state between observed bands and continuum channels');
+
+// 11. Check CanvasViewer dynamic announcements and boundary protection
+assert(canvasViewer.includes('Offset: X='), 'CanvasViewer generates dynamic offset coordinates in announcements to prevent consecutive speech silence');
+assert(canvasViewer.includes('Maximum zoom limit reached'), 'CanvasViewer announces zoom limit boundaries to screen readers');
+
+// 12. Check App.tsx for URL observation deep linking synchronization
+assert(app.includes("url.searchParams.set('obs', obs.id)"), 'App synchronizes active observation with URL search params on timeline navigation');
 
 console.log('\n============================================================');
 console.log(`Results: ${passCount} passed, ${failCount} failed`);

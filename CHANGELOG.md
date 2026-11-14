@@ -2,6 +2,16 @@
 
 All notable changes to the SPHEREx Discovery project will be documented in this file.
 
+## [1.4.1] - 2026-11-14
+### Added & Hardened (Skeptical Review & Visual Acceptance Round)
+- **Perceptually Balanced Diverging Colormap for Difference Images:** Added `apply_diverging_colormap` in `fits_processing.py` (Cool-Warm: Blue -> Light Neutral -> Crimson Red) strictly centered at 128 (zero net flux residual) per NASA Data Visualization guidance. Exposed via `/api/frames/diff` (`colormapped_base64`) with interactive palette toggle and colorbar legend in `ComparisonView.tsx`.
+- **102-Channel Spectrophotometric Model Accessible Data Table:** Enhanced `SpectrumChart.tsx`'s accessible data table disclosure with an accessible tab switcher (`role="tablist"` / `role="tab"` for `Observed Bands` vs `102-Channel Continuum Model`), enabling screen-reader and keyboard users to inspect all 102 synthesized channels with channel number, detector, wavelength, and modeled flux.
+- **Strict HTML/ARIA Table Compliance:** Corrected table semantics in `LightCurveChart.tsx` by eliminating invalid `role="button"` on `<tr>` elements and encapsulating selection actions in semantic `<button type="button">` elements inside `<td className="...">`.
+- **Dynamic Speech Announcement Feedback:** Enhanced `CanvasViewer.tsx` keyboard navigation to include dynamic coordinates in announcement strings (`Offset: X=..., Y=...`), preventing screen reader speech silence on consecutive arrow keypresses, and added zoom boundary limit vocalization (800% max, 40% min).
+- **Proactive Incompatibility Alert & Smart Compatible Epoch Pairing:** In `ComparisonView.tsx`, added proactive warnings for incompatible detector bands and auto-paired compatible detector epochs upon mounting or target selection.
+- **Multi-Epoch Survey Selection & Deep-Link State Synchronization:** Added `ALL (Multi-Epoch)` survey selection in `SearchControls.tsx` and updated `demo_service.py` to support multi-epoch matching. Synchronized active observation (`obs`) and tab (`tab`) with URL deep links.
+- **Visual Acceptance Verification:** Captured real headless Chrome screenshots at desktop (1280x800) and mobile (320x640) viewports in `docs/screenshots/`. Expanded automated accessibility test suite to 41 passing checks; expanded backend pytest test suite to 82 passing tests.
+
 ## [1.4.0] - 2026-11-14
 ### Added & Enhanced — UI/UX Refinement, NASA/USWDS Accessibility & WCAG 2.2 AA Compliance
 - **Accessible Tabular Data Tables:** Implemented `<details><summary>View Accessible Data Table</summary>...` alongside SVG charts in `SpectrumChart.tsx` and `LightCurveChart.tsx` with semantic `role="table"`, `<caption className="sr-only">`, and `<th scope="col">` column headers for screen-reader and keyboard users.

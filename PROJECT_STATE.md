@@ -1,18 +1,23 @@
 # SPHEREx Discovery — Project State
 
-**Last Updated:** 2026-11-14T20:35:00Z  
-**Current Implementation Stage:** Phase 7 UI/UX Refinement & WCAG 2.2 AA Accessibility (Accessible Tabular Data Tables, Canvas Keyboard Controls with Live Announcements, Contrast >= 4.5:1, Standardized Focus Rings, ARIA Navigation Roles, 320px Responsive Viewport Reflow, 81 Passing Pytest Tests, 34 Automated UI Accessibility Checks, Clean Production Build).
+**Last Updated:** 2026-11-14T20:53:00Z  
+**Current Implementation Stage:** Phase 7 UI/UX Refinement & WCAG 2.2 AA Accessibility (Perceptually Balanced Diverging Difference Palettes, 102-Channel Accessible Spectrophotometric Continuum Tables, Semantic HTML Table Buttons, Dynamic Canvas Speech Announcements, Multi-Epoch ALL Survey Search, Deep-Link State Synchronization, Headless Visual Acceptance Screenshots, 82 Passing Pytest Tests, 41 Passing Accessibility Checks, Clean Production Build).
 
 ---
 
 ## 1. Verified Working Features
-- **NASA Data Visualization & WCAG 2.2 AA Accessibility (`SpectrumChart.tsx`, `LightCurveChart.tsx`, `CanvasViewer.tsx`, `index.css`):**
-  - **Accessible Tabular Data Alternatives:** Implemented `<details><summary>View Accessible Data Table</summary>...` alongside SVG charts with semantic `role="table"`, `<caption className="sr-only">`, and `<th scope="col">` column headers for full screen-reader accessibility.
-  - **Canvas Keyboard Controls:** Added arrow key panning (ArrowUp, ArrowDown, ArrowLeft, ArrowRight), zoom (`+`/`-`), and reset (`0`) with `tabIndex={0}`, visible focus indicators, and screen-reader announcements via `aria-live="polite"`.
-  - **WCAG 2.2 AA Color Contrast:** Upgraded typography and metadata text across the application to meet or exceed 4.5:1 contrast against dark space-navy backgrounds.
+- **NASA Data Visualization & WCAG 2.2 AA Accessibility (`SpectrumChart.tsx`, `LightCurveChart.tsx`, `CanvasViewer.tsx`, `ComparisonView.tsx`, `index.css`):**
+  - **Diverging Colormap for Difference Imagery (`fits_processing.py`, `ComparisonView.tsx`):** Implemented `apply_diverging_colormap` (Cool-Warm: Blue -> Light Neutral -> Crimson Red) centered strictly at 128 (zero net flux residual) per NASA Data Visualization guidelines, complete with palette toggle and colorbar legend.
+  - **102-Channel Spectrophotometric Continuum Accessible Table (`SpectrumChart.tsx`):** Added accessible dataset switcher tablist (`Observed Bands` vs `102-Channel Continuum Model`), enabling screen-reader and keyboard users to inspect all 102 synthesized spectrophotometric channels with channel index, detector, wavelength, and flux.
+  - **HTML/ARIA Table Semantics (`LightCurveChart.tsx`):** Removed invalid `role="button"` from table rows (`<tr>`); encapsulated interactive selection in semantic `<button type="button">` inside `<td className="...">` with visible focus rings.
+  - **Dynamic Canvas Speech Announcements (`CanvasViewer.tsx`):** Dynamic coordinates in announcement strings (`Offset: X=..., Y=...`) eliminate screen reader silence on consecutive pan keypresses, with clear announcements when zoom limits (800% max, 40% min) are reached.
+  - **Accessible Tabular Data Alternatives:** Implemented `<details><summary>View Accessible Data Table</summary>...` alongside SVG charts and comparison metrics with semantic `role="table"`, `<caption className="sr-only">`, and `<th scope="col">` column headers for full screen-reader accessibility.
+  - **Canvas Keyboard Controls:** Added arrow key panning (ArrowUp, ArrowDown, ArrowLeft, ArrowRight), zoom (`+`/`-`), and reset (`0`/`Home`) with `tabIndex={0}`, visible focus indicators, and screen-reader announcements via `aria-live="polite"`.
+  - **WCAG 2.2 AA Color Contrast:** Standardized typography and metadata text across the application to meet or exceed 4.5:1 contrast against dark space-navy backgrounds.
   - **High-Visibility Focus Indicators:** Standardized global `focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none` in `index.css` and on all interactive controls.
   - **ARIA Role Hierarchy:** Equipped all primary navigation tabs, telemetry modes, viewer modes, and comparison modes with `role="tablist"` and `role="tab"` (`aria-selected`, `aria-controls`), and modal dialogs with `role="dialog"` (`aria-modal="true"`).
-  - **320px Responsive Viewport Reflow:** Added a deliberate mobile workspace panel switcher tabs (`[Canvas] [Target] [SED & Telemetry]`), responsive wrapping on headers and timeline player, and `min-width: 320px` safety preventing horizontal page overflow.
+  - **320px Responsive Viewport Reflow:** Added deliberate mobile workspace panel switcher tabs (`[Canvas] [Target] [SED & Telemetry]`), responsive wrapping on headers and timeline player, and `min-width: 320px` safety preventing horizontal page overflow.
+  - **Multi-Epoch Survey Search & Deep-Link Synchronization (`SearchControls.tsx`, `App.tsx`, `demo_service.py`):** Added `ALL (Multi-Epoch)` survey release button; synchronized active observation (`obs`) and tab (`tab`) with URL deep links.
 - **SPHEREx Level 2 FLAGS Bit Definitions & Source Mask Distinction (`fits_processing.py`):**
   - Parses documented `MSKN*`/`MSKM*` FITS header cards dynamically.
   - Distinguishes nominal astronomical source detections (`SOURCE`, bit 21 = 2,097,152; `FULLSAMPLE`, bit 12 = 4,096) from fatal detector defects (`NONFUNC` dead pixel = 64, `OVERFLOW` saturation = 2, `SUR_ERROR` ramp fit error = 4, `HOT` = 1,024, `COLD` = 2,048, `NONLINEAR` = 32,768, `SNOWBALL` cosmic ray = 134,217,728, `TRANSIENT` = 1).

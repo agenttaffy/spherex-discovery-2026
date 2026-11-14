@@ -162,7 +162,7 @@ class DemoService:
         """
         matches: List[ObservationRecord] = []
         for rec in self.demo_records:
-            if collection and rec.collection != collection:
+            if collection and collection != "ALL" and rec.collection != collection:
                 continue
             if detector and detector != "ALL" and detector.lower() not in rec.detector.lower():
                 continue

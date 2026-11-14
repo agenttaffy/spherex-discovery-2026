@@ -95,6 +95,7 @@ async def diff_frames(req: DiffRequest = Body(...)):
 
         diff_u8, stats = compute_difference_frame(i1, i2, wcs1=h1, wcs2=h2, mask1=mask1, mask2=mask2)
         diff_b64 = render_image_to_base64(diff_u8, format=req.format or "png")
+        colormapped_b64 = render_image_to_base64(diff_u8, colormap="coolwarm", format=req.format or "png")
 
         return {
             "eligible": True,
@@ -103,6 +104,7 @@ async def diff_frames(req: DiffRequest = Body(...)):
             "diff_stats": stats,
             "dimensions": [int(diff_u8.shape[0]), int(diff_u8.shape[1])],
             "image_base64": diff_b64,
+            "colormapped_base64": colormapped_b64,
         }
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))

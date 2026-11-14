@@ -15,6 +15,7 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
   const [selectedDetector, setSelectedDetector] = useState<string | null>(null);
   const [hoveredBand, setHoveredBand] = useState<SpectrumBandPoint | null>(null);
   const [hoveredChannel, setHoveredChannel] = useState<SpectralChannel | null>(null);
+  const [tableDataset, setTableDataset] = useState<'bands' | 'channels'>('bands');
 
   if (loading) {
     return (
@@ -405,44 +406,108 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
             <Table className="w-3.5 h-3.5 text-cyan-400" />
             <span>View Accessible Data Table</span>
           </span>
-          <span className="text-[9px] text-slate-400 font-mono">({bands.length} bands{showChannels102 ? ' + 102 channels' : ''})</span>
+          <span className="text-[9px] text-slate-400 font-mono">
+            ({bands.length} observed bands{channels_102 && channels_102.length > 0 ? ` · ${channels_102.length} modeled channels` : ''})
+          </span>
         </summary>
-        <div className="mt-2 overflow-x-auto max-h-48 overflow-y-auto">
-          <table className="w-full text-left border-collapse" role="table" aria-label="SPHEREx Spectral Energy Distribution Observed Detector Bands">
-            <caption className="sr-only">SPHEREx Infrared SED photometrically observed detector bands and flux values</caption>
-            <thead>
-              <tr className="border-b border-slate-800 text-slate-400 text-[9px] uppercase tracking-wider">
-                <th scope="col" className="py-1 px-1.5 font-semibold">Detector</th>
-                <th scope="col" className="py-1 px-1.5 font-semibold text-right">λ (µm)</th>
-                <th scope="col" className="py-1 px-1.5 font-semibold text-right">Flux (MJy/sr)</th>
-                <th scope="col" className="py-1 px-1.5 font-semibold text-right">± Err</th>
-                <th scope="col" className="py-1 px-1.5 font-semibold text-right">SNR</th>
-                <th scope="col" className="py-1 px-1.5 font-semibold text-center">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60 text-slate-300">
-              {bands.map((b) => (
-                <tr key={b.detector} className="hover:bg-slate-900/60 transition">
-                  <td className="py-1 px-1.5 font-semibold" style={{ color: b.color }}>{b.detector}</td>
-                  <td className="py-1 px-1.5 text-right font-mono">{b.wavelength_um.toFixed(3)}</td>
-                  <td className="py-1 px-1.5 text-right font-mono font-medium text-slate-100">{b.flux_mjy_sr.toFixed(2)}</td>
-                  <td className="py-1 px-1.5 text-right font-mono text-slate-400">±{b.flux_err_mjy_sr.toFixed(2)}</td>
-                  <td className="py-1 px-1.5 text-right font-mono text-cyan-300 font-semibold">{b.snr}σ</td>
-                  <td className="py-1 px-1.5 text-center">
-                    {b.is_observed ? (
-                      <span className="text-emerald-400 font-semibold">Observed</span>
-                    ) : (
-                      <span className="text-slate-400">Modeled</span>
-                    )}
-                  </td>
+
+        {/* Dataset switcher for screen reader and keyboard exploration */}
+        <div className="flex items-center gap-1.5 mt-2.5 mb-1.5 border-b border-slate-800 pb-1.5" role="tablist" aria-label="Accessible table dataset selection">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tableDataset === 'bands'}
+            onClick={() => setTableDataset('bands')}
+            className={`px-2 py-0.5 rounded text-[10px] font-mono transition focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${
+              tableDataset === 'bands'
+                ? 'bg-cyan-500/20 text-cyan-300 font-semibold border border-cyan-500/40'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            Observed Bands ({bands.length})
+          </button>
+          {channels_102 && channels_102.length > 0 && (
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tableDataset === 'channels'}
+              onClick={() => setTableDataset('channels')}
+              className={`px-2 py-0.5 rounded text-[10px] font-mono transition focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${
+                tableDataset === 'channels'
+                  ? 'bg-indigo-500/20 text-indigo-300 font-semibold border border-indigo-500/40'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              102-Channel Model ({channels_102.length})
+            </button>
+          )}
+        </div>
+
+        <div className="overflow-x-auto max-h-52 overflow-y-auto">
+          {tableDataset === 'bands' ? (
+            <table className="w-full text-left border-collapse" role="table" aria-label="SPHEREx Spectral Energy Distribution Observed Detector Bands">
+              <caption className="sr-only">SPHEREx Infrared SED photometrically observed detector bands and flux values</caption>
+              <thead>
+                <tr className="border-b border-slate-800 text-slate-400 text-[9px] uppercase tracking-wider">
+                  <th scope="col" className="py-1 px-1.5 font-semibold">Detector</th>
+                  <th scope="col" className="py-1 px-1.5 font-semibold text-right">λ (µm)</th>
+                  <th scope="col" className="py-1 px-1.5 font-semibold text-right">Flux (MJy/sr)</th>
+                  <th scope="col" className="py-1 px-1.5 font-semibold text-right">± Err</th>
+                  <th scope="col" className="py-1 px-1.5 font-semibold text-right">SNR</th>
+                  <th scope="col" className="py-1 px-1.5 font-semibold text-center">Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          {showChannels102 && (
-            <div className="mt-2 pt-2 border-t border-slate-800 text-[9px] text-slate-400">
-              <span className="font-semibold text-indigo-300">Note on 102 channels:</span> Showing 6 measured detector bands above. The 102 channels represent the continuous PCHIP spline interpolated spectrophotometric SED model across SPHEREx linear variable filter dispersion.
-            </div>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60 text-slate-300">
+                {bands.map((b) => (
+                  <tr key={b.detector} className="hover:bg-slate-900/60 transition">
+                    <td className="py-1 px-1.5 font-semibold" style={{ color: b.color }}>{b.detector}</td>
+                    <td className="py-1 px-1.5 text-right font-mono">{b.wavelength_um.toFixed(3)}</td>
+                    <td className="py-1 px-1.5 text-right font-mono font-medium text-slate-100">{b.flux_mjy_sr.toFixed(2)}</td>
+                    <td className="py-1 px-1.5 text-right font-mono text-slate-400">±{b.flux_err_mjy_sr.toFixed(2)}</td>
+                    <td className="py-1 px-1.5 text-right font-mono text-cyan-300 font-semibold">{b.snr}σ</td>
+                    <td className="py-1 px-1.5 text-center">
+                      {b.is_observed ? (
+                        <span className="text-emerald-400 font-semibold">Observed</span>
+                      ) : (
+                        <span className="text-slate-400">Modeled</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <table className="w-full text-left border-collapse" role="table" aria-label="SPHEREx 102-Channel Spectrophotometric Continuum Model">
+              <caption className="sr-only">SPHEREx 102-channel spectrophotometric continuum model interpolated fluxes across linear variable filters</caption>
+              <thead>
+                <tr className="border-b border-slate-800 text-slate-400 text-[9px] uppercase tracking-wider">
+                  <th scope="col" className="py-1 px-1.5 font-semibold">Ch #</th>
+                  <th scope="col" className="py-1 px-1.5 font-semibold">Detector</th>
+                  <th scope="col" className="py-1 px-1.5 font-semibold text-right">λ (µm)</th>
+                  <th scope="col" className="py-1 px-1.5 font-semibold text-right">Flux (MJy/sr)</th>
+                  <th scope="col" className="py-1 px-1.5 font-semibold text-right">mJy</th>
+                  <th scope="col" className="py-1 px-1.5 font-semibold text-center">Type</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60 text-slate-300">
+                {channels_102?.map((c) => (
+                  <tr key={c.channel_index} className="hover:bg-slate-900/60 transition">
+                    <td className="py-1 px-1.5 font-mono text-slate-400">#{c.channel_index}</td>
+                    <td className="py-1 px-1.5 font-semibold" style={{ color: c.color }}>{c.detector}</td>
+                    <td className="py-1 px-1.5 text-right font-mono">{c.wavelength_um.toFixed(4)}</td>
+                    <td className="py-1 px-1.5 text-right font-mono font-medium text-slate-100">{c.flux_mjy_sr.toFixed(2)}</td>
+                    <td className="py-1 px-1.5 text-right font-mono text-slate-400">{c.flux_density_mjy.toFixed(2)}</td>
+                    <td className="py-1 px-1.5 text-center font-mono text-[8.5px]">
+                      {c.is_observed_band ? (
+                        <span className="text-emerald-400 font-semibold">Anchor</span>
+                      ) : (
+                        <span className="text-indigo-300">Interpolated</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
         </div>
       </details>

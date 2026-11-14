@@ -208,16 +208,20 @@ export const LightCurveChart: React.FC<LightCurveChartProps> = ({
                   key={p.obs_id + i}
                   className={`hover:bg-slate-900/60 transition cursor-pointer ${selectedObsId === p.obs_id ? 'bg-cyan-950/50 text-cyan-200' : ''}`}
                   onClick={() => onSelectObsId && onSelectObsId(p.obs_id)}
-                  tabIndex={0}
-                  role="button"
-                  aria-label={`Select observation ${p.obs_id}`}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      onSelectObsId && onSelectObsId(p.obs_id);
-                    }
-                  }}
                 >
-                  <td className="py-1 px-1.5 font-semibold text-cyan-300 font-mono">{p.obs_id}</td>
+                  <td className="py-1 px-1.5 font-semibold text-cyan-300 font-mono">
+                    <button
+                      type="button"
+                      className="text-left font-semibold text-cyan-300 hover:text-cyan-200 hover:underline focus-visible:ring-2 focus-visible:ring-cyan-400 rounded outline-none"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectObsId && onSelectObsId(p.obs_id);
+                      }}
+                      aria-label={`Select observation ${p.obs_id}, date ${p.utc_date?.slice(0, 10) || 'N/A'}`}
+                    >
+                      {p.obs_id}
+                    </button>
+                  </td>
                   <td className="py-1 px-1.5 text-slate-300 font-mono">{p.utc_date?.slice(0, 10) || 'N/A'}</td>
                   <td className="py-1 px-1.5 text-indigo-300 font-mono">{p.detector}</td>
                   <td className="py-1 px-1.5 text-right font-medium text-slate-100 font-mono">{p.net_flux_mjy_sr.toFixed(2)}</td>

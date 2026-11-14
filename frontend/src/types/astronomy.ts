@@ -77,6 +77,7 @@ export interface DiffResult {
   };
   dimensions?: [number, number];
   image_base64: string;
+  colormapped_base64?: string;
 }
 
 export interface CatalogSource {
