@@ -25,17 +25,6 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({
 }) => {
   const [telemetryTab, setTelemetryTab] = useState<'lightcurve' | 'spectrum'>('spectrum');
 
-  if (!frame) {
-    return (
-      <div className="w-80 bg-slate-900/60 border-l border-slate-800 p-4 text-xs text-slate-500 flex flex-col items-center justify-center text-center">
-        <Info className="w-8 h-8 opacity-40 mb-2 text-cyan-400" />
-        <p>Select an observation frame to inspect calibrated telemetry, quality bitmasks, and provenance.</p>
-      </div>
-    );
-  }
-
-  const { pixel_stats, flag_summary, wcs } = frame;
-
   return (
     <div className="w-80 bg-slate-900/60 border-l border-slate-800 p-4 flex flex-col gap-4 overflow-y-auto text-xs">
       {/* Telemetry Mode Tabs Switcher */}
@@ -71,39 +60,44 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({
         <LightCurveChart
           series={lightCurve}
           loading={loadingPhotometry}
-          selectedObsId={frame.obs_id}
+          selectedObsId={frame?.obs_id}
           onSelectObsId={onSelectObsId}
         />
       )}
 
-      <div>
-        <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 mb-2">
-          <Tag className="w-3.5 h-3.5 text-cyan-400" />
-          Observation Metadata
-        </label>
-        <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-3 space-y-2 font-mono">
-          <div className="flex justify-between items-center text-[11px]">
-            <span className="text-slate-400">Obs ID:</span>
-            <span className="text-cyan-300 font-semibold">{frame.obs_id}</span>
+      {frame ? (
+        (() => {
+          const { pixel_stats, flag_summary, wcs } = frame;
+          return (
+            <>
+              <div>
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 mb-2">
+              <Tag className="w-3.5 h-3.5 text-cyan-400" />
+              Observation Metadata
+            </label>
+            <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-3 space-y-2 font-mono">
+              <div className="flex justify-between items-center text-[11px]">
+                <span className="text-slate-400">Obs ID:</span>
+                <span className="text-cyan-300 font-semibold">{frame.obs_id}</span>
+              </div>
+              <div className="flex justify-between items-center text-[11px]">
+                <span className="text-slate-400">Release:</span>
+                <span className="text-slate-200 uppercase">{frame.collection}</span>
+              </div>
+              <div className="flex justify-between items-center text-[11px]">
+                <span className="text-slate-400">Detector:</span>
+                <span className="text-indigo-300 font-semibold">{frame.detector}</span>
+              </div>
+              <div className="flex justify-between items-center text-[11px]">
+                <span className="text-slate-400">UTC Date:</span>
+                <span className="text-slate-200">{frame.utc_date || 'N/A'}</span>
+              </div>
+              <div className="flex justify-between items-center text-[11px]">
+                <span className="text-slate-400">Dimensions:</span>
+                <span className="text-slate-300">{frame.dimensions.join(' × ')} px</span>
+              </div>
+            </div>
           </div>
-          <div className="flex justify-between items-center text-[11px]">
-            <span className="text-slate-400">Release:</span>
-            <span className="text-slate-200 uppercase">{frame.collection}</span>
-          </div>
-          <div className="flex justify-between items-center text-[11px]">
-            <span className="text-slate-400">Detector:</span>
-            <span className="text-indigo-300 font-semibold">{frame.detector}</span>
-          </div>
-          <div className="flex justify-between items-center text-[11px]">
-            <span className="text-slate-400">UTC Date:</span>
-            <span className="text-slate-200">{frame.utc_date || 'N/A'}</span>
-          </div>
-          <div className="flex justify-between items-center text-[11px]">
-            <span className="text-slate-400">Dimensions:</span>
-            <span className="text-slate-300">{frame.dimensions.join(' × ')} px</span>
-          </div>
-        </div>
-      </div>
 
       {/* Scientific Pixel Telemetry */}
       <div>
@@ -190,18 +184,27 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({
         </button>
       )}
 
-      {/* Provenance & Citation Link */}
-      <div className="mt-auto pt-1">
-        <a
-          href={frame.provenance_url}
-          target="_blank"
-          rel="noreferrer"
-          className="w-full py-1.5 px-3 bg-slate-950 border border-slate-800 hover:border-cyan-500/50 rounded-lg text-slate-400 hover:text-cyan-300 text-[11px] flex items-center justify-center gap-1.5 transition font-mono"
-        >
-          <span>Raw NASA FITS Cutout</span>
-          <ExternalLink className="w-3 h-3" />
-        </a>
-      </div>
+          {/* Provenance & Citation Link */}
+          <div className="mt-auto pt-1">
+            <a
+              href={frame.provenance_url}
+              target="_blank"
+              rel="noreferrer"
+              className="w-full py-1.5 px-3 bg-slate-950 border border-slate-800 hover:border-cyan-500/50 rounded-lg text-slate-400 hover:text-cyan-300 text-[11px] flex items-center justify-center gap-1.5 transition font-mono"
+            >
+              <span>Raw NASA FITS Cutout</span>
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
+        </>
+      );
+    })()
+  ) : (
+        <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-4 text-xs text-slate-500 flex flex-col items-center justify-center text-center mt-2">
+          <Info className="w-6 h-6 opacity-40 mb-2 text-cyan-400" />
+          <p>Select an observation frame from the timeline to inspect calibrated pixel stats, quality bitmasks, and WCS header.</p>
+        </div>
+      )}
     </div>
   );
 };

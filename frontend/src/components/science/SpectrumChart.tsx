@@ -12,6 +12,7 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
   loading = false,
 }) => {
   const [showChannels102, setShowChannels102] = useState(false);
+  const [selectedDetector, setSelectedDetector] = useState<string | null>(null);
   const [hoveredBand, setHoveredBand] = useState<SpectrumBandPoint | null>(null);
   const [hoveredChannel, setHoveredChannel] = useState<SpectralChannel | null>(null);
 
@@ -106,6 +107,33 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
         </button>
       </div>
 
+      {/* Detector Array Quick Filter Pills */}
+      <div className="flex items-center justify-between gap-1 text-[9px] font-mono">
+        {detectorBands.map((db) => {
+          const fullName = `SPHEREx-${db.name}`;
+          const isSel = selectedDetector === fullName;
+          return (
+            <button
+              key={db.name}
+              onClick={() => setSelectedDetector(isSel ? null : fullName)}
+              className={`flex-1 py-0.5 rounded text-center transition border ${
+                isSel
+                  ? 'font-bold border-white/60 shadow-sm'
+                  : 'opacity-70 hover:opacity-100 border-slate-800 bg-slate-950/60'
+              }`}
+              style={{
+                color: db.color,
+                borderColor: isSel ? db.color : undefined,
+                backgroundColor: isSel ? `${db.color}22` : undefined,
+              }}
+              title={`Filter ${fullName} (${db.min}–${db.max} µm)`}
+            >
+              {db.name}
+            </button>
+          );
+        })}
+      </div>
+
       {/* SVG Spectrum Plot */}
       <div className="relative">
         <svg
@@ -186,21 +214,27 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
               const cx = getX(ch.wavelength_um);
               const cy = getY(ch.flux_mjy_sr);
               const isHov = hoveredChannel?.channel_index === ch.channel_index;
+              const isDimmed = selectedDetector && ch.detector !== selectedDetector;
               return (
-                <circle
+                <g
                   key={ch.channel_index}
-                  cx={cx}
-                  cy={cy}
-                  r={isHov ? 2.8 : 1.2}
-                  fill={ch.color}
-                  opacity={isHov ? 1.0 : 0.65}
                   className="cursor-pointer"
                   onMouseEnter={() => {
                     setHoveredChannel(ch);
                     setHoveredBand(null);
                   }}
                   onMouseLeave={() => setHoveredChannel(null)}
-                />
+                >
+                  <circle cx={cx} cy={cy} r={6} fill="transparent" />
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r={isHov ? 3.0 : 1.3}
+                    fill={ch.color}
+                    opacity={isDimmed ? 0.2 : isHov ? 1.0 : 0.75}
+                    pointerEvents="none"
+                  />
+                </g>
               );
             })}
 
@@ -211,16 +245,19 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
             const cyErrTop = getY(Math.min(maxFlux * 1.15, b.flux_mjy_sr + b.flux_err_mjy_sr));
             const cyErrBot = getY(Math.max(0, b.flux_mjy_sr - b.flux_err_mjy_sr));
             const isHovered = hoveredBand?.detector === b.detector;
+            const isDimmed = selectedDetector && b.detector !== selectedDetector;
 
             return (
               <g
                 key={b.detector}
                 className="cursor-pointer"
+                opacity={isDimmed ? 0.3 : 1.0}
                 onMouseEnter={() => {
                   setHoveredBand(b);
                   setHoveredChannel(null);
                 }}
                 onMouseLeave={() => setHoveredBand(null)}
+                onClick={() => setSelectedDetector(selectedDetector === b.detector ? null : b.detector)}
               >
                 {/* Photometric Error Bar */}
                 <line

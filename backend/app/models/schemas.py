@@ -4,7 +4,7 @@ from typing import List, Optional, Dict, Any
 class ObservationRecord(BaseModel):
     id: str
     obs_id: str
-    collection: str
+    collection: Optional[str] = "spherex_dr1"
     detector: str
     mjd: Optional[float] = None
     utc_date: Optional[str] = None

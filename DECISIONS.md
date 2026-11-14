@@ -78,3 +78,8 @@
 - **Date:** 2026-11-14
 - **Decision:** Implement multi-frame image stacking endpoint (`/api/frames/stack`) supporting `mean`, `median`, and `sum` methods with `reproject_interp` registration, paired with a frontend operation mode switcher in `ComparisonView.tsx`.
 - **Rationale:** While temporal differencing ($I_2 - I_1$) is optimal for finding fast-moving objects and transients, it adds noise ($\sqrt{2}\sigma$). Conversely, co-addition ($I_1 + I_2$) suppresses noise by $\sim\sqrt{N}$ (+41.4% SNR gain for $N=2$), enabling discoveries of extremely faint static sources, brown dwarfs, and high-redshift infrared galaxies.
+
+## ADR-017: Robust Background Noise Estimation, Non-Overlapping WCS Enforcement & Multi-Epoch Stacking Scope
+- **Date:** 2026-11-14
+- **Decision:** Use iterative sigma-clipping and MAD in `stacking.py` for noise calculations, reject non-overlapping celestial WCS footprints with explicit 400 errors, enforce duplicate frame validation, and add a multi-epoch scope selector ("Selected Pair" vs "All Epochs") in `ComparisonView.tsx`.
+- **Rationale:** Traditional whole-image standard deviation (`np.std`) is corrupted by bright point sources and stellar cores (yielding zero measured noise suppression on real targets). Robust background sigma isolation measures true $\sqrt{N}$ noise suppression. Explicit non-overlapping footprint rejection prevents physically meaningless stacking of distant sky coordinates. The multi-epoch scope allows users to stack across all available detector arrays and survey epochs simultaneously.

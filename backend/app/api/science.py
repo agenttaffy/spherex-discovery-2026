@@ -45,6 +45,9 @@ async def get_catalogs(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+    if radius <= 0 or radius > 1.0:
+        raise HTTPException(status_code=400, detail="Radius must be between 0.001 and 1.0 degrees.")
+
     sources = await catalog_service.query_catalog(
         ra=ra_deg,
         dec=dec_deg,
@@ -74,6 +77,9 @@ async def get_photometry(
         ra_deg, dec_deg = parse_coordinates(ra, dec)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+    if fov <= 0 or fov > 2.0:
+        raise HTTPException(status_code=400, detail="FOV must be between 0.001 and 2.0 degrees.")
 
     coll_filter = None if (not collection or collection.lower() in ("all", "none")) else collection
 
@@ -147,6 +153,9 @@ async def get_spectrum(
         ra_deg, dec_deg = parse_coordinates(ra, dec)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+    if fov <= 0 or fov > 2.0:
+        raise HTTPException(status_code=400, detail="FOV must be between 0.001 and 2.0 degrees.")
 
     coll_filter = None if (not collection or collection.lower() in ("all", "none")) else collection
 

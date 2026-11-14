@@ -1,7 +1,7 @@
 # SPHEREx Discovery — Project State
 
-**Last Updated:** 2026-11-14T18:05:00Z  
-**Current Implementation Stage:** Phase 5 Complete (On-The-Fly Spectra Generation SED: Flux vs. Wavelength $\lambda$ across 6 Detector Arrays & 102 Channels, Astronomical Image Co-Addition & Stacking with $\sim\sqrt{N}$ SNR Improvement, Operation Mode Switcher in ComparisonView, 64 Passing Pytest Tests, Clean Production Build).
+**Last Updated:** 2026-11-14T18:15:00Z  
+**Current Implementation Stage:** Phase 5 Fully Hardened & Verified (On-The-Fly Spectra Generation SED: Flux vs. Wavelength $\lambda$ across 6 Detector Arrays & 102 Channels with PCHIP Monotonic Interpolation, Astronomical Image Co-Addition & Stacking with Robust Sigma-Clipped Background Noise and $\sim\sqrt{N}$ SNR Improvement, Multi-Epoch Stacking Scope Switcher in ComparisonView, 69 Passing Pytest Tests, Clean Production Build).
 
 ---
 
@@ -61,7 +61,7 @@
   - Formatted J2000 sexagesimal target reports with astrometric vectors, light curve stats, and verified IRSA DOI 10.26131/IRSA678 citations.
 - **Guided Educational Tour Modal (`GuidedTourModal.tsx`):**
   - 4-step interactive walkthrough explaining SPHEREx LVF optics, dipole vs monopole signatures, official targets, and judging criteria alignment.
-- **Comprehensive Automated Test Suite:** 64 passing pytest tests covering unit, science, 3D WCS reprojection, rotated WCS alignment, WebP, co-addition/stacking, 102-channel SED, offline resilience, and integration flows.
+- **Comprehensive Automated Test Suite:** 69 passing pytest tests covering unit, science, 3D WCS reprojection, rotated WCS alignment, WebP, robust background co-addition/stacking, 102-channel SED, offline resilience, and integration flows.
 
 ---
 
@@ -72,11 +72,11 @@
 - **Viewers:**
   - Canvas Viewer (sub-pixel photometric & astrometric inspection).
   - Aladin Lite v3 (HiPS full-sky context).
-  - Comparison View (Difference $I_2 - I_1$ vs Co-Add Stack $I_1 + I_2$).
+  - Comparison View (Difference $I_2 - I_1$ vs Co-Add Stack $I_1 + I_2$ with Selected Pair and All Epochs scopes).
 - **Data:** Direct NASA IRSA SIA2/IBE protocols with disk-backed cache in `data/cache/` and manifest in `data/manifests/`.
 
 ---
 
 ## 3. Latest Build & Test Status
-- **Backend pytest:** 64 passed in 5.28s (0 failures).
-- **Frontend build:** `npm run build` succeeded in 2.24s (0 type errors, 0 warnings).
+- **Backend pytest:** 69 passed in 4.93s (0 failures).
+- **Frontend build:** `npm run build` succeeded in 2.21s (0 type errors, 0 warnings).

@@ -1,4 +1,5 @@
 from typing import Optional, Literal, List
+import numpy as np
 from fastapi import APIRouter, Query, HTTPException, Body
 from pydantic import BaseModel
 from app.models.schemas import FrameResponse
@@ -111,15 +112,36 @@ async def stack_frames(req: StackRequest = Body(...)):
     """
     if not req.frame_ids or len(req.frame_ids) < 2:
         raise HTTPException(status_code=400, detail="At least 2 frame IDs are required for co-addition/stacking.")
+    if len(set(req.frame_ids)) < 2:
+        raise HTTPException(status_code=400, detail="At least 2 distinct frame IDs are required for co-addition/stacking.")
 
     images = []
     wcs_list = []
     resolved_ids = []
+    metas = []
 
     for fid in req.frame_ids:
         meta = OBSERVATION_REGISTRY.get(fid)
         if not meta:
             raise HTTPException(status_code=404, detail=f"Frame ID '{fid}' not found in observation registry.")
+        metas.append(meta)
+
+    # Check celestial proximity across frames to ensure overlapping footprints
+    ref_ra = float(metas[0].get("ra", 0.0))
+    ref_dec = float(metas[0].get("dec", 0.0))
+    for m in metas[1:]:
+        c_ra = float(m.get("ra", 0.0))
+        c_dec = float(m.get("dec", 0.0))
+        delta_ra = (ref_ra - c_ra + 180.0) % 360.0 - 180.0
+        mean_dec_rad = np.radians((ref_dec + c_dec) / 2.0)
+        dist_deg = float(np.hypot(delta_ra * np.cos(mean_dec_rad), ref_dec - c_dec))
+        if dist_deg > 0.5:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Frame '{m.get('id')}' pointing is too far from reference frame ({dist_deg:.2f}° > 0.5°). Co-addition requires overlapping celestial footprints."
+            )
+
+    for fid, meta in zip(req.frame_ids, metas):
 
         b = None
         if "cached_cutout_url" in meta:
@@ -170,5 +192,7 @@ async def stack_frames(req: StackRequest = Body(...)):
             "alignment_method": stats["alignment_method"],
             "image_base64": stacked_b64,
         }
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error computing frame co-addition: {e}")

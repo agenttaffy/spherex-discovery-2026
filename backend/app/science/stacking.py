@@ -3,6 +3,26 @@ import numpy as np
 from astropy.wcs import WCS
 from app.science.image_registration import estimate_pixel_shift
 
+def compute_robust_noise_sigma(img: np.ndarray) -> float:
+    """
+    Robust astronomical noise estimation using iterative sigma-clipped standard deviation
+    with fallback to Median Absolute Deviation (MAD), preventing bright point sources
+    and cosmic rays from corrupting the measured background noise floor.
+    """
+    finite = img[np.isfinite(img)]
+    if len(finite) == 0:
+        return 1.0
+    try:
+        from astropy.stats import sigma_clipped_stats
+        _, _, s = sigma_clipped_stats(finite, sigma=2.5, maxiters=5)
+        sigma = float(s)
+    except Exception:
+        med = float(np.median(finite))
+        sigma = float(1.4826 * np.median(np.abs(finite - med)))
+    if not np.isfinite(sigma) or sigma < 1e-6:
+        sigma = float(np.std(finite)) if len(finite) > 0 else 1.0
+    return max(float(sigma), 1e-6)
+
 def compute_coadd_stack(
     images: List[np.ndarray],
     wcs_list: Optional[List[Optional[Any]]] = None,
@@ -21,7 +41,7 @@ def compute_coadd_stack(
     if len(images) == 1:
         img = images[0].astype(np.float32)
         finite = img[np.isfinite(img)]
-        sigma = float(np.std(finite)) if len(finite) > 0 else 1.0
+        sigma = compute_robust_noise_sigma(img)
         return img, {
             "method": method,
             "frame_count": 1,
@@ -39,9 +59,9 @@ def compute_coadd_stack(
     ref_img = images[0].copy().astype(np.float32)
     ref_wcs = wcs_list[0] if (wcs_list and len(wcs_list) > 0) else None
     
-    # Calculate single-frame reference noise floor (standard deviation of finite pixels or background)
-    ref_finite = ref_img[np.isfinite(ref_img)]
-    ref_sigma = float(np.std(ref_finite)) if len(ref_finite) > 0 else 1.0
+    # Calculate single-frame robust reference noise floor across input frames
+    ref_sigmas = [compute_robust_noise_sigma(im) for im in images]
+    ref_sigma = float(np.median(ref_sigmas))
     if ref_sigma < 1e-6:
         ref_sigma = 1.0
 
@@ -82,6 +102,10 @@ def compute_coadd_stack(
                         curr_img[footprint == 0] = np.nan
                         aligned = True
                         alignment_methods_used.append("wcs_reproject")
+                    else:
+                        raise ValueError(f"Frames have no overlapping celestial sky coverage.")
+            except ValueError:
+                raise
             except Exception:
                 pass
 
@@ -121,6 +145,8 @@ def compute_coadd_stack(
             stacked = np.nanmedian(cube, axis=0)
         elif method == "sum":
             stacked = np.nansum(cube, axis=0)
+            all_nan_mask = np.all(~np.isfinite(cube), axis=0)
+            stacked[all_nan_mask] = np.nan
         else:  # default "mean"
             stacked = np.nanmean(cube, axis=0)
 
@@ -132,11 +158,8 @@ def compute_coadd_stack(
     else:
         stacked = np.zeros(ref_img.shape, dtype=np.float32)
 
-    # Compute stacked noise statistics
-    stacked_finite = stacked[np.isfinite(stacked)]
-    stacked_sigma = float(np.std(stacked_finite)) if len(stacked_finite) > 0 else 1.0
-    if stacked_sigma < 1e-6:
-        stacked_sigma = 1.0
+    # Compute stacked noise statistics using robust sigma clipping
+    stacked_sigma = compute_robust_noise_sigma(stacked)
 
     theoretical_gain = float(np.sqrt(n_frames))
     

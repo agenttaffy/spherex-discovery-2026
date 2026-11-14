@@ -81,13 +81,14 @@ class IRSAClient:
                             continue
 
                         # Generate stable unique ID
+                        coll_name = collection or row.get("obs_collection") or row.get("collection") or "spherex_dr1"
                         clean_band = band.replace("-", "_").replace(" ", "_")
-                        record_id = f"{collection}_{obs_id}_{clean_band}".replace("/", "_")
+                        record_id = f"{coll_name}_{obs_id}_{clean_band}".replace("/", "_")
 
                         record_dict = {
                             "id": record_id,
                             "obs_id": obs_id,
-                            "collection": collection,
+                            "collection": coll_name,
                             "detector": band,
                             "mjd": mjd_float,
                             "utc_date": utc_date,

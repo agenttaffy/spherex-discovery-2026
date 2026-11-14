@@ -12,6 +12,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations }) 
   const [index2, setIndex2] = useState(1);
   const [opMode, setOpMode] = useState<'diff' | 'stack'>('diff');
   const [stackMethod, setStackMethod] = useState<'mean' | 'median' | 'sum'>('mean');
+  const [stackScope, setStackScope] = useState<'pair' | 'all'>('pair');
 
   const [diffResult, setDiffResult] = useState<DiffResult | null>(null);
   const [stackResult, setStackResult] = useState<StackResult | null>(null);
@@ -48,11 +49,20 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations }) 
   // Compute differential image or co-addition stack
   useEffect(() => {
     if (observations.length < 2 || !obs1 || !obs2) return;
-    if (obs1.id === obs2.id) {
+
+    if (opMode === 'diff' && obs1.id === obs2.id) {
       setDiffResult(null);
       setStackResult(null);
       setMotionResult(null);
-      setError('Please select two different epochs for comparison or co-addition.');
+      setError('Please select two different epochs for comparison differencing.');
+      return;
+    }
+
+    if (opMode === 'stack' && stackScope === 'pair' && obs1.id === obs2.id) {
+      setDiffResult(null);
+      setStackResult(null);
+      setMotionResult(null);
+      setError('Please select two different epochs for pairwise co-addition.');
       return;
     }
 
@@ -79,7 +89,12 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations }) 
         });
     } else {
       // Co-Add Stacking Mode
-      stackFrames([obs1.id, obs2.id], stackMethod)
+      const idsToStack =
+        stackScope === 'all'
+          ? Array.from(new Set(observations.map((o) => o.id)))
+          : [obs1.id, obs2.id];
+
+      stackFrames(idsToStack, stackMethod)
         .then((res) => {
           if (active) setStackResult(res);
         })
@@ -94,7 +109,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations }) 
     return () => {
       active = false;
     };
-  }, [obs1?.id, obs2?.id, observations.length, opMode, stackMethod]);
+  }, [obs1?.id, obs2?.id, observations, opMode, stackMethod, stackScope]);
 
   if (observations.length < 2) {
     return (
@@ -170,18 +185,32 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations }) 
         {/* Epoch & Stacking Selectors */}
         <div className="flex items-center flex-wrap gap-3 text-xs">
           {opMode === 'stack' && (
-            <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-800 rounded px-2 py-1">
-              <span className="text-slate-400 text-[11px]">Method:</span>
-              <select
-                value={stackMethod}
-                onChange={(e) => setStackMethod(e.target.value as any)}
-                className="bg-transparent text-cyan-300 font-mono text-xs focus:outline-none"
-              >
-                <option value="mean" className="bg-slate-900 text-slate-200">Mean (Max SNR)</option>
-                <option value="median" className="bg-slate-900 text-slate-200">Median (Reject Outliers)</option>
-                <option value="sum" className="bg-slate-900 text-slate-200">Sum (Total Counts)</option>
-              </select>
-            </div>
+            <>
+              <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-800 rounded px-2 py-1">
+                <span className="text-slate-400 text-[11px]">Scope:</span>
+                <select
+                  value={stackScope}
+                  onChange={(e) => setStackScope(e.target.value as 'pair' | 'all')}
+                  className="bg-transparent text-cyan-300 font-mono text-xs focus:outline-none"
+                >
+                  <option value="pair" className="bg-slate-900 text-slate-200">Selected Pair (2)</option>
+                  <option value="all" className="bg-slate-900 text-slate-200">All Epochs ({observations.length})</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-800 rounded px-2 py-1">
+                <span className="text-slate-400 text-[11px]">Method:</span>
+                <select
+                  value={stackMethod}
+                  onChange={(e) => setStackMethod(e.target.value as any)}
+                  className="bg-transparent text-cyan-300 font-mono text-xs focus:outline-none"
+                >
+                  <option value="mean" className="bg-slate-900 text-slate-200">Mean (Max SNR)</option>
+                  <option value="median" className="bg-slate-900 text-slate-200">Median (Reject Outliers)</option>
+                  <option value="sum" className="bg-slate-900 text-slate-200">Sum (Total Counts)</option>
+                </select>
+              </div>
+            </>
           )}
 
           <div className="flex items-center gap-2">

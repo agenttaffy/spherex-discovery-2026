@@ -116,6 +116,9 @@ def generate_spectrum_for_target(
         b = None
         obs_id = obs.id if hasattr(obs, "id") else obs.get("id")
         obs_access = obs.access_url if hasattr(obs, "access_url") else obs.get("access_url")
+        obs_ra = obs.ra if hasattr(obs, "ra") else obs.get("ra", ra)
+        obs_dec = obs.dec if hasattr(obs, "dec") else obs.get("dec", dec)
+
         if not b and obs_id:
             from app.services.irsa_client import OBSERVATION_REGISTRY
             reg_item = OBSERVATION_REGISTRY.get(obs_id)
@@ -128,7 +131,13 @@ def generate_spectrum_for_target(
             b = demo_service.get_cached_cutout_for_url(obs_access)
             if not b:
                 from app.services.cache_service import cache_service
-                b = cache_service.get(obs_access)
+                exact_cutout_url = f"{obs_access}?center={obs_ra:.6f},{obs_dec:.6f}&size={fov_deg:.4f}"
+                b = cache_service.get(exact_cutout_url)
+                if not b:
+                    exact_cutout_url_target = f"{obs_access}?center={ra:.6f},{dec:.6f}&size={fov_deg:.4f}"
+                    b = cache_service.get(exact_cutout_url_target)
+                if not b:
+                    b = cache_service.get(obs_access)
 
         if b:
             try:
@@ -184,18 +193,21 @@ def generate_spectrum_for_target(
     elif preset_type == "epsilon_indi_b":
         temp_k = 1300.0  # T-dwarf
     elif len(observed_detectors) >= 2:
-        # Simple color ratio from measured detectors to estimate temperature
-        d_first = SPHEREX_DETECTOR_CONFIG[0]
-        d_last = SPHEREX_DETECTOR_CONFIG[-1]
-        f_first = measured_by_detector.get(d_first["detector"], {}).get("flux_mjy_sr")
-        f_last = measured_by_detector.get(d_last["detector"], {}).get("flux_mjy_sr")
-        if f_first and f_last and f_first > 0 and f_last > 0:
-            if f_last > f_first * 2.0:
-                temp_k = 400.0  # cold IR source
-            elif f_first > f_last * 2.0:
-                temp_k = 4500.0  # warm star
+        # Robust color ratio across shortest and longest observed wavelengths
+        obs_cfgs = [c for c in SPHEREX_DETECTOR_CONFIG if c["detector"] in measured_by_detector]
+        obs_cfgs.sort(key=lambda c: c["wave_eff"])
+        c_short = obs_cfgs[0]
+        c_long = obs_cfgs[-1]
+        f_short = measured_by_detector[c_short["detector"]].get("flux_mjy_sr")
+        f_long = measured_by_detector[c_long["detector"]].get("flux_mjy_sr")
+        if f_short and f_long and f_short > 0 and f_long > 0:
+            ratio = f_long / f_short
+            if ratio > 1.8:
+                temp_k = 450.0  # cold IR source / brown dwarf
+            elif ratio < 0.6:
+                temp_k = 4800.0  # warm stellar continuum
             else:
-                temp_k = 2500.0
+                temp_k = 2800.0
 
     # Calculate scale factor to match measured flux
     scale_factor = 1.0
@@ -295,6 +307,16 @@ def generate_spectrum_for_target(
     # We will interpolate across the 6 band center flux values
     band_waves = np.array([b["wavelength_um"] for b in bands_output])
     band_fluxes = np.array([b["flux_mjy_sr"] for b in bands_output])
+    log_band_w = np.log(band_waves)
+    log_band_f = np.log(np.maximum(1e-4, band_fluxes))
+
+    # Interpolation model in log-log space
+    try:
+        from scipy.interpolate import PchipInterpolator
+        interp_model = PchipInterpolator(log_band_w, log_band_f, extrapolate=True)
+        eval_flux = lambda lw: float(np.exp(interp_model(lw)))
+    except Exception:
+        eval_flux = lambda lw: float(np.exp(np.interp(lw, log_band_w, log_band_f)))
 
     for cfg in SPHEREX_DETECTOR_CONFIG:
         w_min = cfg["wave_min"]
@@ -304,11 +326,8 @@ def generate_spectrum_for_target(
         det_obs = cfg["detector"] in measured_by_detector
 
         for w in waves:
-            # Linear or spline interpolation in log-log space for physical SED
             log_w = np.log(w)
-            log_band_w = np.log(band_waves)
-            log_band_f = np.log(np.maximum(1e-4, band_fluxes))
-            ch_flux = float(np.exp(np.interp(log_w, log_band_w, log_band_f)))
+            ch_flux = max(0.005, eval_flux(log_w))
 
             channels_102.append({
                 "channel_index": channel_global_idx,
@@ -321,14 +340,12 @@ def generate_spectrum_for_target(
             })
             channel_global_idx += 1
 
-    # 6. Smooth continuum curve for SVG rendering (e.g. 50 evaluation points)
+    # 6. Smooth continuum curve for SVG rendering (e.g. 60 evaluation points)
     continuum_eval_waves = np.linspace(0.75, 5.00, 60)
     continuum_curve: List[Dict[str, float]] = []
-    log_band_w = np.log(band_waves)
-    log_band_f = np.log(np.maximum(1e-4, band_fluxes))
     
     for w in continuum_eval_waves:
-        cf = float(np.exp(np.interp(np.log(w), log_band_w, log_band_f)))
+        cf = max(0.005, eval_flux(np.log(w)))
         continuum_curve.append({
             "wavelength_um": round(float(w), 3),
             "flux_mjy_sr": round(cf, 4),

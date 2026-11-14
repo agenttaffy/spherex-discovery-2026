@@ -184,3 +184,71 @@ def test_compute_coadd_stack_edge_cases():
     assert stats["frame_count"] == 1
     assert stats["snr_improvement_factor"] == 1.0
 
+def test_stack_frames_endpoint_duplicate_frames_rejected():
+    barnard_recs = demo_service.find_matching_observations(269.45208, 4.69339, radius_deg=0.1)
+    fid = barnard_recs[0].id
+    resp = client.post("/api/frames/stack", json={
+        "frame_ids": [fid, fid],
+        "method": "mean",
+    })
+    assert resp.status_code == 400
+    assert "At least 2 distinct frame IDs" in resp.json()["detail"]
+
+def test_compute_coadd_stack_non_overlapping_wcs_raises():
+    w1 = WCS(naxis=2)
+    w1.wcs.crpix = [10.0, 10.0]
+    w1.wcs.cdelt = [-0.01, 0.01]
+    w1.wcs.crval = [10.0, 10.0]
+    w1.wcs.ctype = ['RA---TAN', 'DEC--TAN']
+
+    w2 = WCS(naxis=2)
+    w2.wcs.crpix = [10.0, 10.0]
+    w2.wcs.cdelt = [-0.01, 0.01]
+    w2.wcs.crval = [60.0, 60.0]  # 70+ degrees away
+    w2.wcs.ctype = ['RA---TAN', 'DEC--TAN']
+
+    i1 = np.ones((20, 20), dtype=np.float32)
+    i2 = np.ones((20, 20), dtype=np.float32)
+
+    with pytest.raises(ValueError, match="no overlapping celestial sky coverage"):
+        compute_coadd_stack([i1, i2], wcs_list=[w1, w2], method="mean")
+
+def test_stack_frames_endpoint_distant_pointings_rejected():
+    barnard_recs = demo_service.find_matching_observations(269.45208, 4.69339, radius_deg=0.1)
+    wise_recs = demo_service.find_matching_observations(133.79513, -7.24515, radius_deg=0.1)
+    assert len(barnard_recs) >= 1 and len(wise_recs) >= 1
+
+    resp = client.post("/api/frames/stack", json={
+        "frame_ids": [barnard_recs[0].id, wise_recs[0].id],
+        "method": "mean",
+    })
+    assert resp.status_code == 400
+    assert "too far from reference frame" in resp.json()["detail"]
+
+def test_spectrum_endpoint_fov_validation():
+    # Negative FOV
+    resp_neg = client.get("/api/science/spectrum?ra=269.45208&dec=4.69339&fov=-0.05")
+    assert resp_neg.status_code == 400
+    assert "FOV must be between" in resp_neg.json()["detail"]
+
+    # Excessive FOV (>2.0 deg)
+    resp_huge = client.get("/api/science/spectrum?ra=269.45208&dec=4.69339&fov=5.0")
+    assert resp_huge.status_code == 400
+
+def test_robust_noise_sigma_point_source_insensitivity():
+    np.random.seed(42)
+    # Background Gaussian noise sigma = 0.5
+    bg1 = np.random.normal(0, 0.5, (40, 40)).astype(np.float32)
+    bg2 = np.random.normal(0, 0.5, (40, 40)).astype(np.float32)
+    # Add huge 500 MJy/sr point source at center
+    bg1[20, 20] += 500.0
+    bg2[20, 20] += 500.0
+
+    stacked, stats = compute_coadd_stack([bg1, bg2], method="mean")
+    # Robust noise estimation should measure the true ~0.5 / ~0.35 background, NOT 500 MJy!
+    assert stats["reference_noise_sigma"] < 1.0
+    assert stats["stacked_noise_sigma"] < stats["reference_noise_sigma"]
+    # Gain should be approximately sqrt(2) ~ 1.41
+    assert stats["snr_improvement_factor"] >= 1.2
+
+
