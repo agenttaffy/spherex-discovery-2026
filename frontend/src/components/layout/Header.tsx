@@ -1,13 +1,25 @@
 import React from 'react';
-import { Telescope, Radio, Sparkles, Orbit } from 'lucide-react';
+import { Telescope, Radio, Sparkles, Orbit, BookOpen, Share2, Check, Download } from 'lucide-react';
 
 interface HeaderProps {
   irsaConnected: boolean;
   activeTab: 'explorer' | 'blink' | 'diff' | 'about';
   setActiveTab: (tab: 'explorer' | 'blink' | 'diff' | 'about') => void;
+  onOpenGuidedTour?: () => void;
+  onCopyShareLink?: () => void;
+  onExportReport?: () => void;
+  copiedLink?: boolean;
 }
 
-export const Header: React.FC<HeaderProps> = ({ irsaConnected, activeTab, setActiveTab }) => {
+export const Header: React.FC<HeaderProps> = ({
+  irsaConnected,
+  activeTab,
+  setActiveTab,
+  onOpenGuidedTour,
+  onCopyShareLink,
+  onExportReport,
+  copiedLink = false,
+}) => {
   return (
     <header className="h-16 border-b border-slate-800 bg-slate-950/80 backdrop-blur-md px-6 flex items-center justify-between sticky top-0 z-50">
       <div className="flex items-center space-x-3">
@@ -73,8 +85,42 @@ export const Header: React.FC<HeaderProps> = ({ irsaConnected, activeTab, setAct
         </button>
       </nav>
 
-      {/* NASA Connection Status Indicator */}
+      {/* Right Actions & Status */}
       <div className="flex items-center space-x-2 text-xs">
+        {onOpenGuidedTour && (
+          <button
+            onClick={onOpenGuidedTour}
+            className="px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-cyan-500/50 text-slate-300 hover:text-cyan-300 flex items-center gap-1.5 transition"
+            title="Interactive Walkthrough & Science Guide"
+          >
+            <BookOpen className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="hidden sm:inline">Guided Tour</span>
+          </button>
+        )}
+
+        {onCopyShareLink && (
+          <button
+            onClick={onCopyShareLink}
+            className="px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-cyan-500/50 text-slate-300 hover:text-cyan-300 flex items-center gap-1.5 transition"
+            title="Copy Shareable Deep-Link URL"
+          >
+            {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5" />}
+            <span className="hidden sm:inline">{copiedLink ? 'Link Copied!' : 'Share URL'}</span>
+          </button>
+        )}
+
+        {onExportReport && (
+          <button
+            onClick={onExportReport}
+            className="px-2.5 py-1.5 rounded-lg bg-cyan-950/60 border border-cyan-800/80 hover:bg-cyan-900/60 text-cyan-200 flex items-center gap-1.5 transition font-semibold"
+            title="Export Scientific Discovery Report"
+          >
+            <Download className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="hidden md:inline">Export Report</span>
+          </button>
+        )}
+
+        {/* NASA Connection Status Indicator */}
         <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md border ${
           irsaConnected
             ? 'bg-emerald-950/40 border-emerald-800/60 text-emerald-300'

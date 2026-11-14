@@ -76,3 +76,81 @@ export interface DiffResult {
   };
   image_base64: string;
 }
+
+export interface CatalogSource {
+  source_id: string;
+  ra: number;
+  dec: number;
+  g_mag?: number | null;
+  bp_rp?: number | null;
+  pm_ra?: number;
+  pm_dec?: number;
+  parallax_mas?: number | null;
+  designation: string;
+  catalog: string;
+  star_type: string;
+  separation_arcsec: number;
+}
+
+export interface PhotometryPoint {
+  obs_id: string;
+  frame_id: string;
+  mjd?: number | null;
+  utc_date?: string | null;
+  detector: string;
+  collection: string;
+  net_flux_mjy_sr: number;
+  peak_flux_mjy_sr: number;
+  aperture_flux_sum: number;
+  background_median: number;
+  snr: number;
+}
+
+export interface LightCurveSeries {
+  total_points: number;
+  is_variable: boolean;
+  variability_index: number;
+  mean_flux_mjy_sr: number;
+  std_flux_mjy_sr: number;
+  min_flux_mjy_sr: number;
+  max_flux_mjy_sr: number;
+  amplitude_delta_mjy_sr: number;
+  points: PhotometryPoint[];
+  target?: {
+    ra: number;
+    dec: number;
+  };
+}
+
+export interface AstrometricMotion {
+  dx_pixels: number;
+  dy_pixels: number;
+  displacement_pixels: number;
+  displacement_arcsec: number;
+  position_angle_deg: number;
+  delta_time_days: number;
+  delta_time_years: number;
+  proper_motion_arcsec_yr: number;
+  proper_motion_mas_yr: number;
+  motion_class: string;
+  centroid_detected: boolean;
+  pixel_scale_arcsec: number;
+  confidence_score: number;
+}
+
+export interface DiscoveryReport {
+  report_id: string;
+  timestamp: string;
+  target: {
+    name: string;
+    ra_deg: number;
+    dec_deg: number;
+    sexagesimal: string;
+    target_type?: string;
+  };
+  motion_analysis?: AstrometricMotion;
+  photometry_analysis?: LightCurveSeries;
+  observations_summary: any[];
+  markdown_report: string;
+  irsa_doi: string;
+}

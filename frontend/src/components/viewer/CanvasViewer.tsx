@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { FrameResponse } from '../../types/astronomy';
-import { ZoomIn, ZoomOut, RotateCcw, Crosshair, Palette, Sliders } from 'lucide-react';
+import { FrameResponse, CatalogSource } from '../../types/astronomy';
+import { ZoomIn, ZoomOut, RotateCcw, Crosshair, Palette, Sliders, Star } from 'lucide-react';
 
 interface CanvasViewerProps {
   frame: FrameResponse | null;
@@ -9,6 +9,9 @@ interface CanvasViewerProps {
   setStretch: (s: string) => void;
   colormap: string;
   setColormap: (c: string) => void;
+  catalogSources?: CatalogSource[];
+  showCatalog?: boolean;
+  setShowCatalog?: (show: boolean) => void;
   title?: string;
   subtitle?: string;
 }
@@ -20,6 +23,9 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
   setStretch,
   colormap,
   setColormap,
+  catalogSources = [],
+  showCatalog = false,
+  setShowCatalog,
   title,
   subtitle,
 }) => {
@@ -78,6 +84,57 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
     const drawH = cachedImg.height * 14;
     ctx.drawImage(cachedImg, -drawW / 2, -drawH / 2, drawW, drawH);
 
+    // Gaia DR3 Celestial Catalog Overlay
+    if (showCatalog && catalogSources.length > 0 && frame?.wcs?.crval1 && frame?.wcs?.crval2) {
+      const crval1 = frame.wcs.crval1;
+      const crval2 = frame.wcs.crval2;
+      const meanDecRad = (crval2 * Math.PI) / 180.0;
+
+      catalogSources.forEach((src) => {
+        const deltaRaDeg = (src.ra - crval1) * Math.cos(meanDecRad);
+        const deltaDecDeg = src.dec - crval2;
+
+        const deltaRaArcsec = deltaRaDeg * 3600.0;
+        const deltaDecArcsec = deltaDecDeg * 3600.0;
+
+        // Convert arcseconds to canvas image units (6.2" per pixel * 14 canvas scale)
+        // East is left (-x), North is up (-y)
+        const markerX = -(deltaRaArcsec / 6.2) * 14;
+        const markerY = -(deltaDecArcsec / 6.2) * 14;
+
+        ctx.strokeStyle = '#38bdf8'; // Cyan-400
+        ctx.fillStyle = '#38bdf8';
+        ctx.lineWidth = 1.5;
+
+        // Diamond marker
+        ctx.beginPath();
+        ctx.moveTo(markerX, markerY - 7);
+        ctx.lineTo(markerX + 7, markerY);
+        ctx.lineTo(markerX, markerY + 7);
+        ctx.lineTo(markerX - 7, markerY);
+        ctx.closePath();
+        ctx.stroke();
+
+        // Proper Motion Vector Arrow (if pm > 200 mas/yr)
+        if (src.pm_ra || src.pm_dec) {
+          const pmScale = 0.008; // visual scaling
+          const vecX = -(src.pm_ra || 0) * pmScale;
+          const vecY = -(src.pm_dec || 0) * pmScale;
+          ctx.strokeStyle = '#f59e0b'; // Amber-500
+          ctx.beginPath();
+          ctx.moveTo(markerX, markerY);
+          ctx.lineTo(markerX + vecX, markerY + vecY);
+          ctx.stroke();
+        }
+
+        // Designation label
+        ctx.font = '10px monospace';
+        ctx.fillStyle = '#f8fafc';
+        const label = `${src.designation}${src.g_mag ? ` (G=${src.g_mag.toFixed(1)})` : ''}`;
+        ctx.fillText(label, markerX + 10, markerY + 3);
+      });
+    }
+
     // Crosshair
     if (showCrosshair) {
       ctx.strokeStyle = 'rgba(56, 189, 248, 0.5)';
@@ -98,7 +155,7 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
     }
 
     ctx.restore();
-  }, [cachedImg, zoom, offset, showCrosshair]);
+  }, [cachedImg, zoom, offset, showCrosshair, showCatalog, catalogSources, frame]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     setIsDragging(true);
@@ -233,6 +290,23 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
 
         {/* Zoom controls */}
         <div className="bg-slate-900/80 backdrop-blur-md border border-slate-800 p-1 rounded-lg pointer-events-auto flex items-center gap-1">
+          {setShowCatalog && (
+            <button
+              onClick={() => setShowCatalog(!showCatalog)}
+              title="Toggle Gaia DR3 Reference Star Overlay"
+              className={`px-2 py-1 rounded text-[11px] font-mono flex items-center gap-1 transition ${
+                showCatalog
+                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-semibold'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Star className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Gaia DR3 {catalogSources.length > 0 ? `(${catalogSources.length})` : ''}</span>
+            </button>
+          )}
+
+          <div className="h-4 w-px bg-slate-800 mx-0.5" />
+
           <button
             onClick={() => setShowCrosshair(!showCrosshair)}
             title="Toggle Celestial Crosshair"

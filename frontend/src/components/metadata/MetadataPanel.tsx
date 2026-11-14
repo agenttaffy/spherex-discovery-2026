@@ -1,12 +1,23 @@
 import React from 'react';
-import { ExternalLink, Info, Activity, ShieldCheck, Tag, FileText } from 'lucide-react';
-import { FrameResponse } from '../../types/astronomy';
+import { ExternalLink, Info, Activity, ShieldCheck, Tag, FileText, Download } from 'lucide-react';
+import { FrameResponse, LightCurveSeries } from '../../types/astronomy';
+import { LightCurveChart } from '../science/LightCurveChart';
 
 interface MetadataPanelProps {
   frame: FrameResponse | null;
+  lightCurve?: LightCurveSeries | null;
+  loadingPhotometry?: boolean;
+  onSelectObsId?: (obsId: string) => void;
+  onOpenDiscoveryReport?: () => void;
 }
 
-export const MetadataPanel: React.FC<MetadataPanelProps> = ({ frame }) => {
+export const MetadataPanel: React.FC<MetadataPanelProps> = ({
+  frame,
+  lightCurve = null,
+  loadingPhotometry = false,
+  onSelectObsId,
+  onOpenDiscoveryReport,
+}) => {
   if (!frame) {
     return (
       <div className="w-80 bg-slate-900/60 border-l border-slate-800 p-4 text-xs text-slate-500 flex flex-col items-center justify-center text-center">
@@ -20,6 +31,14 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({ frame }) => {
 
   return (
     <div className="w-80 bg-slate-900/60 border-l border-slate-800 p-4 flex flex-col gap-4 overflow-y-auto text-xs">
+      {/* Light Curve Telemetry Dock */}
+      <LightCurveChart
+        series={lightCurve}
+        loading={loadingPhotometry}
+        selectedObsId={frame.obs_id}
+        onSelectObsId={onSelectObsId}
+      />
+
       <div>
         <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 mb-2">
           <Tag className="w-3.5 h-3.5 text-cyan-400" />
@@ -123,13 +142,24 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({ frame }) => {
         </div>
       )}
 
+      {/* Discovery Report Action Button */}
+      {onOpenDiscoveryReport && (
+        <button
+          onClick={onOpenDiscoveryReport}
+          className="w-full py-2 px-3 bg-gradient-to-r from-cyan-600/30 to-indigo-600/30 hover:from-cyan-600/50 hover:to-indigo-600/50 border border-cyan-500/40 rounded-lg text-cyan-200 font-semibold text-xs flex items-center justify-center gap-2 transition shadow-md shadow-cyan-950/40"
+        >
+          <Download className="w-3.5 h-3.5 text-cyan-300" />
+          <span>Export Discovery Report</span>
+        </button>
+      )}
+
       {/* Provenance & Citation Link */}
-      <div className="mt-auto pt-2">
+      <div className="mt-auto pt-1">
         <a
           href={frame.provenance_url}
           target="_blank"
           rel="noreferrer"
-          className="w-full py-2 px-3 bg-slate-950 border border-slate-800 hover:border-cyan-500/50 rounded-lg text-slate-300 hover:text-cyan-300 text-[11px] flex items-center justify-center gap-1.5 transition"
+          className="w-full py-1.5 px-3 bg-slate-950 border border-slate-800 hover:border-cyan-500/50 rounded-lg text-slate-400 hover:text-cyan-300 text-[11px] flex items-center justify-center gap-1.5 transition font-mono"
         >
           <span>Raw NASA FITS Cutout</span>
           <ExternalLink className="w-3 h-3" />

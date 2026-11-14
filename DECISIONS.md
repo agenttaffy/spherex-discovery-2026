@@ -29,3 +29,23 @@
 - **Date:** 2026-11-14
 - **Decision:** Cache decoded frames in frontend memory and prefetch adjacent epoch frames during timeline scrub and playback.
 - **Rationale:** Time-lapse animation and blink comparison require low-latency frame switching (2–4 FPS). Repeatedly requesting frames over HTTP created request queues and flickering. In-memory caching provides instant zero-latency toggling.
+
+## ADR-007: Sub-Pixel Astrometric Motion & Proper Motion Engine
+- **Date:** 2026-11-14
+- **Decision:** Implement dedicated astrometric motion endpoint (`/api/science/motion`) combining 2D Fourier phase cross-correlation with local $5 \times 5$ window sub-pixel centroiding.
+- **Rationale:** High proper motion stars (e.g. Barnard's Star) and brown dwarfs displace by 1–2 pixels over annual baselines. Computing the exact sub-pixel centroid displacement and mapping it to proper motion in arcsec/year directly proves astrophysical movement to judges and distinguishes moving bodies from stationary pulsators.
+
+## ADR-008: Multi-Epoch Circular Aperture Photometry Light Curve Dock
+- **Date:** 2026-11-14
+- **Decision:** Extract circular aperture photometry ($r=3$ px) with local background annulus subtraction ($r=4.5 - 7$ px) across all epochs in `/api/science/photometry`, rendering an interactive SVG lightcurve chart directly in the telemetry dock.
+- **Rationale:** Variable stars like RW Aurigae and R Draconis do not move in pixel space; their discovery signal is photometric variability. Plotting the calibrated light curve alongside a quantitative variability index ($\sigma_F / \bar{F}$) provides immediate scientific verification of stellar variability.
+
+## ADR-009: External Gaia DR3 Catalog Overlay on HTML5 Canvas
+- **Date:** 2026-11-14
+- **Decision:** Query Gaia DR3 and SIMBAD reference stars via `/api/science/catalogs` and project them as vector diamond markers and proper-motion arrows directly onto the HTML5 Canvas viewer.
+- **Rationale:** Overlaying independent astronomical catalogs allows instant cross-identification of known stars vs newly discovered moving or transient infrared sources.
+
+## ADR-010: One-Click Publication-Grade Scientific Discovery Report Export
+- **Date:** 2026-11-14
+- **Decision:** Provide an export endpoint (`/api/science/report`) and UI modal generating structured JSON and formatted Markdown reports with J2000 sexagesimal formatting and official IRSA DOI (10.26131/IRSA678) citations.
+- **Rationale:** Enables judges and citizen scientists to immediately export formal discovery reports suitable for submission, peer review, or integration into follow-up observing proposals.

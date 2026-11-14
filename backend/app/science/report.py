@@ -1,0 +1,104 @@
+from typing import Dict, Any, Optional
+from datetime import datetime
+from app.science.coordinates import format_sexagesimal
+
+def generate_discovery_report(
+    target_name: str,
+    ra_deg: float,
+    dec_deg: float,
+    target_type: Optional[str] = None,
+    motion_data: Optional[Dict[str, Any]] = None,
+    photometry_data: Optional[Dict[str, Any]] = None,
+    observations: Optional[list] = None,
+    notes: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Builds a structured scientific discovery report with J2000 sexagesimal formatting,
+    astrometric vectors, photometric variability indices, and IRSA archive DOIs.
+    """
+    sex_coord = format_sexagesimal(ra_deg, dec_deg)
+    now_iso = datetime.utcnow().isoformat() + "Z"
+
+    # Compile Markdown Document
+    md_lines = [
+        f"# SPHEREx Discovery Report: {target_name}",
+        f"**Generated:** {now_iso} | **Platform:** SPHEREx Discovery Engine (NASA Space Apps Challenge 2026)",
+        "",
+        "## 1. Astronomical Target Information",
+        f"- **Designation / Target Name:** {target_name}",
+        f"- **Coordinates (J2000):** RA {ra_deg:.6f}°, Dec {dec_deg:.6f}° (`{sex_coord}`)",
+        f"- **Candidate Classification:** {target_type or 'Astronomical Source'}",
+        "",
+        "## 2. Multi-Epoch Observation Provenance",
+        f"- **Data Archive:** NASA/IPAC Infrared Science Archive (IRSA)",
+        f"- **Level 2 Science Archive DOI:** [10.26131/IRSA678](https://doi.org/10.26131/IRSA678)",
+        f"- **Instrument:** SPHEREx (Spectro-Photometer for the History of the Universe, Epoch of Reionization and Ices)",
+        f"- **Spectrophotometric Range:** 0.75 μm – 5.0 μm (Detectors D1–D6 Linear Variable Filters)",
+    ]
+
+    if observations:
+        md_lines.append("")
+        md_lines.append("### Evaluated Observation Epochs")
+        md_lines.append("| Obs ID | UTC Date | Collection | Detector | MJD |")
+        md_lines.append("| :--- | :--- | :--- | :--- | :--- |")
+        for obs in observations[:8]:
+            md_lines.append(f"| `{obs.get('obs_id', 'N/A')}` | {obs.get('utc_date', 'N/A')} | {obs.get('collection', 'N/A')} | {obs.get('detector', 'N/A')} | {obs.get('mjd', 'N/A')} |")
+
+    # Astrometric Motion Analysis
+    if motion_data:
+        md_lines.extend([
+            "",
+            "## 3. Astrometric Motion & Centroid Analysis",
+            f"- **Motion Classification:** **{motion_data.get('motion_class', 'N/A')}**",
+            f"- **Angular Displacement:** {motion_data.get('displacement_arcsec', 0.0):.3f} arcsec ({motion_data.get('displacement_pixels', 0.0):.3f} pixels)",
+            f"- **Shift Vectors:** Δx = {motion_data.get('dx_pixels', 0.0):.3f} px, Δy = {motion_data.get('dy_pixels', 0.0):.3f} px",
+            f"- **Position Angle (North through East):** {motion_data.get('position_angle_deg', 0.0):.1f}°",
+            f"- **Time Baseline:** {motion_data.get('delta_time_days', 0.0):.1f} days ({motion_data.get('delta_time_years', 0.0):.3f} years)",
+            f"- **Calculated Proper Motion:** **{motion_data.get('proper_motion_arcsec_yr', 0.0):.3f} arcsec/year** ({motion_data.get('proper_motion_mas_yr', 0.0):.1f} mas/yr)",
+            f"- **Centroid Detection Confidence:** {float(motion_data.get('confidence_score', 0.0))*100:.0f}%",
+        ])
+
+    # Photometric Variability Analysis
+    if photometry_data:
+        md_lines.extend([
+            "",
+            "## 4. Photometric Light Curve Analysis",
+            f"- **Variability Assessment:** **{'CONFIRMED VARIABLE' if photometry_data.get('is_variable') else 'STABLE / NON-VARIABLE'}**",
+            f"- **Total Epoch Points:** {photometry_data.get('total_points', 0)}",
+            f"- **Variability Index (std/mean):** {photometry_data.get('variability_index', 0.0):.3f}",
+            f"- **Mean Net Flux:** {photometry_data.get('mean_flux_mjy_sr', 0.0):.4f} MJy/sr",
+            f"- **Peak Flux Observed:** {photometry_data.get('max_flux_mjy_sr', 0.0):.4f} MJy/sr",
+            f"- **Flux Range (ΔF):** {photometry_data.get('amplitude_delta_mjy_sr', 0.0):.4f} MJy/sr",
+        ])
+
+    if notes:
+        md_lines.extend([
+            "",
+            "## 5. Analyst Notes & Scientific Interpretation",
+            notes,
+        ])
+
+    md_lines.extend([
+        "",
+        "---",
+        "**Citation:** NASA/IPAC Infrared Science Archive (IRSA), SPHEREx Data Release 1 & Quick Release 3 (DOI: 10.26131/IRSA678). Produced with SPHEREx Discovery.",
+    ])
+
+    markdown_content = "\n".join(md_lines)
+
+    return {
+        "report_id": f"SPX-REP-{int(datetime.utcnow().timestamp())}",
+        "timestamp": now_iso,
+        "target": {
+            "name": target_name,
+            "ra_deg": ra_deg,
+            "dec_deg": dec_deg,
+            "sexagesimal": sex_coord,
+            "target_type": target_type,
+        },
+        "motion_analysis": motion_data,
+        "photometry_analysis": photometry_data,
+        "observations_summary": observations[:10] if observations else [],
+        "markdown_report": markdown_content,
+        "irsa_doi": "10.26131/IRSA678",
+    }

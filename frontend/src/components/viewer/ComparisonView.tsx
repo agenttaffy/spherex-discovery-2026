@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { ObservationRecord, DiffResult, FrameResponse } from '../../types/astronomy';
-import { computeDiff, fetchFrame } from '../../services/api';
-import { ArrowRight, Sparkles, Loader2, AlertCircle } from 'lucide-react';
+import { ObservationRecord, DiffResult, FrameResponse, AstrometricMotion } from '../../types/astronomy';
+import { computeDiff, fetchFrame, computeMotion } from '../../services/api';
+import { ArrowRight, Sparkles, Loader2, AlertCircle, Move } from 'lucide-react';
 
 interface ComparisonViewProps {
   observations: ObservationRecord[];
@@ -11,6 +11,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations }) 
   const [index1, setIndex1] = useState(0);
   const [index2, setIndex2] = useState(1);
   const [diffResult, setDiffResult] = useState<DiffResult | null>(null);
+  const [motionResult, setMotionResult] = useState<AstrometricMotion | null>(null);
   const [frame1, setFrame1] = useState<FrameResponse | null>(null);
   const [frame2, setFrame2] = useState<FrameResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -40,11 +41,12 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations }) 
     }
   }, [obs2?.id]);
 
-  // Compute differential image
+  // Compute differential image and astrometric motion
   useEffect(() => {
     if (observations.length < 2 || !obs1 || !obs2) return;
     if (obs1.id === obs2.id) {
       setDiffResult(null);
+      setMotionResult(null);
       setError('Please select two different epochs for temporal differencing.');
       return;
     }
@@ -53,9 +55,15 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations }) 
     setLoading(true);
     setError(null);
 
-    computeDiff(obs1.id, obs2.id)
-      .then((res) => {
-        if (active) setDiffResult(res);
+    Promise.all([
+      computeDiff(obs1.id, obs2.id),
+      computeMotion(obs1.id, obs2.id).catch(() => null),
+    ])
+      .then(([diff, motion]) => {
+        if (active) {
+          setDiffResult(diff);
+          if (motion) setMotionResult(motion.motion);
+        }
       })
       .catch((err) => {
         if (active) setError(err.message);
@@ -95,7 +103,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations }) 
             <span>Differential Image Analysis (I₂ − I₁)</span>
             {deltaDays !== null && (
               <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800/60">
-                Δt = {deltaDays.toFixed(1)} days
+                Δt = {deltaDays.toFixed(1)} days ({(deltaDays / 365.25).toFixed(2)} yrs)
               </span>
             )}
           </h2>
@@ -150,7 +158,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations }) 
       {loading && (
         <div className="flex-1 flex flex-col items-center justify-center p-12 text-cyan-400 gap-2">
           <Loader2 className="w-8 h-8 animate-spin" />
-          <span className="text-xs font-mono">Computing calibrated differential frame...</span>
+          <span className="text-xs font-mono">Computing calibrated differential frame & astrometric vectors...</span>
         </div>
       )}
 
@@ -204,16 +212,87 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations }) 
                 <span className="text-amber-300 font-semibold">Difference (I₂ − I₁)</span>
                 <span className="text-slate-400">RMS: {diffResult.diff_stats.rms_diff_mjy_sr}</span>
               </div>
-              <div className="w-full aspect-square bg-black rounded-lg border border-slate-700 overflow-hidden flex items-center justify-center">
+              <div className="w-full aspect-square bg-black rounded-lg border border-slate-700 overflow-hidden flex items-center justify-center relative">
                 <img
                   src={diffResult.image_base64}
                   alt="Difference Frame"
                   className="w-full h-full object-contain [image-rendering:pixelated]"
                 />
+                {/* Visual Dipole Vector Overlay */}
+                {motionResult && motionResult.displacement_pixels > 0.4 && (
+                  <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                    <svg className="w-full h-full" viewBox="-20 -20 40 40">
+                      <line
+                        x1={-motionResult.dx_pixels * 5}
+                        y1={-motionResult.dy_pixels * 5}
+                        x2={motionResult.dx_pixels * 5}
+                        y2={motionResult.dy_pixels * 5}
+                        stroke="#38bdf8"
+                        strokeWidth="1.5"
+                        strokeDasharray="2,2"
+                      />
+                      <circle cx={-motionResult.dx_pixels * 5} cy={-motionResult.dy_pixels * 5} r="2" fill="#f43f5e" />
+                      <circle cx={motionResult.dx_pixels * 5} cy={motionResult.dy_pixels * 5} r="2" fill="#10b981" />
+                    </svg>
+                  </div>
+                )}
               </div>
-              <span className="text-[10px] text-slate-400 font-mono mt-2">Mid-gray = 0 residual</span>
+              <span className="text-[10px] text-slate-400 font-mono mt-2">
+                {motionResult?.displacement_pixels ? `Displacement: ${motionResult.displacement_pixels} px` : 'Mid-gray = 0 residual'}
+              </span>
             </div>
           </div>
+
+          {/* Astrometric Motion Detection Card */}
+          {motionResult && (
+            <div className="bg-slate-900/60 border border-indigo-900/50 rounded-xl p-5 flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-semibold text-indigo-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <Move className="w-4 h-4 text-cyan-400" />
+                  Candidate Astrometric Motion & Proper Motion Vector
+                </h4>
+                <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full border ${
+                  motionResult.motion_class.includes('High')
+                    ? 'bg-amber-950/80 text-amber-300 border-amber-800'
+                    : 'bg-slate-800 text-slate-300 border-slate-700'
+                }`}>
+                  {motionResult.motion_class}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3 font-mono text-xs">
+                <div className="p-3 bg-slate-950 rounded-lg border border-slate-800">
+                  <span className="text-slate-400 text-[10px] block">Annual Proper Motion</span>
+                  <span className="text-cyan-300 font-bold text-sm">
+                    {motionResult.proper_motion_arcsec_yr}″/yr
+                  </span>
+                  <span className="text-[9px] text-slate-500 block">({motionResult.proper_motion_mas_yr} mas/yr)</span>
+                </div>
+                <div className="p-3 bg-slate-950 rounded-lg border border-slate-800">
+                  <span className="text-slate-400 text-[10px] block">Net Angular Shift</span>
+                  <span className="text-slate-100 font-bold text-sm">{motionResult.displacement_arcsec}″</span>
+                  <span className="text-[9px] text-slate-500 block">({motionResult.displacement_pixels} pixels)</span>
+                </div>
+                <div className="p-3 bg-slate-950 rounded-lg border border-slate-800">
+                  <span className="text-slate-400 text-[10px] block">Vector (Δx, Δy)</span>
+                  <span className="text-indigo-300 font-bold text-sm">
+                    ({motionResult.dx_pixels}, {motionResult.dy_pixels}) px
+                  </span>
+                </div>
+                <div className="p-3 bg-slate-950 rounded-lg border border-slate-800">
+                  <span className="text-slate-400 text-[10px] block">Position Angle (PA)</span>
+                  <span className="text-amber-400 font-bold text-sm">{motionResult.position_angle_deg}°</span>
+                  <span className="text-[9px] text-slate-500 block">N through E</span>
+                </div>
+                <div className="p-3 bg-slate-950 rounded-lg border border-slate-800">
+                  <span className="text-slate-400 text-[10px] block">Detection Confidence</span>
+                  <span className="text-emerald-400 font-bold text-sm">
+                    {(motionResult.confidence_score * 100).toFixed(0)}%
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Differential Metrics Dock */}
           <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5 flex flex-col gap-4">
@@ -242,7 +321,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations }) 
             <div className="p-3 bg-cyan-950/20 border border-cyan-800/40 rounded-lg text-[11px] text-cyan-300 space-y-1">
               <p className="font-semibold">Interpretation:</p>
               <p className="text-slate-400">
-                Mid-gray (128) denotes zero net brightness change between epochs. Bright white spots represent newly brightened or incoming sources, while dark regions indicate dimmed or departed sources.
+                Mid-gray (128) denotes zero net brightness change between epochs. Red marker indicates Epoch 1 point source centroid, green indicates Epoch 2 centroid. Bright white spots represent newly brightened or incoming sources, while dark regions indicate dimmed or departed sources.
               </p>
             </div>
           </div>

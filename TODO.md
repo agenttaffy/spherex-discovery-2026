@@ -13,20 +13,19 @@
 - [x] `P1-002` | COMPLETED | Display contrast scaling engines (`asinh`, `zscale`, `linear`)
 - [x] `P1-003` | COMPLETED | Data quality flag bitmask evaluation (`flags_processing.py`, `MetadataPanel.tsx`)
 - [x] `P1-004` | COMPLETED | Local caching of 22 verified real FITS cutouts for judging demo reliability (`data/cache`)
-- [x] `P1-005` | COMPLETED | Full automated test suite (36 pytest tests passing)
-- [x] `P1-006` | COMPLETED | Offline / archive downtime resilience with automatic demo manifest fallback (`demo_service.py`)
+- [x] `P1-005` | COMPLETED | Full automated test suite (43 pytest tests passing)
+- [x] `P1-006` | COMPLETED | Offline / archive downtime resilience with automatic demo manifest fallback (`demo_service.py`, `irsa_client.py`)
 - [x] `P1-007` | COMPLETED | Spherical RA 0°/360° boundary wrapping and NaN-safe differencing (`comparison.py`)
 - [x] `P1-008` | COMPLETED | Sub-pixel 2D FFT image translation estimator (`image_registration.py`)
 - [x] `P1-009` | COMPLETED | Side-by-side Epoch 1, Epoch 2, and Difference inspection cards with baseline $\Delta t$ (`ComparisonView.tsx`)
 - [x] `P1-010` | COMPLETED | In-memory frame caching and adjacent prefetching for stutter-free playback (`api.ts`, `App.tsx`)
 
-## P2: Advanced Astronomy & User Experience (Next Iteration)
-- [ ] `P2-001` | OPEN | Gaia DR3 celestial source overlay (render star markers on canvas)
-- [ ] `P2-002` | OPEN | Multi-epoch photometric light curve graph for variable stars (RW Aurigae, R Draconis)
-- [ ] `P2-003` | OPEN | Shareable deep-link state encoder (e.g., `/explore?target=barnards_star&stretch=asinh`)
-- [ ] `P2-004` | OPEN | Spectral energy distribution (SED) plot across detectors D1–D6
-
-## P3: Enhancements
-- [ ] `P3-001` | OPEN | Automated sub-pixel moving object trajectory vector drawing
-- [ ] `P3-002` | OPEN | Export discovery report as publication-ready PDF
-- [ ] `P3-003` | OPEN | Aladin Lite sky overview map embedding
+## P2: Advanced Astronomy & Technical Differentiation (ALL COMPLETED)
+- [x] `P2-001` | COMPLETED | Gaia DR3 celestial source overlay with proper motion vectors (`catalog_service.py`, `CanvasViewer.tsx`)
+- [x] `P2-002` | COMPLETED | Multi-epoch circular aperture photometric light curve dock with variability classification (`photometry.py`, `LightCurveChart.tsx`)
+- [x] `P2-003` | COMPLETED | Shareable deep-link URL state encoder (`/?ra=...&dec=...&fov=...&target=...`) with clipboard feedback
+- [x] `P2-004` | COMPLETED | Candidate astrometric motion detection & proper motion vector engine (`motion.py`, `/api/science/motion`)
+- [x] `P2-005` | COMPLETED | Exportable scientific discovery report in Markdown and structured JSON with IRSA DOI 10.26131/IRSA678 citations (`report.py`, `DiscoveryReportModal.tsx`)
+- [x] `P2-006` | COMPLETED | Guided educational exploration tour modal (`GuidedTourModal.tsx`)
+- [x] `P2-007` | COMPLETED | Comprehensive documentation suite in `docs/` (10 technical documents)
+- [x] `P2-008` | COMPLETED | Multi-container Dockerization and CI/CD workflows (`Dockerfile`, `docker-compose.yml`, `render.yaml`, `vercel.json`, `ci.yml`)

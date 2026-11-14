@@ -1,4 +1,13 @@
-import { ObservationRecord, FrameResponse, DemoPreset, DiffResult } from '../types/astronomy';
+import {
+  ObservationRecord,
+  FrameResponse,
+  DemoPreset,
+  DiffResult,
+  CatalogSource,
+  LightCurveSeries,
+  AstrometricMotion,
+  DiscoveryReport,
+} from '../types/astronomy';
 
 const API_BASE = '/api';
 
@@ -78,6 +87,87 @@ export async function computeDiff(frameId1: string, frameId2: string): Promise<D
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({ detail: 'Failed to compute diff' }));
     throw new Error(err.detail || 'Failed to compute diff');
+  }
+  return resp.json();
+}
+
+export async function fetchCatalogs(
+  ra: number | string,
+  dec: number | string,
+  radius: number = 0.08,
+  catalog: string = 'gaia_dr3'
+): Promise<{ total_sources: number; sources: CatalogSource[] }> {
+  const params = new URLSearchParams({
+    ra: String(ra),
+    dec: String(dec),
+    radius: String(radius),
+    catalog,
+  });
+  const resp = await fetch(`${API_BASE}/science/catalogs?${params.toString()}`);
+  if (!resp.ok) {
+    return { total_sources: 0, sources: [] };
+  }
+  return resp.json();
+}
+
+export async function fetchPhotometry(
+  ra: number | string,
+  dec: number | string,
+  collection: string = 'spherex_dr1',
+  detector?: string,
+  fov: number = 0.04
+): Promise<LightCurveSeries> {
+  const params = new URLSearchParams({
+    ra: String(ra),
+    dec: String(dec),
+    collection,
+    fov: String(fov),
+  });
+  if (detector && detector !== 'ALL') {
+    params.set('detector', detector);
+  }
+  const resp = await fetch(`${API_BASE}/science/photometry?${params.toString()}`);
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({ detail: 'Failed to load photometry' }));
+    throw new Error(err.detail || 'Failed to load photometry');
+  }
+  return resp.json();
+}
+
+export async function computeMotion(
+  frameId1: string,
+  frameId2: string,
+  pixelScale: number = 6.2
+): Promise<{ eligible: boolean; motion: AstrometricMotion }> {
+  const resp = await fetch(`${API_BASE}/science/motion`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ frame_id_1: frameId1, frame_id_2: frameId2, pixel_scale_arcsec: pixelScale }),
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({ detail: 'Motion calculation failed' }));
+    throw new Error(err.detail || 'Motion calculation failed');
+  }
+  return resp.json();
+}
+
+export async function generateDiscoveryReport(data: {
+  target_name: string;
+  ra: number;
+  dec: number;
+  target_type?: string;
+  motion_data?: any;
+  photometry_data?: any;
+  observations?: any[];
+  notes?: string;
+}): Promise<DiscoveryReport> {
+  const resp = await fetch(`${API_BASE}/science/report`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!resp.ok) {
+    throw new Error('Failed to generate discovery report');
   }
   return resp.json();
 }

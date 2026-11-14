@@ -1,38 +1,45 @@
 # UI/UX Design System: Deep Infrared Astronomical Explorer
 
 ## 1. Design Philosophy
-Astronomical inspection requires extreme contrast fidelity, dark adaptation preservation, and uncluttered instrument control.
+Astronomical inspection requires extreme contrast fidelity, dark adaptation preservation, responsive 60 FPS viewport manipulation, and uncluttered instrument telemetry.
 - **Color Palette:**
-  - Background Deep Navy: `#0b0f19` / `#050811`
-  - Panel Surfaces: `#111827` with subtle `#1f293d` borders
-  - Primary Accent: Scientific Indigo/Cyan `#38bdf8` / `#6366f1`
-  - Infrared Heatmap Accents: `#f43f5e` (highlights), `#fbbf24` (indicators)
-  - Typography: Inter / SF Pro for interface labels; JetBrains Mono for coordinates, epochs, and pixel telemetry.
+  - Background Deep Space Navy: `#020617` (Slate 950)
+  - Panel Surfaces: `#0f172a` (Slate 900) with `#1e293b` (Slate 800) borders
+  - Primary Accent: Astronomical Cyan `#38bdf8` / `#06b6d4`
+  - Infrared Heatmap Accents: `#f43f5e` (Rose), `#fbbf24` (Amber), `#10b981` (Emerald)
+  - Typography: Inter for UI chrome and navigational elements; JetBrains Mono for coordinates, epochs, and pixel telemetry.
 
 ## 2. Layout Hierarchy
-1. **Top Header Bar (56px):**
-   - Brand: SPHEREx Discovery
-   - Badge: NASA Space Apps Challenge 2026
-   - Global status: IRSA Live / Demo Mode toggle
+1. **Top Header Bar (64px):**
+   - Brand: SPHEREx Discovery (NASA Space Apps 2026)
+   - Navigation: Explorer & Timeline, Blink Comparator, Difference Engine, About & Science
+   - Action buttons: Guided Tour, Share URL (deep linking), Export Report
+   - Global status: NASA/IPAC IRSA Live vs. Demo Cache Active indicator
 2. **Left Control Dock (320px):**
-   - Quick Target Presets: WISE 0855, Barnard's Star, RW Aurigae, etc.
-   - Coordinate Search: RA / Dec inputs with Sexagesimal / Decimal auto-detect.
-   - Field of view (FOV) selector: 3 arcmin (0.05°), 6 arcmin (0.10°), 12 arcmin (0.20°).
-   - Data release & detector filters.
+   - Quick Target Presets: Barnard's Star, WISE 0855, RW Aurigae, R Draconis, Epsilon Indi B
+   - Coordinate Search: RA / Dec inputs with Sexagesimal / Decimal auto-detect and validation
+   - Field of view (FOV) selector: 0.02° to 0.10°
+   - Data release (`spherex_dr1`, `spherex_qr3`) & detector filters (D1–D6)
 3. **Center Astronomical Canvas (Fluid Flex):**
-   - High-DPI Canvas 2D renderer.
-   - Interactive mouse pan and wheel zoom.
-   - Live crosshair with RA/Dec and MJy/sr flux telemetry under cursor.
-   - Contrast stretch controls: asinh, ZScale, MinMax, Log.
-   - Colormap selector: Grayscale, Inferno, Magma, Viridis.
-4. **Bottom Time-Lapse Player (80px):**
-   - Multi-epoch scrubber bar with observation markers.
-   - Step forward / backward, Play / Pause.
-   - Playback speed slider (0.5 fps to 5 fps).
-   - Blink Comparison mode: rapid 2-frame alternate blink.
-   - Epoch timestamp and delta-t indicator ($\Delta t = +366$ days).
-5. **Right Telemetry & Provenance Dock (300px):**
-   - Observation metadata: ObsID, UTC Date, MJD, Release.
-   - Instrument specs: Detector (D1–D6), Wavelength coverage ($\lambda = 0.75 - 1.12$ µm).
-   - Quality flag status and variance estimation.
-   - Direct NASA IRSA FITS provenance hyperlink.
+   - Hardware-accelerated HTML5 Canvas 2D renderer with nearest-neighbor block interpolation
+   - Interactive mouse drag pan and wheel zoom ($0.4\times$ to $8.0\times$)
+   - Gaia DR3 catalog reference star vector overlay with proper motion arrows
+   - Live celestial crosshair and cursor position HUD
+   - Contrast stretch controls: Asinh, ZScale, Linear
+   - Colormap selector: Grayscale and Inferno
+4. **Bottom Time-Lapse Player (76px):**
+   - Multi-epoch scrubber bar with observation markers
+   - Step forward / backward, Play / Pause, variable FPS (1–10 fps)
+   - Blink Comparison mode: rapid 2-frame alternate blink
+   - In-memory frame caching and adjacent prefetching for zero latency
+5. **Right Telemetry & Science Dock (320px):**
+   - Interactive Circular Aperture Photometry Light Curve SVG chart with variability detection
+   - Observation metadata: ObsID, Release, Detector, UTC Date, dimensions
+   - Scientific pixel telemetry: peak flux, baseline, mean, noise ($\pm\sigma$) in $\text{MJy/sr}$
+   - Quality flag bitmask breakdown: masked pixels, saturation, cosmic rays, dead pixels
+   - Celestial WCS parameters: CRVAL1, CRVAL2, nominal 6.2″/pixel scale
+   - One-click "Export Discovery Report" modal trigger
+   - Direct NASA IRSA FITS provenance hyperlink
+6. **Modals & Overlays:**
+   - **Guided Tour Modal:** 4-step interactive educational walkthrough explaining LVF physics and challenge targets
+   - **Discovery Report Modal:** Formatted Markdown and structured JSON report preview and download

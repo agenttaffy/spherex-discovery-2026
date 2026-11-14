@@ -49,48 +49,47 @@ class IRSAClient:
         try:
             async with httpx.AsyncClient(verify=ssl_ctx, timeout=25.0) as client:
                 resp = await client.get(self.sia_base_url, params=params)
-                if resp.status_code != 200:
-                    return records
+                if resp.status_code == 200:
+                    reader = csv.DictReader(io.StringIO(resp.text))
+                    for row in reader:
+                        obs_id = row.get("obs_id", "unknown")
+                        band = row.get("energy_bandpassname", "SPHEREx")
+                        access_url = row.get("access_url", "")
+                        mjd_raw = row.get("t_min")
+                        mjd_float = float(mjd_raw) if mjd_raw else None
+                        utc_date = self._mjd_to_utc(mjd_raw)
 
-                reader = csv.DictReader(io.StringIO(resp.text))
-                for row in reader:
-                    obs_id = row.get("obs_id", "unknown")
-                    band = row.get("energy_bandpassname", "SPHEREx")
-                    access_url = row.get("access_url", "")
-                    mjd_raw = row.get("t_min")
-                    mjd_float = float(mjd_raw) if mjd_raw else None
-                    utc_date = self._mjd_to_utc(mjd_raw)
+                        # Optional detector filtering
+                        if detector and detector.lower() not in band.lower():
+                            continue
 
-                    # Optional detector filtering
-                    if detector and detector.lower() not in band.lower():
-                        continue
+                        # Generate stable unique ID
+                        clean_band = band.replace("-", "_").replace(" ", "_")
+                        record_id = f"{collection}_{obs_id}_{clean_band}".replace("/", "_")
 
-                    # Generate stable unique ID
-                    clean_band = band.replace("-", "_").replace(" ", "_")
-                    record_id = f"{collection}_{obs_id}_{clean_band}".replace("/", "_")
+                        record_dict = {
+                            "id": record_id,
+                            "obs_id": obs_id,
+                            "collection": collection,
+                            "detector": band,
+                            "mjd": mjd_float,
+                            "utc_date": utc_date,
+                            "em_min": float(row["em_min"]) if row.get("em_min") else None,
+                            "em_max": float(row["em_max"]) if row.get("em_max") else None,
+                            "access_url": access_url,
+                            "ra": float(row.get("s_ra", ra)),
+                            "dec": float(row.get("s_dec", dec)),
+                        }
 
-                    record_dict = {
-                        "id": record_id,
-                        "obs_id": obs_id,
-                        "collection": collection,
-                        "detector": band,
-                        "mjd": mjd_float,
-                        "utc_date": utc_date,
-                        "em_min": float(row["em_min"]) if row.get("em_min") else None,
-                        "em_max": float(row["em_max"]) if row.get("em_max") else None,
-                        "access_url": access_url,
-                        "ra": float(row.get("s_ra", ra)),
-                        "dec": float(row.get("s_dec", dec)),
-                    }
+                        # Store in registry for frame fetching
+                        OBSERVATION_REGISTRY[record_id] = record_dict
 
-                    # Store in registry for frame fetching
-                    OBSERVATION_REGISTRY[record_id] = record_dict
+                        records.append(ObservationRecord(**record_dict))
 
-                    records.append(ObservationRecord(**record_dict))
-
-                    if len(records) >= limit:
-                        break
-
+                        if len(records) >= limit:
+                            break
+                else:
+                    print(f"[IRSAClient] IRSA SIA returned status {resp.status_code}")
         except Exception as e:
             print(f"[IRSAClient] Error querying IRSA SIA: {e}")
 

@@ -7,8 +7,26 @@ import { TimelinePlayer } from './components/timeline/TimelinePlayer';
 import { MetadataPanel } from './components/metadata/MetadataPanel';
 import { ComparisonView } from './components/viewer/ComparisonView';
 import { AboutPage } from './pages/AboutPage';
-import { ObservationRecord, FrameResponse, DemoPreset } from './types/astronomy';
-import { checkHealth, fetchObservations, fetchFrame, prefetchFrame, fetchDemoPresets } from './services/api';
+import { GuidedTourModal } from './components/layout/GuidedTourModal';
+import { DiscoveryReportModal } from './components/science/DiscoveryReportModal';
+import {
+  ObservationRecord,
+  FrameResponse,
+  DemoPreset,
+  CatalogSource,
+  LightCurveSeries,
+  DiscoveryReport,
+} from './types/astronomy';
+import {
+  checkHealth,
+  fetchObservations,
+  fetchFrame,
+  prefetchFrame,
+  fetchDemoPresets,
+  fetchCatalogs,
+  fetchPhotometry,
+  generateDiscoveryReport,
+} from './services/api';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'explorer' | 'blink' | 'diff' | 'about'>('explorer');
@@ -30,6 +48,18 @@ export const App: React.FC = () => {
   const [stretch, setStretch] = useState('asinh');
   const [colormap, setColormap] = useState('grayscale');
   const [isBlinkActive, setIsBlinkActive] = useState(false);
+
+  // Gaia DR3 & Photometry Science state
+  const [catalogSources, setCatalogSources] = useState<CatalogSource[]>([]);
+  const [showCatalog, setShowCatalog] = useState(false);
+  const [lightCurve, setLightCurve] = useState<LightCurveSeries | null>(null);
+  const [loadingPhotometry, setLoadingPhotometry] = useState(false);
+
+  // Modals & Share State
+  const [isTourOpen, setIsTourOpen] = useState(false);
+  const [isReportOpen, setIsReportOpen] = useState(false);
+  const [reportData, setReportData] = useState<DiscoveryReport | null>(null);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   // Loading states
   const [loadingObs, setLoadingObs] = useState(false);
@@ -55,6 +85,11 @@ export const App: React.FC = () => {
           const urlRa = params.get('ra');
           const urlDec = params.get('dec');
           const urlFov = params.get('fov');
+          const urlStretch = params.get('stretch');
+          const urlColormap = params.get('colormap');
+
+          if (urlStretch) setStretch(urlStretch);
+          if (urlColormap) setColormap(urlColormap);
 
           if (urlRa && urlDec) {
             setRa(urlRa);
@@ -88,6 +123,19 @@ export const App: React.FC = () => {
         } else {
           setCurrentFrame(null);
         }
+
+        // Fetch Catalogs in background
+        fetchCatalogs(searchRa, searchDec, 0.08)
+          .then((cat) => setCatalogSources(cat.sources))
+          .catch(() => setCatalogSources([]));
+
+        // Fetch Photometric light curve in background
+        setLoadingPhotometry(true);
+        fetchPhotometry(searchRa, searchDec, searchColl, detector, searchFov)
+          .then(setLightCurve)
+          .catch(() => setLightCurve(null))
+          .finally(() => setLoadingPhotometry(false));
+
       } catch (err: any) {
         setErrorMessage(err.message || 'Observation discovery failed');
       } finally {
@@ -149,11 +197,51 @@ export const App: React.FC = () => {
     const url = new URL(window.location.href);
     url.searchParams.set('ra', String(preset.ra));
     url.searchParams.set('dec', String(preset.dec));
+    url.searchParams.set('target', preset.id);
     window.history.replaceState({}, '', url.toString());
   };
 
   const handleManualSearch = () => {
     searchWithCoords(ra, dec, fov, collection);
+  };
+
+  // Share URL Deep Link
+  const handleCopyShareLink = () => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('ra', ra);
+    url.searchParams.set('dec', dec);
+    url.searchParams.set('fov', String(fov));
+    url.searchParams.set('collection', collection);
+    url.searchParams.set('stretch', stretch);
+    url.searchParams.set('colormap', colormap);
+    window.history.replaceState({}, '', url.toString());
+
+    navigator.clipboard.writeText(url.toString());
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
+  };
+
+  // Generate & Export Scientific Discovery Report
+  const handleExportDiscoveryReport = async () => {
+    const currentPreset = presets.find((p) => p.id === selectedPresetId);
+    const targetName = currentPreset ? currentPreset.name : `SPHEREx Target (RA ${ra}, Dec ${dec})`;
+    const targetType = currentPreset ? currentPreset.target_type : 'Astronomical Source';
+
+    try {
+      const rep = await generateDiscoveryReport({
+        target_name: targetName,
+        ra: Number(ra),
+        dec: Number(dec),
+        target_type: targetType,
+        photometry_data: lightCurve,
+        observations: observations,
+        notes: currentPreset?.description,
+      });
+      setReportData(rep);
+      setIsReportOpen(true);
+    } catch (err) {
+      console.error('Failed to generate report:', err);
+    }
   };
 
   return (
@@ -162,6 +250,10 @@ export const App: React.FC = () => {
         irsaConnected={irsaConnected}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
+        onOpenGuidedTour={() => setIsTourOpen(true)}
+        onCopyShareLink={handleCopyShareLink}
+        onExportReport={handleExportDiscoveryReport}
+        copiedLink={copiedLink}
       />
 
       {/* Main Workspace Layout */}
@@ -209,6 +301,9 @@ export const App: React.FC = () => {
                 setStretch={handleSetStretch}
                 colormap={colormap}
                 setColormap={setColormap}
+                catalogSources={catalogSources}
+                showCatalog={showCatalog}
+                setShowCatalog={setShowCatalog}
                 title={observations[currentIndex]?.obs_id}
                 subtitle={
                   observations[currentIndex]
@@ -228,12 +323,38 @@ export const App: React.FC = () => {
             </div>
 
             {/* Right Telemetry & Provenance Dock */}
-            <MetadataPanel frame={currentFrame} />
+            <MetadataPanel
+              frame={currentFrame}
+              lightCurve={lightCurve}
+              loadingPhotometry={loadingPhotometry}
+              onSelectObsId={(obsId) => {
+                const idx = observations.findIndex((o) => o.obs_id === obsId);
+                if (idx >= 0) handleSelectIndex(idx);
+              }}
+              onOpenDiscoveryReport={handleExportDiscoveryReport}
+            />
           </>
         )}
       </div>
 
       <Footer />
+
+      {/* Guided Tour Modal */}
+      <GuidedTourModal
+        isOpen={isTourOpen}
+        onClose={() => setIsTourOpen(false)}
+        onSelectPreset={(presetId) => {
+          const p = presets.find((x) => x.id === presetId);
+          if (p) handleSelectPreset(p);
+        }}
+      />
+
+      {/* Scientific Discovery Report Modal */}
+      <DiscoveryReportModal
+        report={reportData}
+        isOpen={isReportOpen}
+        onClose={() => setIsReportOpen(false)}
+      />
     </div>
   );
 };

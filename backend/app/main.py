@@ -5,6 +5,7 @@ from app.api.health import router as health_router
 from app.api.observations import router as obs_router
 from app.api.frames import router as frames_router
 from app.api.demo import router as demo_router
+from app.api.science import router as science_router
 
 app = FastAPI(
     title="SPHEREx Discovery API",
@@ -26,6 +27,7 @@ app.include_router(health_router, prefix="/api", tags=["System"])
 app.include_router(obs_router, prefix="/api", tags=["Observations"])
 app.include_router(frames_router, prefix="/api", tags=["Frames"])
 app.include_router(demo_router, prefix="/api", tags=["Demo"])
+app.include_router(science_router, prefix="/api", tags=["Science"])
 
 @app.get("/")
 def root():
