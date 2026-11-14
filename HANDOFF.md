@@ -57,4 +57,5 @@ npm run build
 ```
 
 ## 8. Latest Git Commit & Uncommitted Work
-- Clean Git repository ready for initial milestone commit.
+- Commit: `c6298af11b41193030c2fc0fd236414c01c164ef`
+- Clean working directory, 0 uncommitted changes.
