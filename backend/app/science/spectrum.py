@@ -142,15 +142,24 @@ def generate_spectrum_for_target(
         if b:
             try:
                 hd = load_fits_cutout(b)
-                img, _ = extract_primary_image(hd)
-                phot = compute_aperture_photometry(img)
+                img, hdr = extract_primary_image(hd)
+                from app.science.fits_processing import extract_variance_data, extract_fatal_quality_mask
+                var = extract_variance_data(hd)
+                mask = extract_fatal_quality_mask(hd)
+                phot = compute_aperture_photometry(
+                    image=img,
+                    target_coord=(ra, dec),
+                    wcs=hdr,
+                    variance=var,
+                    mask=mask,
+                )
                 snr = phot.get("snr", 0.0)
 
                 if det_key not in measured_by_detector or snr > measured_by_detector[det_key]["snr"]:
                     measured_by_detector[det_key] = {
                         "flux_mjy_sr": phot["net_flux"],
                         "peak_flux_mjy_sr": phot["peak_flux"],
-                        "flux_err_mjy_sr": phot["background_std"],
+                        "flux_err_mjy_sr": phot.get("flux_err", phot["background_std"]),
                         "snr": snr,
                         "obs_id": obs_id,
                         "observed": True,
@@ -337,6 +346,9 @@ def generate_spectrum_for_target(
                 "flux_mjy_sr": round(ch_flux, 4),
                 "flux_density_mjy": round(ch_flux * 0.9035, 4),
                 "is_observed_band": det_obs,
+                "is_observed": False,
+                "is_interpolated": True,
+                "model_label": "Estimated Continuum Model (Interpolated)",
             })
             channel_global_idx += 1
 
@@ -376,12 +388,18 @@ def generate_spectrum_for_target(
     else:
         spec_class = "Broadband Infrared Continuum Source"
 
+    observed_channels = [b for b in bands_output if b.get("is_observed")]
+
     return {
         "target": {"ra": round(ra, 6), "dec": round(dec, 6)},
         "total_observed_bands": len(measured_by_detector),
+        "total_observed_channels": len(observed_channels),
+        "observed_channels": observed_channels,
         "bands": bands_output,
         "channels_102": channels_102,
+        "estimated_channels_102": channels_102,
         "continuum_curve": continuum_curve,
+        "continuum_model_label": "Estimated Continuum Model (Interpolated)",
         "summary": {
             "peak_wavelength_um": peak_band["wavelength_um"],
             "peak_detector": peak_band["detector"],
@@ -390,5 +408,7 @@ def generate_spectrum_for_target(
             "spectral_class": spec_class,
             "integrated_flux_mjy_sr_um": round(total_flux_integral, 3),
             "total_channels": len(channels_102),
+            "continuum_model_label": "Estimated Continuum Model (Interpolated)",
+            "observed_channels_count": len(observed_channels),
         },
     }

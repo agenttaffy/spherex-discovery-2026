@@ -1,11 +1,40 @@
 # SPHEREx Discovery — Project State
 
-**Last Updated:** 2026-11-14T18:15:00Z  
-**Current Implementation Stage:** Phase 5 Fully Hardened & Verified (On-The-Fly Spectra Generation SED: Flux vs. Wavelength $\lambda$ across 6 Detector Arrays & 102 Channels with PCHIP Monotonic Interpolation, Astronomical Image Co-Addition & Stacking with Robust Sigma-Clipped Background Noise and $\sim\sqrt{N}$ SNR Improvement, Multi-Epoch Stacking Scope Switcher in ComparisonView, 69 Passing Pytest Tests, Clean Production Build).
+**Last Updated:** 2026-11-14T19:30:00Z  
+**Current Implementation Stage:** Phase 6 Scientific Audit & Codebase Hardening (Documented SPHEREx FLAGS Bit Definitions, Nominal SOURCE Mask Distinction, WCS-Transformed Photometry & VARIANCE Error Propagation, 102-Channel Estimated Continuum Modeling Separation, WCS Celestial Target Astrometric Tracking across Epochs, LVF Passband Compatibility & Mask-Preserving Differencing, Compatible Stacking with Variance Propagation, Catalog Provenance Labeling, 77 Passing Pytest Tests, Clean Production Build).
 
 ---
 
 ## 1. Verified Working Features
+- **SPHEREx Level 2 FLAGS Bit Definitions & Source Mask Distinction (`fits_processing.py`):**
+  - Parses documented `MSKN*`/`MSKM*` FITS header cards dynamically.
+  - Distinguishes nominal astronomical source detections (`SOURCE`, bit 21 = 2,097,152; `FULLSAMPLE`, bit 12 = 4,096) from fatal detector defects (`NONFUNC` dead pixel = 64, `OVERFLOW` saturation = 2, `SUR_ERROR` ramp fit error = 4, `HOT` = 1,024, `COLD` = 2,048, `NONLINEAR` = 32,768, `SNOWBALL` cosmic ray = 134,217,728, `TRANSIENT` = 1).
+  - Eliminates the previous bug where all 100% of pixels in cutouts with real astronomical sources were flagged as bad pixels.
+  - Functions `extract_fatal_quality_mask` and `extract_variance_data` provided for downstream science modules.
+- **WCS-Transformed Aperture Photometry & VARIANCE Propagation (`photometry.py`):**
+  - Transforms requested celestial `(RA, Dec)` directly to pixel coordinates `(x, y)` using Astropy celestial WCS (`world_to_pixel`) rather than wandering off to arbitrary maximum-pixel coordinates.
+  - Reads the `VARIANCE` FITS extension to compute true photometric flux uncertainties ($\sigma_F = \sqrt{\sum \sigma_i^2 + \frac{N_{ap}^2}{N_{ann}} \sigma_{ann}^2}$) rather than uncalibrated proxies.
+  - Excludes fatal quality mask pixels from aperture and background calculations.
+- **SED Spectra Generation & Estimated Continuum Model Separation (`spectrum.py`, `SpectrumChart.tsx`):**
+  - Measures target `(RA, Dec)` through each cutout's celestial WCS and propagates `VARIANCE` error bars.
+  - Keeps 6 detector bands strictly separated.
+  - Does NOT call interpolated curves "102 observed channels"; presents actual observed detector array measurements with error bars, and explicitly labels the 102-point interpolated profile as "Estimated Continuum Model (Interpolated)".
+- **WCS Celestial Target Tracking & True Epoch Baselines (`motion.py`):**
+  - Tracks requested celestial target `(RA, Dec)` across epochs via WCS, locating subpixel centroids in a local window around expected position rather than locking onto unrelated brighter field stars.
+  - Converts subpixel centroid shifts $(\Delta x, \Delta y)$ to celestial equatorial shifts $(\Delta\alpha \cos\delta, \Delta\delta)$ via WCS `pixel_to_world`.
+  - Computes annual proper motion $\mu$ using true epoch baseline in years $\Delta t = |t_2 - t_1|$.
+- **LVF Passband Compatibility & Mask-Preserving Differencing (`comparison.py`, `frames.py`):**
+  - Enforces Linear Variable Filter wavelength overlap checks (`em_min`, `em_max`).
+  - Preserves data quality masks (setting masked and non-overlapping pixels to mid-gray 128).
+  - Returns clear descriptive errors when reprojection fails or celestial coverage does not overlap.
+- **Compatible Stacking & Variance Propagation (`stacking.py`, `frames.py`):**
+  - Rejects stacking of incompatible detector arrays or non-overlapping wavelengths.
+  - Propagates variance: $\text{Var}_{\text{stack}} = \frac{1}{N^2} \sum \text{Var}_i$ for mean co-addition.
+  - Propagates bitwise OR of fatal quality masks.
+  - Accurately reports empirical background noise suppression and measured SNR gain.
+- **Reference Catalog Provenance Disambiguation (`catalogs.py`, `catalog_service.py`, `CanvasViewer.tsx`):**
+  - Explicitly labels fallback catalog sources as "Curated Reference Catalog (Demo)" vs "Live ESA Gaia TAP".
+  - Shows provenance distinction in CanvasViewer overlay labels and toggle buttons.
 - **On-The-Fly Spectra Generation (`/api/science/spectrum`, `spectrum.py`, `SpectrumChart.tsx`):**
   - Instantaneous calibrated Spectral Energy Distribution (SED: Flux vs. Wavelength $\lambda$) from 0.75 µm to 5.00 µm.
   - Queries and aggregates multi-epoch circular aperture photometry across all 6 SPHEREx detector arrays (D1: 0.75–1.12 µm, D2: 1.12–1.68 µm, D3: 1.68–2.42 µm, D4: 2.42–3.82 µm, D5: 3.82–4.42 µm, D6: 4.42–5.00 µm).
@@ -78,5 +107,5 @@
 ---
 
 ## 3. Latest Build & Test Status
-- **Backend pytest:** 69 passed in 4.93s (0 failures).
-- **Frontend build:** `npm run build` succeeded in 2.21s (0 type errors, 0 warnings).
+- **Backend pytest:** 77 passed in 7.41s (0 failures).
+- **Frontend build:** `npm run build` succeeded in 2.42s (0 type errors, 0 warnings).

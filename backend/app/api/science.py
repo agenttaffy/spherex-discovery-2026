@@ -121,7 +121,11 @@ async def get_photometry(
 
         if b:
             try:
-                img, _ = extract_primary_image(load_fits_cutout(b))
+                hd = load_fits_cutout(b)
+                img, hdr = extract_primary_image(hd)
+                from app.science.fits_processing import extract_variance_data, extract_fatal_quality_mask
+                var = extract_variance_data(hd)
+                mask = extract_fatal_quality_mask(hd)
                 epoch_frames.append({
                     "frame_id": obs.id,
                     "obs_id": obs.obs_id,
@@ -130,11 +134,14 @@ async def get_photometry(
                     "detector": obs.detector,
                     "collection": obs.collection,
                     "image": img,
+                    "header": hdr,
+                    "variance": var,
+                    "mask": mask,
                 })
             except Exception:
                 pass
 
-    series = build_lightcurve_series(epoch_frames)
+    series = build_lightcurve_series(epoch_frames, target_ra=ra_deg, target_dec=dec_deg)
     series["target"] = {"ra": ra_deg, "dec": dec_deg}
     return series
 
@@ -231,14 +238,16 @@ async def compute_astrometric_motion(req: MotionRequest = Body(...)):
     if not b2:
         b2 = await cutout_service.fetch_cutout_fits(meta2["access_url"], meta2["ra"], meta2["dec"])
 
-    i1, _ = extract_primary_image(load_fits_cutout(b1))
-    i2, _ = extract_primary_image(load_fits_cutout(b2))
+    i1, h1 = extract_primary_image(load_fits_cutout(b1))
+    i2, h2 = extract_primary_image(load_fits_cutout(b2))
 
     motion = measure_astrometric_motion(
         img1=i1,
         img2=i2,
         meta1=meta1,
         meta2=meta2,
+        wcs1=h1,
+        wcs2=h2,
         pixel_scale_arcsec=req.pixel_scale_arcsec or 6.2,
     )
 

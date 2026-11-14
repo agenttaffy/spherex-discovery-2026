@@ -89,9 +89,14 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <Layers className="w-3.5 h-3.5 text-indigo-400" />
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-300">
-            Infrared SED (Flux vs. λ)
-          </span>
+          <div>
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-300 block">
+              Infrared SED (Flux vs. λ)
+            </span>
+            <span className="text-[9px] font-mono text-slate-500">
+              Observed Bands ({total_observed_bands}) · Continuum (Interpolated)
+            </span>
+          </div>
         </div>
         <button
           onClick={() => setShowChannels102(!showChannels102)}
@@ -100,10 +105,10 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
               ? 'bg-indigo-950 text-indigo-300 border-indigo-700 font-semibold'
               : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
           }`}
-          title="Toggle display of all 102 spectroscopic channels"
+          title="Toggle display of Estimated Continuum Model (102 Interpolated Channels)"
         >
           <Eye className="w-3 h-3 text-indigo-400" />
-          <span>{showChannels102 ? '102 Chans' : '6 Bands'}</span>
+          <span>{showChannels102 ? 'Estimated (102 Ch)' : 'Observed Bands'}</span>
         </button>
       </div>
 
@@ -333,7 +338,7 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
             </div>
             <div className="pt-0.5 text-[9px]">
               {hoveredBand.is_observed ? (
-                <span className="text-emerald-400 font-semibold">✓ Calibrated FITS Cutout Photometry</span>
+                <span className="text-emerald-400 font-semibold">✓ Observed SPHEREx Channel (Calibrated WCS)</span>
               ) : (
                 <span className="text-amber-300">○ Modeled SED Profile Continuum</span>
               )}
@@ -344,6 +349,9 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
         {/* Hover Tooltip: 102 Individual Channels */}
         {hoveredChannel && (
           <div className="absolute top-1 right-2 bg-slate-900 border border-slate-700 rounded p-2 text-[10px] text-slate-200 pointer-events-none shadow-xl z-20 font-mono space-y-0.5">
+            <div className="text-[9px] text-indigo-400 font-bold uppercase tracking-wider">
+              Estimated Continuum Model (Interpolated)
+            </div>
             <div className="flex items-center gap-1.5 font-bold" style={{ color: hoveredChannel.color }}>
               <span>Chan #{hoveredChannel.channel_index} / 102</span>
               <span className="text-[9px] text-slate-400">({hoveredChannel.detector})</span>
@@ -352,7 +360,7 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
               <span className="text-slate-400">Wavelength λ:</span> {hoveredChannel.wavelength_um.toFixed(4)} µm
             </div>
             <div>
-              <span className="text-slate-400">Flux Density:</span> {hoveredChannel.flux_mjy_sr.toFixed(2)} MJy/sr
+              <span className="text-slate-400">Modeled Flux:</span> {hoveredChannel.flux_mjy_sr.toFixed(2)} MJy/sr
             </div>
           </div>
         )}

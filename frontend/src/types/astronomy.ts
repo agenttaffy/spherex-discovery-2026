@@ -92,6 +92,8 @@ export interface CatalogSource {
   catalog: string;
   star_type: string;
   separation_arcsec: number;
+  provenance?: string;
+  catalog_source?: string;
 }
 
 export interface PhotometryPoint {

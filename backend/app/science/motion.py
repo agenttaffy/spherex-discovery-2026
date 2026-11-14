@@ -47,24 +47,128 @@ def _find_brightest_centroid(img: np.ndarray) -> Optional[Tuple[float, float, fl
 
     return float(cen_y), float(cen_x), snr
 
+def _find_local_centroid(
+    img: np.ndarray,
+    expected_y: float,
+    expected_x: float,
+    search_radius: int = 4
+) -> Optional[Tuple[float, float, float]]:
+    """
+    Locates sub-pixel centroid (y, x) in a local neighborhood centered around an expected
+    celestial position (expected_y, expected_x). Prevents wandering off to an unrelated brighter star.
+    """
+    finite_mask = np.isfinite(img)
+    if not np.any(finite_mask):
+        return None
+
+    clean_img = img.copy()
+    bg_median = float(np.median(clean_img[finite_mask]))
+    bg_std = float(np.std(clean_img[finite_mask]))
+    if bg_std < 1e-6:
+        bg_std = 1.0
+    clean_img[~finite_mask] = bg_median
+
+    h, w = clean_img.shape
+    int_y = int(round(expected_y))
+    int_x = int(round(expected_x))
+
+    if int_y < 0 or int_y >= h or int_x < 0 or int_x >= w:
+        return None
+
+    y_min, y_high = max(0, int_y - search_radius), min(h, int_y + search_radius + 1)
+    x_min, x_high = max(0, int_x - search_radius), min(w, int_x + search_radius + 1)
+
+    local_patch = clean_img[y_min:y_high, x_min:x_high]
+    if local_patch.size == 0:
+        return None
+
+    loc_y_max, loc_x_max = np.unravel_index(np.argmax(local_patch), local_patch.shape)
+    peak_y = y_min + loc_y_max
+    peak_x = x_min + loc_x_max
+    peak_val = float(clean_img[peak_y, peak_x])
+    snr = (peak_val - bg_median) / bg_std
+
+    # Sub-pixel center of mass in 5x5 box around local peak
+    box_y_min, box_y_max = max(0, peak_y - 2), min(h, peak_y + 3)
+    box_x_min, box_x_max = max(0, peak_x - 2), min(w, peak_x + 3)
+    sub = clean_img[box_y_min:box_y_max, box_x_min:box_x_max] - bg_median
+    sub = np.maximum(sub, 0.0)
+    total_flux = np.sum(sub)
+    if total_flux <= 0:
+        return float(peak_y), float(peak_x), snr
+
+    yy, xx = np.indices(sub.shape)
+    cen_y = box_y_min + np.sum(yy * sub) / total_flux
+    cen_x = box_x_min + np.sum(xx * sub) / total_flux
+
+    return float(cen_y), float(cen_x), snr
+
 def measure_astrometric_motion(
     img1: np.ndarray,
     img2: np.ndarray,
     meta1: Dict[str, Any],
     meta2: Dict[str, Any],
+    wcs1: Optional[Any] = None,
+    wcs2: Optional[Any] = None,
+    target_coord: Optional[Tuple[float, float]] = None,
     pixel_scale_arcsec: float = NOMINAL_PIXEL_SCALE_ARCSEC,
 ) -> Dict[str, Any]:
     """
     Computes astrometric displacement and annual proper motion vector between two observation epochs.
+    Tracks the requested celestial target (RA, Dec) through each image WCS rather than the global
+    brightest pixel. Converts shifts through celestial WCS and uses true epoch baselines.
     Returns displacement in pixels and arcseconds, annual proper motion (arcsec/yr),
     position angle (deg), and candidate motion classification.
     """
     # 1. 2D FFT Cross-correlation overall translation shift
     fft_dy, fft_dx = estimate_pixel_shift(img1, img2)
 
-    # 2. Centroid tracking on primary point source
-    c1 = _find_brightest_centroid(img1)
-    c2 = _find_brightest_centroid(img2)
+    # 2. Celestial target coordinates and WCS extraction
+    from app.science.fits_processing import extract_astropy_wcs
+    from astropy.wcs import WCS
+    from astropy.coordinates import SkyCoord
+    import astropy.units as u
+
+    w_obj1 = wcs1 if isinstance(wcs1, WCS) else (extract_astropy_wcs(wcs1) if wcs1 is not None else None)
+    w_obj2 = wcs2 if isinstance(wcs2, WCS) else (extract_astropy_wcs(wcs2) if wcs2 is not None else None)
+
+    if w_obj1 is None and "header" in meta1:
+        w_obj1 = extract_astropy_wcs(meta1["header"])
+    if w_obj2 is None and "header" in meta2:
+        w_obj2 = extract_astropy_wcs(meta2["header"])
+
+    # Establish target coordinates
+    if target_coord is None:
+        tgt_ra = meta1.get("target_ra") or meta1.get("ra")
+        tgt_dec = meta1.get("target_dec") or meta1.get("dec")
+        if tgt_ra is not None and tgt_dec is not None:
+            target_coord = (float(tgt_ra), float(tgt_dec))
+
+    c1 = None
+    c2 = None
+    used_wcs = False
+
+    if target_coord is not None and w_obj1 is not None and w_obj2 is not None:
+        try:
+            sc = SkyCoord(target_coord[0] * u.deg, target_coord[1] * u.deg, frame="icrs")
+            px1, py1 = w_obj1.world_to_pixel(sc)
+            px2, py2 = w_obj2.world_to_pixel(sc)
+
+            if np.isfinite(px1) and np.isfinite(py1) and np.isfinite(px2) and np.isfinite(py2):
+                c1 = _find_local_centroid(img1, float(py1), float(px1), search_radius=4)
+                c2 = _find_local_centroid(img2, float(py2), float(px2), search_radius=4)
+                used_wcs = True
+        except Exception:
+            used_wcs = False
+
+    # Centroid tracking fallback if WCS target centroid was not found
+    if c1 is None:
+        c1 = _find_brightest_centroid(img1)
+    if c2 is None:
+        c2 = _find_brightest_centroid(img2)
+
+    celestial_shift_arcsec = None
+    celestial_pa_deg = None
 
     if c1 is not None and c2 is not None:
         y1, x1, snr1 = c1
@@ -75,6 +179,16 @@ def measure_astrometric_motion(
         confidence = min(1.0, max(0.2, (snr1 + snr2) / 20.0))
         centroid_1 = [round(x1, 2), round(y1, 2)]
         centroid_2 = [round(x2, 2), round(y2, 2)]
+
+        # Transform sub-pixel centroids through celestial WCS
+        if w_obj1 is not None and w_obj2 is not None:
+            try:
+                sky1 = w_obj1.pixel_to_world(x1, y1)
+                sky2 = w_obj2.pixel_to_world(x2, y2)
+                celestial_shift_arcsec = float(sky1.separation(sky2).arcsec)
+                celestial_pa_deg = float(sky1.position_angle(sky2).degree)
+            except Exception:
+                pass
     else:
         dx_pix = fft_dx
         dy_pix = fft_dy
@@ -85,20 +199,36 @@ def measure_astrometric_motion(
 
     # Total displacement
     disp_pix = float(np.hypot(dx_pix, dy_pix))
-    disp_arcsec = float(disp_pix * pixel_scale_arcsec)
+    if celestial_shift_arcsec is not None:
+        disp_arcsec = celestial_shift_arcsec
+    else:
+        disp_arcsec = float(disp_pix * pixel_scale_arcsec)
 
-    # Position Angle: North is up (-y), East is left (-x) in astronomical WCS standard
-    # PA is measured from North through East
-    pa_deg = float((np.degrees(np.arctan2(-dx_pix, -dy_pix)) + 360.0) % 360.0)
+    # Position Angle
+    if celestial_pa_deg is not None:
+        pa_deg = celestial_pa_deg
+    else:
+        pa_deg = float((np.degrees(np.arctan2(-dx_pix, -dy_pix)) + 360.0) % 360.0)
 
-    # Temporal separation
+    # Temporal separation using true epoch baselines
     mjd1 = float(meta1.get("mjd") or 0.0)
     mjd2 = float(meta2.get("mjd") or 0.0)
     dt_days = abs(mjd2 - mjd1)
+
+    if dt_days < 1e-4:
+        utc1 = meta1.get("utc_date")
+        utc2 = meta2.get("utc_date")
+        if utc1 and utc2:
+            try:
+                from astropy.time import Time
+                dt_days = abs((Time(utc2) - Time(utc1)).jd)
+            except Exception:
+                pass
+
     dt_years = dt_days / 365.25 if dt_days > 0 else 1.0
 
     # Annual proper motion rate
-    proper_motion_arcsec_yr = float(disp_arcsec / dt_years) if dt_years > 0.001 else 0.0
+    proper_motion_arcsec_yr = float(disp_arcsec / dt_years) if dt_days > 1e-4 else 0.0
     proper_motion_mas_yr = float(proper_motion_arcsec_yr * 1000.0)
 
     # Classification
@@ -125,4 +255,5 @@ def measure_astrometric_motion(
         "centroid_2": centroid_2,
         "pixel_scale_arcsec": pixel_scale_arcsec,
         "confidence_score": round(confidence, 2),
+        "wcs_tracking": used_wcs,
     }

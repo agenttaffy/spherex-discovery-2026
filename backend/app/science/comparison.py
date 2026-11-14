@@ -18,11 +18,24 @@ def check_comparison_eligibility(
     if id1 and id2 and id1 == id2:
         return False, "Cannot compare an observation with itself."
 
-    # 1. Detector match
+    # 1. Detector match & LVF passband compatibility
     det1 = meta1.get("detector")
     det2 = meta2.get("detector")
     if det1 and det2 and det1 != det2:
         return False, f"Incompatible detectors: {det1} vs {det2}. Spectral bands differ."
+
+    # Check LVF effective wavelength coverage if available
+    em_min1 = meta1.get("em_min")
+    em_max1 = meta1.get("em_max")
+    em_min2 = meta2.get("em_min")
+    em_max2 = meta2.get("em_max")
+    if em_min1 is not None and em_max1 is not None and em_min2 is not None and em_max2 is not None:
+        try:
+            overlap = min(float(em_max1), float(em_max2)) - max(float(em_min1), float(em_min2))
+            if overlap <= 0:
+                return False, f"Incompatible LVF wavelength coverage: [{float(em_min1):.2f}, {float(em_max1):.2f}] µm vs [{float(em_min2):.2f}, {float(em_max2):.2f}] µm. Linear Variable Filter differencing requires overlapping spectral coverage."
+        except (ValueError, TypeError):
+            pass
 
     # 2. Celestial proximity with 0/360 RA boundary wrapping
     ra1, dec1 = float(meta1.get("ra", 0.0)), float(meta1.get("dec", 0.0))
@@ -49,12 +62,16 @@ def compute_difference_frame(
     img2: np.ndarray,
     wcs1: Optional[Any] = None,
     wcs2: Optional[Any] = None,
+    mask1: Optional[np.ndarray] = None,
+    mask2: Optional[np.ndarray] = None,
 ) -> Tuple[np.ndarray, Dict[str, Any]]:
     """
     Computes calibrated scientific difference (img2 - img1).
     When celestial WCS coordinates are provided, reprojects img2 onto img1's celestial grid
     using astropy / reproject_interp to account for differing WCS geometries, pixel scales,
     or rotations.
+    Preserves data quality masks (setting masked and non-overlapping pixels to mid-gray).
+    Returns clear errors when celestial coverage does not overlap.
     Gracefully falls back to FFT shift registration if WCS is absent, and crops to overlapping
     bounding boxes when dimensions differ.
     Robust against NaN, Inf, and non-finite pixel values.
@@ -62,36 +79,44 @@ def compute_difference_frame(
         Tuple[difference_array_uint8, stats_dict]
     """
     alignment_method = "direct"
-    i1 = img1.copy()
-    i2 = img2.copy()
+    i1 = img1.copy().astype(np.float32)
+    i2 = img2.copy().astype(np.float32)
+
+    # Apply quality masks before subtraction
+    if mask1 is not None:
+        i1[mask1] = np.nan
+    if mask2 is not None:
+        i2[mask2] = np.nan
 
     # 1. Scientific WCS Reprojection via reproject_interp
     if wcs1 is not None and wcs2 is not None:
-        try:
-            from reproject import reproject_interp
-            w_obj1 = WCS(wcs1) if not isinstance(wcs1, WCS) else wcs1
-            w_obj2 = WCS(wcs2) if not isinstance(wcs2, WCS) else wcs2
+        from reproject import reproject_interp
+        w_obj1 = WCS(wcs1) if not isinstance(wcs1, WCS) else wcs1
+        w_obj2 = WCS(wcs2) if not isinstance(wcs2, WCS) else wcs2
 
-            # Extract 2D celestial sub-WCS if headers contain extra axes (e.g., spectral NAXIS=3)
-            if hasattr(w_obj1, "has_celestial") and w_obj1.has_celestial and w_obj1.naxis > 2:
-                w_obj1 = w_obj1.celestial
-            if hasattr(w_obj2, "has_celestial") and w_obj2.has_celestial and w_obj2.naxis > 2:
-                w_obj2 = w_obj2.celestial
+        # Extract 2D celestial sub-WCS if headers contain extra axes (e.g., spectral NAXIS=3)
+        if hasattr(w_obj1, "has_celestial") and w_obj1.has_celestial and w_obj1.naxis > 2:
+            w_obj1 = w_obj1.celestial
+        if hasattr(w_obj2, "has_celestial") and w_obj2.has_celestial and w_obj2.naxis > 2:
+            w_obj2 = w_obj2.celestial
 
-            if w_obj1.naxis == 2 and w_obj2.naxis == 2:
+        if w_obj1.naxis == 2 and w_obj2.naxis == 2:
+            try:
                 reproj_arr, footprint = reproject_interp(
                     (i2, w_obj2),
                     w_obj1,
                     shape_out=i1.shape,
                     order="bilinear",
                 )
-                if np.any(footprint > 0) and np.any(np.isfinite(reproj_arr)):
-                    i2 = reproj_arr.astype(np.float32)
-                    i2[footprint == 0] = np.nan
-                    alignment_method = "wcs_reproject"
-        except Exception:
-            # Reprojection encountered an edge case; proceed to FFT shift fallback
-            pass
+            except Exception as reproj_err:
+                raise ValueError(f"WCS reprojection failed: {reproj_err}")
+
+            if footprint is None or np.sum(footprint > 0) == 0 or not np.any(np.isfinite(reproj_arr)):
+                raise ValueError("Frames have no overlapping celestial sky coverage.")
+
+            i2 = reproj_arr.astype(np.float32)
+            i2[footprint == 0] = np.nan
+            alignment_method = "wcs_reproject"
 
     # 2. Crop to common overlapping bounding box if dimensions differ
     if i1.shape != i2.shape:

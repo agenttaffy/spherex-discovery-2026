@@ -89,7 +89,11 @@ async def diff_frames(req: DiffRequest = Body(...)):
         i1, h1 = extract_primary_image(hd1)
         i2, h2 = extract_primary_image(hd2)
 
-        diff_u8, stats = compute_difference_frame(i1, i2, wcs1=h1, wcs2=h2)
+        from app.science.fits_processing import extract_fatal_quality_mask
+        mask1 = extract_fatal_quality_mask(hd1)
+        mask2 = extract_fatal_quality_mask(hd2)
+
+        diff_u8, stats = compute_difference_frame(i1, i2, wcs1=h1, wcs2=h2, mask1=mask1, mask2=mask2)
         diff_b64 = render_image_to_base64(diff_u8, format=req.format or "png")
 
         return {
@@ -100,6 +104,8 @@ async def diff_frames(req: DiffRequest = Body(...)):
             "dimensions": [int(diff_u8.shape[0]), int(diff_u8.shape[1])],
             "image_base64": diff_b64,
         }
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error computing frame difference: {e}")
 
@@ -117,6 +123,9 @@ async def stack_frames(req: StackRequest = Body(...)):
 
     images = []
     wcs_list = []
+    variances = []
+    masks = []
+    detectors = []
     resolved_ids = []
     metas = []
 
@@ -159,8 +168,14 @@ async def stack_frames(req: StackRequest = Body(...)):
         try:
             hd = load_fits_cutout(b)
             img, hdr = extract_primary_image(hd)
+            from app.science.fits_processing import extract_variance_data, extract_fatal_quality_mask
+            var = extract_variance_data(hd)
+            mask = extract_fatal_quality_mask(hd)
             images.append(img)
             wcs_list.append(hdr)
+            variances.append(var)
+            masks.append(mask)
+            detectors.append(meta.get("detector"))
             resolved_ids.append(fid)
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to process FITS cutout for frame '{fid}': {e}")
@@ -170,6 +185,9 @@ async def stack_frames(req: StackRequest = Body(...)):
             images=images,
             wcs_list=wcs_list,
             method=req.method or "mean",
+            variances=variances,
+            masks=masks,
+            detectors=detectors,
         )
         u8_stacked = apply_stretch(stacked_float, method=req.stretch or "asinh")
         stacked_b64 = render_image_to_base64(u8_stacked, format=req.format or "png")

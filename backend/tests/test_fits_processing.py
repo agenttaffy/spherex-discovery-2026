@@ -129,3 +129,45 @@ def test_render_image_to_base64_float_sanitization():
     b64 = render_image_to_base64(float_arr, format="webp")
     assert b64.startswith("data:image/webp;base64,")
 
+def test_spherex_documented_flags_distinguish_source_mask():
+    from app.science.fits_processing import extract_fatal_quality_mask, extract_variance_data
+    hdr = fits.Header()
+    hdr["MSKN0000"] = "TRANSIENT"
+    hdr["MSKM0000"] = 1
+    hdr["MSKN0001"] = "OVERFLOW"
+    hdr["MSKM0001"] = 2
+    hdr["MSKN0006"] = "NONFUNC"
+    hdr["MSKM0006"] = 64
+    hdr["MSKN0021"] = "SOURCE"
+    hdr["MSKM0021"] = 2097152
+
+    # Array with 4 pixels:
+    # 0: Clean (0)
+    # 1: Nominal SOURCE only (2097152) -> should NOT be flagged as bad!
+    # 2: Saturated / OVERFLOW + SOURCE (2097154) -> should be flagged as bad!
+    # 3: Dead pixel / NONFUNC (64) -> should be flagged as bad!
+    flags_data = np.array([0, 2097152, 2097154, 64], dtype=np.int32).reshape((2, 2))
+    flags_hdu = fits.ImageHDU(data=flags_data, header=hdr, name="FLAGS")
+    var_data = np.array([0.1, 0.2, 0.3, 0.4], dtype=np.float32).reshape((2, 2))
+    var_hdu = fits.ImageHDU(data=var_data, name="VARIANCE")
+    hdul = fits.HDUList([fits.PrimaryHDU(), flags_hdu, var_hdu])
+
+    summary = evaluate_quality_flags(hdul)
+    assert summary["total_pixels"] == 4
+    # Only pixels 2 and 3 have fatal defects. Pixel 1 (SOURCE only) is valid!
+    assert summary["flagged_pixels"] == 2
+    assert summary["flag_breakdown"]["saturated"] == 1
+    assert summary["flag_breakdown"]["dead_unusable"] == 1
+    assert summary["flag_breakdown"]["source_detection"] == 2
+
+    fatal_mask = extract_fatal_quality_mask(hdul)
+    assert fatal_mask[0, 0] is False or fatal_mask[0, 0] == 0  # Clean
+    assert fatal_mask[0, 1] is False or fatal_mask[0, 1] == 0  # SOURCE only is not fatal!
+    assert fatal_mask[1, 0] == True  # Saturated + SOURCE is fatal
+    assert fatal_mask[1, 1] == True  # NONFUNC is fatal
+
+    var = extract_variance_data(hdul)
+    assert var is not None
+    assert var.shape == (2, 2)
+
+

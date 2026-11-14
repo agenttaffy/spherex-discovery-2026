@@ -18,6 +18,38 @@ def load_fits_cutout(file_source: Union[bytes, str, io.BytesIO]) -> fits.HDUList
     else:
         return fits.open(file_source)
 
+# Documented SPHEREx Level 2 Mask Plane Classifications
+SPHEREX_FATAL_FLAG_NAMES = {
+    "TRANSIENT",
+    "OVERFLOW",
+    "SUR_ERROR",
+    "NONFUNC",
+    "MISSING_DATA",
+    "HOT",
+    "COLD",
+    "NONLINEAR",
+    "SNOWBALL",
+}
+
+SPHEREX_INFORMATIONAL_FLAG_NAMES = {
+    "SOURCE",
+    "FULLSAMPLE",
+}
+
+SPHEREX_ARTIFACT_FLAG_NAMES = {
+    "DICHROIC",
+    "PHANMISS",
+    "PERSIST",
+    "OUTLIER",
+    "CROSSTALK",
+    "GHOST",
+    "GHOST_FPA",
+    "GHOST_EXT",
+    "STREAK",
+    "BLOOM",
+    "HALO",
+}
+
 def extract_primary_image(hdul: fits.HDUList) -> Tuple[np.ndarray, fits.Header]:
     """
     Extracts the calibrated IMAGE extension (surface brightness in MJy/sr).
@@ -55,25 +87,104 @@ def extract_wcs_info(header: fits.Header) -> Dict[str, Any]:
         "ctype2": header.get("CTYPE2"),
     }
 
+def parse_spherex_mask_planes(flags_header: Optional[fits.Header]) -> Dict[str, int]:
+    """
+    Parses documented SPHEREx Level 2 mask planes from FITS header cards (MSKNxxxx, MSKMxxxx).
+    """
+    planes: Dict[str, int] = {}
+    if flags_header is None:
+        return planes
+    for k, v in flags_header.items():
+        if k.startswith("MSKN"):
+            suffix = k[4:]
+            mkey = f"MSKM{suffix}"
+            if mkey in flags_header:
+                try:
+                    planes[str(v).strip().upper()] = int(flags_header[mkey])
+                except Exception:
+                    pass
+    return planes
+
+def extract_fatal_quality_mask(hdul: fits.HDUList) -> Optional[np.ndarray]:
+    """
+    Returns a boolean 2D numpy array where True indicates a fatal defect (unusable pixel).
+    Distinguishes nominal astronomical source detections from bad pixels.
+    Returns None if no FLAGS extension is present.
+    """
+    if "FLAGS" not in hdul or hdul["FLAGS"].data is None:
+        return None
+
+    flags = hdul["FLAGS"].data.astype(np.int32)
+    hdr = hdul["FLAGS"].header
+    planes = parse_spherex_mask_planes(hdr)
+
+    if planes:
+        fatal_mask_val = 0
+        for name in SPHEREX_FATAL_FLAG_NAMES:
+            if name in planes:
+                fatal_mask_val |= planes[name]
+        return (flags & fatal_mask_val) != 0
+    else:
+        # Fallback for synthetic / mock FITS where bits 1, 2, 4, 8, 16 are used
+        legacy_fatal_bits = 1 | 2 | 4 | 8
+        return (flags & legacy_fatal_bits) != 0
+
+def extract_variance_data(hdul: fits.HDUList) -> Optional[np.ndarray]:
+    """
+    Extracts the error variance array from the VARIANCE extension if present.
+    """
+    if "VARIANCE" in hdul and hdul["VARIANCE"].data is not None:
+        var = hdul["VARIANCE"].data.astype(np.float32)
+        # Sanitize non-finite variance values
+        var = np.where(np.isfinite(var) & (var >= 0), var, np.nan)
+        return var
+    return None
+
 def evaluate_quality_flags(hdul: fits.HDUList) -> Dict[str, Any]:
     """
     Evaluates per-pixel data quality flags from the FLAGS extension.
+    Distinguishes nominal astronomical source detections (SOURCE mask) from fatal defect flags.
     """
     if "FLAGS" not in hdul or hdul["FLAGS"].data is None:
         return {"flagged_pixels": 0, "total_pixels": 0, "flag_breakdown": {}}
 
     flags = hdul["FLAGS"].data.astype(np.int32)
     total_pixels = int(flags.size)
-    flagged_mask = flags != 0
-    flagged_count = int(np.count_nonzero(flagged_mask))
+    hdr = hdul["FLAGS"].header
+    planes = parse_spherex_mask_planes(hdr)
 
-    breakdown = {
-        "dead_unusable": int(np.count_nonzero(flags & 1)),
-        "cosmic_ray": int(np.count_nonzero(flags & 2)),
-        "saturated": int(np.count_nonzero(flags & 4)),
-        "non_linear": int(np.count_nonzero(flags & 8)),
-        "stray_light_glint": int(np.count_nonzero(flags & 16)),
-    }
+    if planes:
+        # SPHEREx Level 2 FITS with documented mask metadata
+        fatal_bitmask = 0
+        for name in SPHEREX_FATAL_FLAG_NAMES:
+            if name in planes:
+                fatal_bitmask |= planes[name]
+
+        fatal_mask = (flags & fatal_bitmask) != 0
+        flagged_count = int(np.count_nonzero(fatal_mask))
+
+        breakdown = {
+            "dead_unusable": int(np.count_nonzero(flags & planes.get("NONFUNC", 64))),
+            "saturated": int(np.count_nonzero(flags & planes.get("OVERFLOW", 2))),
+            "cosmic_ray": int(np.count_nonzero(flags & (planes.get("SNOWBALL", 134217728) | planes.get("TRANSIENT", 1)))),
+            "non_linear": int(np.count_nonzero(flags & planes.get("NONLINEAR", 32768))),
+            "sur_error": int(np.count_nonzero(flags & planes.get("SUR_ERROR", 4))),
+            "hot_pixel": int(np.count_nonzero(flags & planes.get("HOT", 1024))),
+            "cold_pixel": int(np.count_nonzero(flags & planes.get("COLD", 2048))),
+            "source_detection": int(np.count_nonzero(flags & planes.get("SOURCE", 2097152))),
+            "stray_light_glint": int(np.count_nonzero(flags & (planes.get("GHOST", 4194304) | planes.get("BLOOM", 67108864) | planes.get("HALO", 268435456)))),
+        }
+    else:
+        # Synthetic / mock FITS without header MSKN cards
+        flagged_mask = (flags & (1 | 2 | 4 | 8 | 16)) != 0
+        flagged_count = int(np.count_nonzero(flagged_mask))
+        breakdown = {
+            "dead_unusable": int(np.count_nonzero(flags & 1)),
+            "cosmic_ray": int(np.count_nonzero(flags & 2)),
+            "saturated": int(np.count_nonzero(flags & 4)),
+            "non_linear": int(np.count_nonzero(flags & 8)),
+            "stray_light_glint": int(np.count_nonzero(flags & 16)),
+        }
 
     return {
         "flagged_pixels": flagged_count,

@@ -187,6 +187,8 @@ class CatalogService:
             if dist <= radius_deg:
                 res_entry = dict(src)
                 res_entry["separation_arcsec"] = round(dist * 3600.0, 2)
+                res_entry["provenance"] = "Curated Reference Catalog (Demo)"
+                res_entry["catalog_source"] = "Curated Reference Catalog (Demo)"
                 results.append(res_entry)
 
         if results:
@@ -229,6 +231,8 @@ class CatalogService:
                             "catalog": "Gaia DR3",
                             "star_type": "Gaia DR3 Source",
                             "separation_arcsec": round(dist * 3600.0, 2),
+                            "provenance": "Live ESA Gaia TAP",
+                            "catalog_source": "Live ESA Gaia TAP",
                         })
         except Exception:
             pass
