@@ -2,7 +2,7 @@
 
 **Execution Timestamp:** 2026-11-14T23:27:00Z  
 **Platform:** Windows 11 / Python 3.11.4 / Node.js v22.19.0  
-**Test Suite Status:** 93 backend pytest tests passed in 10.11s | 41 automated UI accessibility checks passed | Frontend Build: 0 errors in 2.55s | Demo Assets: 22/22 verified | NASA/IPAC IRSA SIA: 200 OK
+**Test Suite Status:** 93 backend pytest tests passed (with 2 Astropy FITSFixedWarnings) in 10.11s | 41 automated UI accessibility checks passed | Frontend Build: 1,497 modules transformed, 0 errors in 2.55s | Demo Assets: 22/22 verified | NASA/IPAC IRSA SIA: 200 OK
 
 ---
 
@@ -14,7 +14,7 @@ platform win32 -- Python 3.11.4, pytest-9.2.0, pluggy-1.7.0 -- C:\Users\haris\Ap
 cachedir: .pytest_cache
 rootdir: C:\SphereX\spherex-discovery-2026
 plugins: anyio-4.12.1, zarr-3.1.6
-collecting ... collected 91 items
+collecting ... collected 93 items
 
 backend/tests/test_comparison.py::test_comparison_eligibility PASSED     [  1%]
 backend/tests/test_comparison.py::test_comparison_ra_boundary_wrapping PASSED [  2%]
@@ -110,7 +110,14 @@ backend/tests/test_stacking_and_spectrum.py::test_stack_frames_endpoint_distant_
 backend/tests/test_stacking_and_spectrum.py::test_spectrum_endpoint_fov_validation PASSED [ 98%]
 backend/tests/test_stacking_and_spectrum.py::test_robust_noise_sigma_point_source_insensitivity PASSED [100%]
 
-======================= 93 passed, 2 warnings in 10.11s ========================
+============================== warnings summary ===============================
+backend/tests/test_scientific_audit_regression.py::test_audit_fits_processing_wavelength_and_mask_semantics
+backend/tests/test_scientific_audit_regression.py::test_audit_fits_processing_wavelength_and_mask_semantics
+  C:\Users\haris\AppData\Local\Programs\Python\Python311\Lib\site-packages\astropy\wcs\wcs.py:695: FITSFixedWarning: The WCS transformation has more axes (3) than the image it is associated with (2)
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 93 passed, 2 warnings in 10.11s =======================
 ```
 
 ---
@@ -127,9 +134,9 @@ transforming...
 rendering chunks...
 computing gzip size...
 dist/index.html                   0.96 kB │ gzip:  0.60 kB
-dist/assets/index-CJZY0b5Z.css   33.27 kB │ gzip:  6.61 kB
-dist/assets/index-g2aTQiDA.js   300.18 kB │ gzip: 80.16 kB
-✓ built in 2.64s
+dist/assets/index-8rk7elrb.css   33.29 kB │ gzip:  6.62 kB
+dist/assets/index-DyTu7ZfP.js   301.60 kB │ gzip: 80.64 kB
+✓ built in 2.55s
 ```
 
 ---
@@ -260,3 +267,17 @@ Testing IRSA SIA connectivity to: https://irsa.ipac.caltech.edu/SIA?COLLECTION=s
 [SUCCESS] All environment requirements passed!
 ============================================================
 ```
+
+---
+
+## 6. Verification Scope & Limitations Notice
+- **Automated Verification:** All 93 backend pytest tests passed (with 2 Astropy `FITSFixedWarning` warnings on 3D WCS dimension reduction tests); 41 automated UI accessibility and responsive checks passed; 22/22 demonstration assets verified valid; frontend production build succeeded with 1,497 modules transformed and 0 errors; environment verification confirmed live IRSA SIA HTTP 200 connectivity outside restricted network.
+- **Manual Verification Status:** No manual physical visual inspection or interactive screen-reader (NVDA/JAWS/VoiceOver) testing was performed in this session. Visual rendering relies on automated headless layout assertions and previously saved PNG screenshots in `docs/screenshots/`.
+
+
+## Current session verification (2026-11-14)
+
+- Full backend: 96 passed, 2 Astropy FITSFixedWarnings with normal local networking. Restricted execution stalled on the first TestClient request and was interrupted.
+- Frontend production build passed; accessibility/responsive source-check script passed 41 checks; demo asset validator passed 22/22. These checks do not establish WCAG conformance or target-object scientific validity.
+- IRSA SIA environment probe returned HTTP 200 with CSV using normal networking.
+- Desktop and 375px viewer layouts were visually inspected, including the mobile science panel. An updated-backend preview showed an IRSA search result. The final observed-band table correction was built but not rechecked visually. Physical screen-reader audio was not tested.

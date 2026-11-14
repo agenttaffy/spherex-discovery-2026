@@ -13,6 +13,7 @@ class ObservationRecord(BaseModel):
     access_url: str
     ra: float
     dec: float
+    search_provenance: str = "unknown"
 
 class ObservationQueryResponse(BaseModel):
     target: Dict[str, Any]
@@ -29,6 +30,7 @@ class PixelStats(BaseModel):
     median_mjy_sr: float
 
 class FlagSummary(BaseModel):
+    quality_state: str = "unknown"
     flagged_pixels: int
     total_pixels: int
     flag_breakdown: Dict[str, int]

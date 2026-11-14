@@ -163,7 +163,7 @@ async def get_spectrum(
 ):
     """
     Computes on-the-fly calibrated Spectral Energy Distribution (SED: Flux vs. Wavelength)
-    across the 6 SPHEREx detector arrays (0.75 - 5.00 µm) and all 102 spectroscopic channels.
+    across up to six detector bands, plus an illustrative 102-point continuum.
     """
     try:
         ra_deg, dec_deg = parse_coordinates(ra, dec)

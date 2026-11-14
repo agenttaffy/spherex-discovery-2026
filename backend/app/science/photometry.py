@@ -182,7 +182,12 @@ def compute_aperture_photometry(
     raw_net_flux = float(ap_sum - (bg_med * n_ap))
 
     # Real Photometric Flux Uncertainty Propagation (sigma_F = sqrt(sum(sigma_i^2)))
-    if variance is not None and variance.shape == image.shape:
+    variance_propagated = (
+        variance is not None and variance.shape == image.shape and n_ann > 0
+        and np.all(np.isfinite(variance[ap_mask])) and np.all(variance[ap_mask] >= 0)
+        and np.all(np.isfinite(variance[ann_mask])) and np.all(variance[ann_mask] >= 0)
+    )
+    if variance_propagated:
         var_clean = np.where(np.isfinite(variance) & (variance >= 0), variance, 0.0)
         ap_var_sum = float(np.sum(var_clean[ap_mask]))
         ann_var_mean = float(np.mean(var_clean[ann_mask])) if n_ann > 0 else (bg_std ** 2)
@@ -214,6 +219,7 @@ def compute_aperture_photometry(
         "background_std": round(bg_std, 4),
         "net_flux": round(net_flux, 4),
         "flux_err": round(flux_err, 4),
+        "uncertainty_source": "variance_propagated" if variance_propagated else "background_estimate",
         "peak_flux": round(peak_val, 4),
         "snr": round(max(0.0, snr), 2),
         "coverage_fraction": round(coverage_fraction, 3),
@@ -314,7 +320,7 @@ def build_lightcurve_series(
             v_idx = s / abs(m) if abs(m) > 1.0 else 0.0
             if v_idx > max_var_index:
                 max_var_index = v_idx
-            # Confirm variability if significant relative variation (>15%) and amplitude (>20.0 MJy/sr) OR large amplitude (>50.0 MJy/sr)
+            # Flag a heuristic threshold; this is not a statistical confirmation of variability.
             if (v_idx > 0.15 and d_amp > 20.0) or d_amp > 50.0:
                 is_variable = True
 

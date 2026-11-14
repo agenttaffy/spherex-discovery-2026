@@ -1,24 +1,36 @@
 # Agent Handoff Document
 
+## 2026-11-14 — Current session handoff
+
+- Continued the existing documentation edits and preserved the working tree. Corrected unverified target claims and labeled the spectrum as at most six observed detector-band measurements plus an illustrative continuum.
+- Added search-result provenance, kept quality-state metadata through the API, labeled estimated versus propagated uncertainty, prevented estimated errors from entering the temperature fit, and changed variability claims to a heuristic. Search and frame responses now guard against stale results; shared coordinates take precedence over a preset.
+- Verified 96 backend tests with two Astropy FITSFixedWarnings, frontend production build, 41 source-based accessibility checks, and 22 demo assets. The backend suite and IRSA HTTP 200 check required normal networking; restricted execution stalled at the first TestClient request. A desktop browser was inspected against an already-running backend that lacked the new provenance field; it displayed the safe unknown state. A separate preview with the updated backend displayed an IRSA search result and was visually inspected at desktop and 375px widths; the mobile science panel was opened. Physical screen-reader audio was not tested.
+- Open scientific work: validate actual wavelength overlap within detector arrays, aperture edge/mask correction and uncertainty propagation, epoch provenance through every analysis and report, and target-object detections using independent evidence. Current background errors can be estimates and are not accepted by the temperature fit. Live search/cutout operation and visual states need end-to-end verification against the newly started backend.
+
+
 ## 1. Last Completed Work
-- **Scientific Truthfulness Follow-up Pass (Spectrum & Temperature Fit):**
-  - **Neutral Broadband Continuum Shape Descriptions:** Replaced broad-band slope inferred astrophysical classifications ("Brown Dwarf Candidate", "Cool Stellar Atmosphere", etc.) with neutral measured-shape descriptions ("flux rises toward longer measured bands", "flux falls toward longer measured bands", "peak among measured detector bands", "insufficient observed coverage"). Added `continuum_shape` field to summary.
-  - **Strict Temperature Fit Conditions:** In `fit_blackbody_continuum`, two-parameter fit requires at least 3 distinct measured detector bands with valid propagated photometric errors ($\text{dof} \ge 1$). Removed 10% error substitution. If inputs lack error, or bands $< 3$, or curvature is unconstrained, returns `status: "unavailable"` and no temperature.
+- **Scientific Truthfulness Follow-up Pass (Commits `8757e6b`, `208aa15`):**
+  - **Neutral Broadband Continuum Shape Descriptions & API Cleanup:** Replaced broad-band slope inferred astrophysical classifications ("Brown Dwarf Candidate", "Cool Stellar Atmosphere", etc.) with neutral measured-shape descriptions ("flux rises toward longer measured bands", "flux falls toward longer measured bands", "peak among measured detector bands", "insufficient observed coverage"). Added `continuum_shape` field to summary. In commit `208aa15`, `spectral_class` was completely removed from the API schemas, backend models, and frontend types to avoid any false impression of spectral typing.
+  - **Spectrophotometry Truthfulness:** Documented that SED analysis measures aperture photometry across up to six detector-band points (D1–D6) with an illustrative/interpolated 102-point continuum; this is explicitly **not 102 observed resolved SPHEREx channels**.
+  - **Strict Temperature Fit Conditions:** In `fit_blackbody_continuum`, two-parameter fit requires at least 3 distinct measured detector bands with valid propagated photometric errors ($\text{dof} \ge 1$). Removed 10% error substitution. If inputs lack error, or bands $< 3$, or curvature is unconstrained, returns `status: "unavailable"` and no temperature. A temperature is strictly an optional constrained single-temperature continuum fit, not a known object's physical temperature.
   - **Zero-Observation Unavailable Metrics:** When zero archive bands exist, peak wavelength, peak detector, peak flux, estimated temperature, and integrated flux are set to `None`. No synthetic peaks are reported as measured.
-  - **Frontend & Discovery Report Updates:** `SpectrumChart.tsx` displays "Continuum Shape:" and caveat; `report.py` clearly documents single-temperature continuum fit without presenting it as verified physical temperature.
-  - **Regression Test Coverage:** Full backend suite passing **93 tests** in 10.11s; accessibility checks passing **41/41**; clean frontend build in 2.55s; 22/22 demonstration cutouts verified; IRSA SIA endpoint verified (HTTP 200).
+  - **Frontend & Discovery Report Updates:** `SpectrumChart.tsx` displays "Continuum Shape:" and italic caveat; `report.py` clearly documents single-temperature continuum fit without presenting it as verified physical temperature.
+  - **Regression Test Coverage:** Full backend suite passing **93 tests (with 2 Astropy FITSFixedWarnings)** in 10.11s; accessibility checks passing **41/41**; clean frontend build in 2.55s (1,497 modules); 22/22 demonstration cutouts verified; IRSA SIA endpoint verified (HTTP 200).
 
 ## 2. Current Working State
-- **Backend:** Starts cleanly with `python -m uvicorn app.main:app --port 8000`. All 93 pytest tests pass.
-- **Frontend:** Builds cleanly with `npm run build` (0 type errors, 0 warnings).
+- **Backend:** Starts cleanly with `python -m uvicorn app.main:app --port 8000`. All 93 pytest tests pass (with 2 Astropy FITSFixedWarnings on 3D WCS dimension reduction tests).
+- **Frontend:** Builds cleanly with `npm run build` (1,497 modules, 0 type errors, 0 warnings).
 - **Accessibility & Responsive:** All 41 automated checks pass in `node scripts/verify_accessibility_and_responsive.mjs`.
 - **Demo Mode:** Local caching of 22 verified FITS cutouts enables immediate offline presentation and judging with circuit breaker fallback on remote outages.
+- **Environment & Connectivity:** `python scripts/verify_environment.py` passes outside restricted network with NASA/IPAC IRSA SIA returning HTTP 200.
+- **Manual Verification Status:** Automated test suites verified; no manual physical visual inspection or physical screen-reader audio checks were performed.
 - **Screenshots:** 4 visual acceptance screenshots preserved in `docs/screenshots/` (desktop and mobile 320px).
 
 ## 3. Current Blocker / Limitations
 - None fatal.
 - Live NASA/IPAC IRSA SIA service occasionally returns HTTP 502 Proxy Error during upstream maintenance; automatically safeguarded by backend circuit breaker and offline demo cutouts.
 - Aladin Lite v3 context tiles require active internet connection to CDS servers; fallback to SPHEREx native HTML5 Canvas works 100% offline.
+- Fractional-pixel polygon clipping is not implemented for apertures intersecting focal plane borders (marked unavailable).
 
 ## 4. Verification Commands
 ```bash
@@ -28,7 +40,7 @@ python scripts/verify_environment.py
 # 2. Demonstration Assets Verification
 python scripts/verify_demo.py
 
-# 3. Backend Test Suite (93 tests)
+# 3. Backend Test Suite (93 tests, 2 Astropy FITSFixedWarnings)
 $env:PYTHONPATH="backend"
 python -m pytest -v
 

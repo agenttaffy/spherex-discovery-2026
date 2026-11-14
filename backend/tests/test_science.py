@@ -9,6 +9,40 @@ from app.services.demo_service import demo_service
 
 client = TestClient(app)
 
+
+def test_uncertainty_provenance_prevents_estimated_error_temperature_fit():
+    from app.science.spectrum import temperature_fit_inputs, fit_blackbody_continuum
+
+    image = np.ones((21, 21))
+    image[10, 10] = 20
+    variance = np.ones_like(image)
+    measured = compute_aperture_photometry(image, center_x=10, center_y=10, variance=variance)
+    assert measured["uncertainty_source"] == "variance_propagated"
+    variance[10, 10] = np.nan
+    estimated = compute_aperture_photometry(image, center_x=10, center_y=10, variance=variance)
+    assert estimated["uncertainty_source"] == "background_estimate"
+    inputs = [{"detector": f"D{i}", "wavelength_um": float(i), "flux_mjy_sr": 10.,
+               "flux_err_mjy_sr": 1., "uncertainty_source": source}
+              for i, source in enumerate(["variance_propagated", "variance_propagated", "background_estimate"], 1)]
+    result = fit_blackbody_continuum(temperature_fit_inputs(inputs))
+    assert result["status"] == "unavailable"
+    assert result["temperature_k"] is None
+
+
+def test_report_variability_is_not_presented_as_diagnosis():
+    for flagged in (True, False):
+        report = generate_discovery_report("Example", 1, 1, photometry_data={"is_variable": flagged})
+        text = report["markdown_report"]
+        assert ("Variation flagged" if flagged else "No variation flagged") in text
+        assert "does not establish variability or stability" in text
+
+
+def test_flag_summary_preserves_unknown_quality_state():
+    from app.models.schemas import FlagSummary
+    summary = FlagSummary(quality_state="unknown_metadata_missing", flagged_pixels=0,
+                          total_pixels=400, flag_breakdown={})
+    assert summary.model_dump()["quality_state"] == "unknown_metadata_missing"
+
 def test_aperture_photometry_gaussian_source():
     # Create 21x21 image with a Gaussian peak in center
     h, w = 21, 21

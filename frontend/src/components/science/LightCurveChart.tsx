@@ -49,6 +49,10 @@ export const LightCurveChart: React.FC<LightCurveChartProps> = ({
   const plotH = height - padTop - padBottom;
 
   const validPoints = points.filter((p) => p.net_flux_mjy_sr != null && (p.valid ?? true));
+  if (validPoints.length === 0) {
+    return <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-4 text-slate-300 text-xs" role="status">No valid photometry is available for these observations.</div>;
+  }
+  const hasDetectorPair = validPoints.some((p, index) => validPoints.some((other, otherIndex) => otherIndex !== index && p.detector === other.detector));
   const validFluxes = validPoints.map((p) => p.net_flux_mjy_sr as number);
   const minVal = validFluxes.length > 0 ? Math.min(...validFluxes) : min_flux_mjy_sr;
   const maxVal = validFluxes.length > 0 ? Math.max(...validFluxes) : max_flux_mjy_sr;
@@ -87,19 +91,23 @@ export const LightCurveChart: React.FC<LightCurveChartProps> = ({
           </span>
         </div>
         <div>
-          {is_variable ? (
+          {!hasDetectorPair ? (
+            <span className="text-[10px] text-slate-300">Not enough comparable observations</span>
+          ) : is_variable ? (
             <span className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-950/80 text-amber-300 border border-amber-800/80 animate-pulse">
               <Flame className="w-3 h-3 text-amber-400" />
-              Variable (Var={variability_index})
+              Variation flagged (index={variability_index})
             </span>
           ) : (
             <span className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-950/60 text-emerald-300 border border-emerald-800/60">
               <CheckCircle className="w-3 h-3 text-emerald-400" />
-              Stable Flux
+              No variation flagged
             </span>
           )}
         </div>
       </div>
+
+      <p className="text-[10px] text-slate-300">A heuristic compares measurements within each detector; it does not establish variability or stability. Wavelength and uncertainty differences require review.</p>
 
       {/* SVG Plot */}
       <div className="relative">

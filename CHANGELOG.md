@@ -2,6 +2,14 @@
 
 All notable changes to the SPHEREx Discovery project will be documented in this file.
 
+## [1.4.7] - 2026-11-14
+### Documentation & Source Truthfulness Reconciliation Pass
+- **Spectrophotometric Truthfulness Documentation:** Updated `README.md`, `TODO.md`, `PROJECT_STATE.md`, `HANDOFF.md`, `TEST_RESULTS.md`, and technical documentation in `docs/` to state clearly that spectrophotometric SED analysis provides up to six measured detector-band points (D1–D6) plus an illustrative/interpolated 102-point continuum; this is not 102 observed resolved SPHEREx channels.
+- **Neutral Broadband Continuum Descriptor & API Clarification:** Formally documented that `continuum_shape` is a neutral broadband descriptor rather than an astrophysical/spectral classification, and that `spectral_class` was removed from the API schemas and models (commit `208aa15`).
+- **Single-Temperature Fit Documentation:** Clarified across all user guides and reports that any temperature is strictly an optional constrained single-temperature blackbody continuum fit (requiring $\ge 3$ distinct observed bands with valid propagated uncertainties, $\text{dof} \ge 1$), not an object's known physical temperature.
+- **Verified Metrics Synchronization:** Reconciled documentation with independently verified test outputs: backend `python -m pytest -v`: 93 passed, 2 Astropy `FITSFixedWarning` warnings; accessibility/responsive: 41 passed, 0 failed; demo assets: 22/22 valid; frontend `npm run build`: 1,497 modules, 0 errors; environment verification: IRSA SIA HTTP 200 outside restricted network.
+- **Verification Boundaries:** Explicitly documented that no manual physical visual inspection or interactive screen-reader audio checks were performed.
+
 ## [1.4.6] - 2026-11-14
 ### Fixed & Hardened — Spectrum & Temperature Fit Scientific Truthfulness Pass
 - **Neutral Broadband Continuum Shape Descriptions:** In `spectrum.py`, replaced inferred broad-band astrophysical classifications with neutral measured-shape descriptions. The API exposes `continuum_shape` rather than a spectral-class field; the chart and exported discovery report state that this is broadband shape, not astrophysical classification.

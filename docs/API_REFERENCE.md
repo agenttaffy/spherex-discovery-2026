@@ -98,6 +98,43 @@ Computes scientific calibrated difference image ($I_2 - I_1$) with 2D sub-pixel 
 }
 ```
 
+### `POST /frames/stack`
+Computes astronomical image co-addition across multi-epoch or multi-detector observation frames using celestial WCS registration via `reproject_interp` with sub-pixel 2D FFT shift fallback.
+
+**Request Body:**
+```json
+{
+  "frame_ids": [
+    "spherex_dr1_2025W33_1A_0144_1_SPHEREx_D3",
+    "spherex_qr3_2026W33_1A_0144_2_SPHEREx_D3"
+  ],
+  "method": "mean",
+  "format": "webp"
+}
+```
+
+**Response Schema:**
+```json
+{
+  "success": true,
+  "method": "mean",
+  "frame_count": 2,
+  "frame_ids": ["spherex_dr1_...", "spherex_qr3_..."],
+  "dimensions": [20, 20],
+  "snr_improvement_factor": 1.41,
+  "snr_gain_status": "measured",
+  "theoretical_snr_gain": 1.414,
+  "theoretical_gain_model": "sqrt(N)",
+  "noise_stats": {
+    "reference_noise_sigma": 0.428,
+    "stacked_noise_sigma": 0.303,
+    "mean_flux_mjy_sr": 2.145
+  },
+  "stacked_image_base64": "data:image/webp;base64,...",
+  "wcs": { ... }
+}
+```
+
 ---
 
 ## 4. Scientific Differentiation Endpoints
@@ -112,7 +149,7 @@ Retrieves nearby reference stars from Gaia DR3 & SIMBAD with high-precision prop
 - `catalog` (string, optional, default: `gaia_dr3`): Catalog identifier.
 
 ### `GET /science/photometry`
-Extracts multi-epoch circular aperture photometry with background annulus subtraction, returning time-series flux measurements and automated variability classification.
+Extracts multi-epoch circular aperture photometry with background annulus subtraction, returning time-series flux measurements and a heuristic variation flag (not confirmation of variability or stability).
 
 **Query Parameters:**
 - `ra` (string/float, required): Right Ascension.
@@ -185,6 +222,66 @@ Measures candidate astrometric displacement and annual proper motion rate ($\mu$
 }
 ```
 
+### `GET /science/spectrum`
+Computes Spectral Energy Distribution (SED) by extracting circular aperture photometry across up to six SPHEREx detector arrays (D1: 0.75–1.12 µm, D2: 1.12–1.68 µm, D3: 1.68–2.42 µm, D4: 2.42–3.82 µm, D5: 3.82–4.42 µm, D6: 4.42–5.00 µm) with WCS-WAVE wavelengths and propagated `VARIANCE` uncertainties where available; otherwise nominal wavelengths or background-estimated uncertainties are labeled. Accompanied by an illustrative/interpolated 102-point continuum model.
+
+> [!IMPORTANT]
+> **Spectrophotometry Truthfulness:**
+> - There are up to six measured detector-band points (D1–D6) plus an illustrative/interpolated 102-point continuum; this is **not 102 observed resolved SPHEREx channels**.
+> - `continuum_shape` is a neutral broadband descriptor (e.g. *"flux rises toward longer measured bands"* or *"peak among measured detector bands"*), not an astrophysical or spectral classification. `spectral_class` was removed from the API.
+> - `estimated_temperature_k` / `temperature_fit` is strictly an optional single-temperature blackbody continuum fit requiring at least 3 distinct measured detector bands with valid propagated uncertainties ($\text{dof} \ge 1$). It is not an object's known physical temperature.
+> - When zero archive bands exist, `peak_wavelength_um`, `peak_detector`, `peak_flux_mjy_sr`, `estimated_temperature_k`, and `integrated_flux_mjy_sr_um` are `null` (`unavailable`), with `peak_is_measured: false`.
+
+**Query Parameters:**
+- `ra` (string/float, required): Right Ascension.
+- `dec` (string/float, required): Declination.
+- `fov` (float, optional, default: `0.04`): Search field of view in degrees.
+
+**Response Schema:**
+```json
+{
+  "target": { "ra": 269.45208, "dec": 4.69339 },
+  "total_observed_bands": 2,
+  "bands": [
+    {
+      "detector": "SPHEREx-D3",
+      "wavelength_um": 2.050,
+      "flux_mjy_sr": 12.45,
+      "flux_err_mjy_sr": 0.35,
+      "snr": 35.6,
+      "is_observed": true,
+      "measurement_status": "measured",
+      "calibration_source": "WCS-WAVE"
+    }
+  ],
+  "channels_102": [
+    {
+      "channel_index": 1,
+      "detector": "SPHEREx-D1",
+      "wavelength_um": 0.75,
+      "flux_mjy_sr": 0.05,
+      "is_observed": false,
+      "is_interpolated": true,
+      "model_label": "Estimated Continuum Model (Interpolated) - Illustrative Continuum, Never Observed Resolution"
+    }
+  ],
+  "summary": {
+    "peak_wavelength_um": 2.050,
+    "peak_detector": "SPHEREx-D3",
+    "peak_flux_mjy_sr": 12.45,
+    "peak_is_measured": true,
+    "estimated_temperature_k": null,
+    "continuum_shape": "flux rises toward longer measured bands",
+    "integrated_flux_mjy_sr_um": 18.25,
+    "temperature_fit": {
+      "status": "unavailable",
+      "temperature_k": null,
+      "reason": "Insufficient observed detector bands (minimum 3 distinct bands required for dof >= 1)"
+    }
+  }
+}
+```
+
 ### `POST /science/report`
 Generates a formal, structured Space Apps scientific discovery report with J2000 sexagesimal formatting, proper motion analysis, light curve statistics, and verified IRSA DOI 10.26131/IRSA678 citations.
 
@@ -200,3 +297,6 @@ Generates a formal, structured Space Apps scientific discovery report with J2000
   "notes": "Verified displacement across DR1 (2025) and QR3 (2026)."
 }
 ```
+
+
+Observation records identify search provenance as `irsa_query`, `cached_demo`, or `unknown`; an IRSA search result may still use cached image bytes. Spectrum band `uncertainty_source` distinguishes `variance_propagated`, `background_estimate`, `unknown`, and illustrative model errors. Only valid propagated uncertainties can enter the temperature fit. The `is_variable` light-curve field is a heuristic flag and does not establish variability or stability.

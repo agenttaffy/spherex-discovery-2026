@@ -80,6 +80,15 @@ def planck_b_nu(wave_um: float, temp_k: float) -> float:
     except Exception:
         return 0.0
 
+def temperature_fit_inputs(measurements: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Exclude estimated or unknown errors from the propagated-uncertainty fit."""
+    return [
+        {**m, "flux_err_mjy_sr": m.get("flux_err_mjy_sr")
+         if m.get("uncertainty_source") == "variance_propagated" else None}
+        for m in measurements
+    ]
+
+
 def fit_blackbody_continuum(obs_measurements: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
     Fits a single-temperature Planck blackbody B_nu(T) to measured broad-band detector fluxes.
@@ -364,7 +373,7 @@ def generate_spectrum_for_target(
 ) -> Dict[str, Any]:
     """
     Computes calibrated Spectral Energy Distribution (SED: Flux vs. Wavelength) across
-    the 6 SPHEREx detector arrays (0.75 - 5.00 µm) and all 102 individual spectroscopic channels.
+    up to six SPHEREx detector bands and an illustrative 102-point continuum.
     Measured detector bands are kept distinct from illustrative estimated continuum models.
     Physical claims are derived strictly from documented blackbody fits with explicit uncertainties
     and limitations, never from preset target identities or hardcoded names.
@@ -449,6 +458,7 @@ def generate_spectrum_for_target(
                         "flux_mjy_sr": phot["net_flux"],
                         "peak_flux_mjy_sr": phot["peak_flux"],
                         "flux_err_mjy_sr": phot.get("flux_err", phot["background_std"]),
+                        "uncertainty_source": phot.get("uncertainty_source", "unknown"),
                         "snr": snr,
                         "obs_id": obs_id,
                         "observed": True,
@@ -465,7 +475,8 @@ def generate_spectrum_for_target(
 
     # 2. Documented physical fit from observed detector bands (no preset coordinates or identity matching)
     obs_list = list(measured_by_detector.values())
-    bb_fit = fit_blackbody_continuum(obs_list)
+    fit_inputs = temperature_fit_inputs(obs_list)
+    bb_fit = fit_blackbody_continuum(fit_inputs)
 
     # 3. Build output for all 6 detector bands
     bands_output: List[Dict[str, Any]] = []
@@ -531,6 +542,7 @@ def generate_spectrum_for_target(
             "flux_density_mjy": round(flux_density_mjy, 4),
             "peak_flux_mjy_sr": round(peak, 4),
             "flux_err_mjy_sr": round(err, 4),
+            "uncertainty_source": meas.get("uncertainty_source", "unknown") if is_obs else "illustrative",
             "snr": round(snr, 1),
             "is_observed": is_obs,
             "obs_id": obs_id_val,

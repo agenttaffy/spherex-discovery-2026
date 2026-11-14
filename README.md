@@ -4,11 +4,15 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-emerald.svg)](LICENSE)
 [![Python 3.11](https://img.shields.io/badge/Python-3.11+-cyan.svg)](https://www.python.org/)
 [![React 18](https://img.shields.io/badge/React-18-indigo.svg)](https://react.dev/)
-[![Tests: 23 Passed](https://img.shields.io/badge/Tests-23%20Passed-emerald.svg)](TEST_RESULTS.md)
+[Test results](TEST_RESULTS.md)
 
-**SPHEREx Discovery** is a publication-grade astronomical web observatory built for the **NASA Space Apps Challenge 2026** ("Planet X and SPHEREx").
+**SPHEREx Discovery** is a experimental astronomical exploration tool built for the **NASA Space Apps Challenge 2026** ("Planet X and SPHEREx").
 
-The application enables citizen scientists, educators, and professional astronomers to explore multi-epoch infrared sky images collected by NASA's **SPHEREx** mission across 102 spectral channels (0.75 – 5.0 µm), visually detect moving celestial bodies (such as brown dwarfs and high-proper-motion stars), analyze variable stars, and conduct sub-pixel image differencing.
+The application enables citizen scientists, educators, and professional astronomers to explore multi-epoch infrared sky images collected by NASA's **SPHEREx** mission across its 6 detector arrays (0.75 – 5.0 µm), visually detect moving celestial bodies (such as brown dwarfs and high-proper-motion stars), analyze variable stars, and conduct sub-pixel image differencing.
+
+> [!NOTE]
+> **Spectrophotometry Truthfulness & Scope:**
+> On-the-fly SED analysis measures aperture photometry across up to six detector-band points (D1–D6) with WCS-WAVE calibration and propagated `VARIANCE` uncertainties where available; otherwise wavelength or uncertainty estimates are labeled, accompanied by an illustrative/interpolated 102-point continuum. This is **not 102 observed resolved SPHEREx channels**. The API reports `continuum_shape` as a neutral broadband descriptor (e.g. "flux rises toward longer measured bands"); `spectral_class` was removed from the API to avoid false impressions of spectral typing. Any fitted temperature is strictly an optional constrained single-temperature blackbody continuum fit (requiring $\ge 3$ distinct measured bands with valid propagated uncertainties, $\text{dof} \ge 1$), not an object's known physical temperature.
 
 ---
 
@@ -30,10 +34,11 @@ The application enables citizen scientists, educators, and professional astronom
    - Multi-extension FITS parsing: `IMAGE` (calibrated surface brightness), `FLAGS` (per-pixel data quality bitmasks), `VARIANCE`, `ZODI` (zodiacal model), and celestial `WCS`.
    - Display-only contrast stretching (`asinh`, `zscale`, `linear`) preserving underlying scientific floating-point data arrays.
 
-5. **Tested on All 5 Official Competition Targets:**
-   - **Barnard's Star:** Highest proper motion star (10.3″/yr) with a 1.0-year baseline between DR1 and QR3 showing a 1.66-pixel astrometric shift.
-   - **RW Aurigae:** Classical T Tauri star with circumstellar dust obscuration showing ~200 MJy/sr infrared flux reduction.
-   - **WISE 0855:** Coldest known brown dwarf (~250 K) visible in mid-IR channels D4–D6.
+5. **Challenge target presets:**
+   - Cached cutouts cover the five named targets, but target detection, motion and variability have not been independently validated in this session.
+   - **Barnard's Star:** Highest proper motion star (10.3″/yr).
+   - **RW Aurigae:** Classical T Tauri star with circumstellar dust obscuration.
+   - **WISE 0855:** Coldest known brown dwarf (astrophysical literature $T_{\text{eff}} \approx 250\text{ K}$); the app does not infer spectral type from broadband shape.
    - **Epsilon Indi B:** Binary brown dwarf system with 4.7″/yr proper motion.
    - **R Draconis:** Mira-type pulsating red giant with large infrared amplitude swings.
 

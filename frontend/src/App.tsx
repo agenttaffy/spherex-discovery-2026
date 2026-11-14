@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Telescope, Search, Activity } from 'lucide-react';
 import { Header } from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
@@ -76,6 +76,8 @@ export const App: React.FC = () => {
   // Presets
   const [presets, setPresets] = useState<DemoPreset[]>([]);
   const [selectedPresetId, setSelectedPresetId] = useState<string>('barnards_star');
+  const searchRequest = useRef(0);
+  const frameRequest = useRef(0);
 
   // 1. Initial health and presets load
   useEffect(() => {
@@ -105,19 +107,20 @@ export const App: React.FC = () => {
           if (urlColormap) setColormap(urlColormap);
 
           const targetPreset = urlTarget ? p.find((x) => x.id === urlTarget) : null;
-          if (targetPreset) {
-            setSelectedPresetId(targetPreset.id);
-            setRa(String(targetPreset.ra));
-            setDec(String(targetPreset.dec));
-            setCollection(targetPreset.default_collection);
-            searchWithCoords(targetPreset.ra, targetPreset.dec, 0.04, targetPreset.default_collection, urlObs);
-          } else if (urlRa && urlDec) {
+          if (urlRa && urlDec) {
+            setSelectedPresetId(targetPreset && Number(urlRa) === targetPreset.ra && Number(urlDec) === targetPreset.dec ? targetPreset.id : '');
             setRa(urlRa);
             setDec(urlDec);
             const searchColl = params.get('collection') || 'spherex_dr1';
             setCollection(searchColl);
             if (urlFov) setFov(Number(urlFov));
             searchWithCoords(urlRa, urlDec, urlFov ? Number(urlFov) : 0.04, searchColl, urlObs);
+          } else if (targetPreset) {
+            setSelectedPresetId(targetPreset.id);
+            setRa(String(targetPreset.ra));
+            setDec(String(targetPreset.dec));
+            setCollection(targetPreset.default_collection);
+            searchWithCoords(targetPreset.ra, targetPreset.dec, 0.04, targetPreset.default_collection, urlObs);
           } else {
             // Load default preset (Barnard's Star)
             const def = p[0];
@@ -140,10 +143,20 @@ export const App: React.FC = () => {
       searchColl: string,
       targetObsId?: string | null
     ) => {
+      const requestId = ++searchRequest.current;
+      ++frameRequest.current;
+      setCurrentFrame(null);
+      setObservations([]);
+      setLightCurve(null);
+      setSpectrum(null);
+      setCatalogSources([]);
+      setLoadingPhotometry(false);
+      setLoadingSpectrum(false);
       setLoadingObs(true);
       setErrorMessage(null);
       try {
         const res = await fetchObservations(searchRa, searchDec, searchFov, searchColl, detector);
+        if (requestId !== searchRequest.current) return;
         setObservations(res.observations);
         let startIdx = 0;
         if (targetObsId && res.observations.length > 0) {
@@ -159,27 +172,27 @@ export const App: React.FC = () => {
 
         // Fetch Catalogs in background
         fetchCatalogs(searchRa, searchDec, 0.08)
-          .then((cat) => setCatalogSources(cat.sources))
-          .catch(() => setCatalogSources([]));
+          .then((cat) => { if (requestId === searchRequest.current) setCatalogSources(cat.sources); })
+          .catch(() => { if (requestId === searchRequest.current) setCatalogSources([]); });
 
         // Fetch Photometric light curve in background
         setLoadingPhotometry(true);
         fetchPhotometry(searchRa, searchDec, searchColl, detector, searchFov)
-          .then(setLightCurve)
-          .catch(() => setLightCurve(null))
-          .finally(() => setLoadingPhotometry(false));
+          .then((value) => { if (requestId === searchRequest.current) setLightCurve(value); })
+          .catch(() => { if (requestId === searchRequest.current) setLightCurve(null); })
+          .finally(() => { if (requestId === searchRequest.current) setLoadingPhotometry(false); });
 
         // Fetch Infrared Spectrum SED in background
         setLoadingSpectrum(true);
         fetchSpectrum(searchRa, searchDec, searchColl, searchFov)
-          .then(setSpectrum)
-          .catch(() => setSpectrum(null))
-          .finally(() => setLoadingSpectrum(false));
+          .then((value) => { if (requestId === searchRequest.current) setSpectrum(value); })
+          .catch(() => { if (requestId === searchRequest.current) setSpectrum(null); })
+          .finally(() => { if (requestId === searchRequest.current) setLoadingSpectrum(false); });
 
       } catch (err: any) {
-        setErrorMessage(err.message || 'Observation discovery failed');
+        if (requestId === searchRequest.current) setErrorMessage(err.message || 'Observation discovery failed');
       } finally {
-        setLoadingObs(false);
+        if (requestId === searchRequest.current) setLoadingObs(false);
       }
     },
     [detector, stretch]
@@ -187,14 +200,16 @@ export const App: React.FC = () => {
 
   const loadFrame = useCallback(
     async (frameId: string, currentStretch: string, currentFov: number) => {
+      const requestId = ++frameRequest.current;
       setLoadingFrame(true);
+      setCurrentFrame(null);
       try {
         const frame = await fetchFrame(frameId, currentStretch, currentFov);
-        setCurrentFrame(frame);
+        if (requestId === frameRequest.current) setCurrentFrame(frame);
       } catch (err: any) {
-        console.error('Frame fetch error:', err);
+        if (requestId === frameRequest.current) setErrorMessage(err.message || 'Frame could not be loaded');
       } finally {
-        setLoadingFrame(false);
+        if (requestId === frameRequest.current) setLoadingFrame(false);
       }
     },
     []
@@ -248,6 +263,7 @@ export const App: React.FC = () => {
   };
 
   const handleManualSearch = () => {
+    setSelectedPresetId('');
     searchWithCoords(ra, dec, fov, collection);
     setMobilePanel('canvas');
     const url = new URL(window.location.href);
@@ -255,6 +271,8 @@ export const App: React.FC = () => {
     url.searchParams.set('dec', dec);
     url.searchParams.set('fov', String(fov));
     url.searchParams.set('collection', collection);
+    url.searchParams.delete('target');
+    url.searchParams.delete('obs');
     window.history.replaceState({}, '', url.toString());
   };
 
@@ -437,6 +455,15 @@ export const App: React.FC = () => {
                   </div>
                 )}
 
+                {observations[currentIndex] && (
+                  <p className="px-3 py-2 text-xs text-slate-200 bg-slate-900" role="status">
+                    {observations[currentIndex].search_provenance === 'cached_demo'
+                      ? 'Cached demonstration observation · not a live archive search result'
+                      : observations[currentIndex].search_provenance === 'irsa_query'
+                        ? 'IRSA archive search result · image may be served from cache'
+                        : 'Observation search provenance unavailable'}
+                  </p>
+                )}
                 <CanvasViewer
                   frame={currentFrame}
                   loading={loadingFrame}

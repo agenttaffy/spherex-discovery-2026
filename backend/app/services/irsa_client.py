@@ -99,6 +99,7 @@ class IRSAClient:
                             "dec": dec,
                             "pointing_ra": float(row["s_ra"]) if row.get("s_ra") else ra,
                             "pointing_dec": float(row["s_dec"]) if row.get("s_dec") else dec,
+                            "search_provenance": "irsa_query",
                         }
 
                         # Store in registry for frame fetching

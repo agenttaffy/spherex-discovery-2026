@@ -5,7 +5,9 @@
 
 ---
 
-## 1. Verified Working Features
+> **Current verification note:** Claims below describe implemented features and historical results, not independently validated scientific performance or WCAG conformance. See HANDOFF.md and TEST_RESULTS.md for current evidence and limitations.
+
+## 1. Implemented Features
 - **NASA Data Visualization & WCAG 2.2 AA Accessibility (`SpectrumChart.tsx`, `LightCurveChart.tsx`, `CanvasViewer.tsx`, `ComparisonView.tsx`, `index.css`):**
   - **Diverging Colormap for Difference Imagery (`fits_processing.py`, `ComparisonView.tsx`):** Implemented `apply_diverging_colormap` (Cool-Warm: Blue -> Light Neutral -> Crimson Red) centered strictly at 128 (zero net flux residual) per NASA Data Visualization guidelines, complete with palette toggle and colorbar legend.
   - **102-Channel Spectrophotometric Continuum Accessible Table (`SpectrumChart.tsx`):** Added accessible dataset switcher tablist (`Observed Bands` vs `102-Channel Continuum Model`), enabling screen-reader and keyboard users to inspect all 102 synthesized spectrophotometric channels with channel index, detector, wavelength, and flux.
@@ -48,12 +50,14 @@
   - Explicitly labels fallback catalog sources as "Curated Reference Catalog (Demo)" vs "Live ESA Gaia TAP".
   - Shows provenance distinction in CanvasViewer overlay labels and toggle buttons.
 - **On-The-Fly Spectra Generation (`/api/science/spectrum`, `spectrum.py`, `SpectrumChart.tsx`):**
-  - Instantaneous calibrated Spectral Energy Distribution (SED: Flux vs. Wavelength $\lambda$) from 0.75 µm to 5.00 µm.
-  - Queries and aggregates multi-epoch circular aperture photometry across all 6 SPHEREx detector arrays (D1: 0.75–1.12 µm, D2: 1.12–1.68 µm, D3: 1.68–2.42 µm, D4: 2.42–3.82 µm, D5: 3.82–4.42 µm, D6: 4.42–5.00 µm).
-  - Synthesizes all 102 individual spectroscopic channels (17 channels per detector array) with color-coded band visualization.
-  - Interactive SVG plotting with detector band boundary shading, photometric error bars, and smooth continuum curves.
-  - Physical spectral classification engine detecting Cold Sub-stellar Brown Dwarfs (peaking in D5/D6, e.g. WISE 0855), Cool Stellar Atmospheres (M-Dwarfs, e.g. Barnard's Star), and Infrared Excesses (circumstellar dust disks, e.g. RW Aurigae).
-  - Telemetry dock tab switcher in `MetadataPanel.tsx` toggling between "Infrared SED (102 Bands)" and "Light Curve".
+  - Instantaneous calibrated Spectral Energy Distribution (SED: Flux vs. Wavelength $\lambda$) across SPHEREx's 0.75 µm to 5.00 µm range.
+  - Queries and aggregates multi-epoch circular aperture photometry across up to 6 SPHEREx detector arrays (D1: 0.75–1.12 µm, D2: 1.12–1.68 µm, D3: 1.68–2.42 µm, D4: 2.42–3.82 µm, D5: 3.82–4.42 µm, D6: 4.42–5.00 µm).
+  - Synthesizes up to six measured detector-band points (D1–D6) with WCS-WAVE calibrated effective wavelengths and `VARIANCE` error bars where available, accompanied by an illustrative/interpolated 102-point continuum (17 channels per detector array).
+  - **Truthfulness Boundary:** This is explicitly **not 102 observed resolved SPHEREx channels**. The 102 channels represent an interpolated continuum curve.
+  - Neutral broadband shape descriptor (`continuum_shape`) describing empirical trends ("flux rises toward longer measured bands", "flux falls toward longer measured bands", "peak among measured detector bands", or "insufficient observed coverage"). Inferred astrophysical classifications were removed from the API (`spectral_class` removed).
+  - Constrained single-temperature blackbody continuum fit ($B_\nu(T)$): Requires $\ge 3$ distinct measured detector bands with valid propagated photometric uncertainties to guarantee positive residual degrees of freedom ($\text{dof} \ge 1$). Unsupported 10% error substitutions are disallowed. The temperature is strictly an optional single-temperature continuum fit, not an object's known physical temperature.
+  - When zero archive bands exist, peak wavelength, peak detector, peak flux, estimated temperature, and integrated flux are set to `None` (`unavailable`), with `peak_is_measured: False`.
+  - Telemetry dock tab switcher in `MetadataPanel.tsx` toggling between "Observed Bands · Continuum (Interpolated)" and "Light Curve".
 - **Astronomical Image Co-Addition & Stacking (`/api/frames/stack`, `stacking.py`, `ComparisonView.tsx`):**
   - Multi-frame image stacking across observation epochs or detector arrays on a shared celestial grid.
   - Supports `mean` (maximum SNR), `median` (outlier & cosmic ray rejection), and `sum` (total flux integration) stacking methods.
@@ -88,11 +92,11 @@
 - **Astrometric Proper Motion Vector Engine (`/api/science/motion`):**
   - Sub-pixel 2D FFT phase cross-correlation + local $5 \times 5$ centroid tracker.
   - Computes angular displacement ($\Delta\theta$ in arcseconds), annual proper motion ($\mu$ in arcsec/year and mas/year), position angle ($\theta_{PA}$), and candidate classification ("High Proper Motion Candidate").
-  - Verified on Barnard's Star (10.3 arcsec/yr displacement between DR1 and QR3).
+  - Target-object motion has not been independently verified in this session.
 - **Multi-Epoch Photometric Light Curve Dock (`/api/science/photometry`, `LightCurveChart.tsx`):**
   - Circular aperture flux integration with local background annulus subtraction.
-  - Time-series flux plotting in calibrated MJy/sr with automated variability classification ("CONFIRMED VARIABLE" vs "STABLE").
-  - Verified on variable stars RW Aurigae and R Draconis.
+  - Time-series flux plotting in calibrated MJy/sr with a heuristic variation flag, not a confirmation of variability or stability.
+  - Target-object variability has not been independently verified in this session.
 - **External Celestial Catalog Overlay (`/api/science/catalogs`):**
   - Gaia DR3 & SIMBAD reference star queries overlaying diamond markers, G-magnitudes, and proper-motion vectors onto the HTML5 Canvas viewer.
 - **Shareable URL Deep Linking:**
@@ -102,7 +106,7 @@
   - Formatted J2000 sexagesimal target reports with astrometric vectors, light curve stats, and verified IRSA DOI 10.26131/IRSA678 citations.
 - **Guided Educational Tour Modal (`GuidedTourModal.tsx`):**
   - 4-step interactive walkthrough explaining SPHEREx LVF optics, dipole vs monopole signatures, official targets, and judging criteria alignment.
-- **Comprehensive Automated Test Suite:** 86 passing pytest tests covering unit, science, 3D WCS reprojection, rotated WCS alignment, WebP, robust background co-addition/stacking, 102-channel SED, offline resilience, and scientific regression flows.
+- **Comprehensive Automated Test Suite:** 93 passing pytest tests (with 2 Astropy FITSFixedWarnings) covering unit, science, 3D WCS reprojection, rotated WCS alignment, WebP, robust background co-addition/stacking, 102-channel SED, offline resilience, and scientific regression flows.
 
 ---
 
@@ -118,7 +122,10 @@
 
 ---
 
-## 3. Latest Build & Test Status
-- **Backend pytest:** 86 passed in 6.70s (0 failures).
-- **Frontend build:** `npm run build` succeeded in 2.70s (0 type errors, 0 warnings).
+## 3. Verified Build & Test Status
+- **Backend pytest:** 93 passed, 2 Astropy FITSFixedWarnings in 10.11s (0 failures).
+- **Frontend build:** `npm run build` succeeded in 2.55s (1,497 modules transformed, 0 type errors, 0 warnings).
 - **Accessibility & Responsive:** 41 checks passed in `node scripts/verify_accessibility_and_responsive.mjs` (0 failures).
+- **Demonstration dataset:** 22/22 assets verified valid in `python scripts/verify_demo.py`.
+- **Environment & Network:** `python scripts/verify_environment.py` passed outside restricted network: NASA/IPAC IRSA SIA reachable with HTTP 200.
+- **Manual Verification Status:** Automated test suites verified; no manual physical visual inspection or physical screen-reader audio checks were performed.

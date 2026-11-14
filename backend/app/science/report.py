@@ -35,15 +35,16 @@ def generate_discovery_report(
         f"- **Level 2 Science Archive DOI:** [10.26131/IRSA678](https://doi.org/10.26131/IRSA678)",
         f"- **Instrument:** SPHEREx (Spectro-Photometer for the History of the Universe, Epoch of Reionization and Ices)",
         f"- **Spectrophotometric Range:** 0.75 μm – 5.0 μm (Detectors D1–D6 Linear Variable Filters)",
+        "- **Search provenance:** See each observation below. A cached demonstration result is not a live search result; image bytes may also come from cache.",
     ]
 
     if observations:
         md_lines.append("")
         md_lines.append("### Evaluated Observation Epochs")
-        md_lines.append("| Obs ID | UTC Date | Collection | Detector | MJD |")
-        md_lines.append("| :--- | :--- | :--- | :--- | :--- |")
+        md_lines.append("| Obs ID | UTC Date | Collection | Detector | MJD | Search provenance |")
+        md_lines.append("| :--- | :--- | :--- | :--- | :--- | :--- |")
         for obs in observations[:8]:
-            md_lines.append(f"| `{obs.get('obs_id', 'N/A')}` | {obs.get('utc_date', 'N/A')} | {obs.get('collection', 'N/A')} | {obs.get('detector', 'N/A')} | {obs.get('mjd', 'N/A')} |")
+            md_lines.append(f"| `{obs.get('obs_id', 'N/A')}` | {obs.get('utc_date', 'N/A')} | {obs.get('collection', 'N/A')} | {obs.get('detector', 'N/A')} | {obs.get('mjd', 'N/A')} | {obs.get('search_provenance', 'unknown')} |")
 
     # Astrometric Motion Analysis
     if motion_data:
@@ -66,11 +67,13 @@ def generate_discovery_report(
             md_lines.append("- **Astrometric Calibration:** WCS-anchored centroiding with pointing-shift isolation")
 
     # Photometric Variability Analysis
-    if photometry_data:
+    if photometry_data and photometry_data.get("valid_points_count") == 0:
+        md_lines.extend(["", "## 4. Photometric Light Curve Analysis", "- No valid photometry available; summary values and variability assessment are unavailable."])
+    elif photometry_data:
         md_lines.extend([
             "",
             "## 4. Photometric Light Curve Analysis",
-            f"- **Variability Assessment:** **{'CONFIRMED VARIABLE' if photometry_data.get('is_variable') else 'STABLE / NON-VARIABLE'}**",
+            f"- **Variability Heuristic:** **{'Variation flagged' if photometry_data.get('is_variable') else 'No variation flagged'}**. This threshold does not establish variability or stability; review wavelength compatibility and uncertainties.",
             f"- **Total Epoch Points:** {photometry_data.get('total_points', 0)}",
             f"- **Variability Index (std/mean):** {photometry_data.get('variability_index', 0.0):.3f}",
             f"- **Mean Net Flux:** {photometry_data.get('mean_flux_mjy_sr', 0.0):.4f} MJy/sr",
@@ -119,11 +122,11 @@ def generate_discovery_report(
         elif obs_bands:
             md_lines.append("")
             md_lines.append("### Observed Detector Photometry")
-            md_lines.append("| Detector | λ_eff (μm) | Net Flux (MJy/sr) | ± Uncertainty | Calibration |")
-            md_lines.append("| :--- | :--- | :--- | :--- | :--- |")
+            md_lines.append("| Detector | λ_eff (μm) | Net Flux (MJy/sr) | ± Uncertainty | Uncertainty source | Calibration |")
+            md_lines.append("| :--- | :--- | :--- | :--- | :--- | :--- |")
             for b in obs_bands:
                 md_lines.append(
-                    f"| {b.get('detector', 'N/A')} | {b.get('wavelength_um', 0.0):.3f} | {b.get('flux_mjy_sr', 0.0):.4f} | ±{b.get('flux_err_mjy_sr', 0.0):.4f} | {b.get('calibration_source', 'WCS-WAVE')} |"
+                    f"| {b.get('detector', 'N/A')} | {b.get('wavelength_um', 0.0):.3f} | {b.get('flux_mjy_sr', 0.0):.4f} | ±{b.get('flux_err_mjy_sr', 0.0):.4f} | {b.get('uncertainty_source', 'unknown')} | {b.get('calibration_source', 'unknown')} |"
                 )
 
     if notes:

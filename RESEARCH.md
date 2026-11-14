@@ -39,3 +39,10 @@ Live queries via `probe_irsa.py` confirmed observations in both DR1 and QR3:
 - Visual stretch: SPHEREx data spans orders of magnitude. Must provide `asinh` (arcsinh) and `ZScale` stretching to reveal faint point sources against zodiacal background without clipping.
 - Registration: Reprojection or WCS grid alignment is essential before differencing frames because pointing jitter and survey scans produce sub-pixel shifts and rotational variations.
 - Wavelength Matching: Images subtracted must be from the same detector band (or interpolated to the same effective wavelength) to prevent false-positive differencing artifacts caused by spectral slope differences.
+
+
+## Interface and data references (2026-11-14)
+- [IRSA SPHEREx overview](https://irsa.ipac.caltech.edu/onlinehelp/spherex/spherex/overview.html): LVF images associate each position with a wavelength; full coverage accumulates over time. Detector labels alone do not prove wavelength compatibility.
+- [IRSA visualization guide](https://irsa.ipac.caltech.edu/onlinehelp/spherex/spherex/visualization.html): Level 2 products include IMAGE, FLAGS, VARIANCE and WCS-WAVE extensions. Missing metadata must stay unknown.
+- [CDS HiPS documentation](https://aladin.cds.unistra.fr/hips/): context surveys are separate progressive image layers, not SPHEREx science images.
+- These references support explicit provenance, wavelength and uncertainty labels. Automated source checks are not a substitute for keyboard, screen-reader and visual testing.

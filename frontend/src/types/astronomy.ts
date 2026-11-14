@@ -1,4 +1,5 @@
 export interface ObservationRecord {
+  search_provenance?: string;
   id: string;
   obs_id: string;
   collection: string;
@@ -21,6 +22,7 @@ export interface PixelStats {
 }
 
 export interface FlagSummary {
+  quality_state?: string;
   flagged_pixels: number;
   total_pixels: number;
   flag_breakdown: Record<string, number>;
@@ -168,6 +170,7 @@ export interface DiscoveryReport {
 }
 
 export interface SpectrumBandPoint {
+  uncertainty_source?: string;
   detector: string;
   band_idx: number;
   wavelength_um: number;

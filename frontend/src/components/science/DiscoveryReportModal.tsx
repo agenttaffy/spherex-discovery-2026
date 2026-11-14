@@ -84,7 +84,7 @@ export const DiscoveryReportModal: React.FC<DiscoveryReportModalProps> = ({
             <ShieldCheck className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
             <div>
               <span className="font-semibold block text-slate-100">NASA Provenance & Citation</span>
-              SPHEREx DR1 & QR3 Level 2 Calibrated Images retrieved via NASA/IPAC Infrared Science Archive (IRSA) SIA2 service. Verified archival DOI: <a href="https://doi.org/10.26131/IRSA678" target="_blank" rel="noreferrer" className="underline font-mono text-cyan-300 hover:text-cyan-100 inline-flex items-center gap-0.5">10.26131/IRSA678 <ExternalLink className="w-3 h-3" /></a>.
+              SPHEREx data are available through NASA/IPAC IRSA. Results may include cached demonstration observations; check the observation list and source before interpreting them. DR1 citation: <a href="https://doi.org/10.26131/IRSA678" target="_blank" rel="noreferrer" className="underline font-mono text-cyan-300 hover:text-cyan-100 inline-flex items-center gap-0.5">10.26131/IRSA678 <ExternalLink className="w-3 h-3" /></a>.
             </div>
           </div>
         </div>

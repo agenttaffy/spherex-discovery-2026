@@ -273,7 +273,7 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
                 className="cursor-pointer"
                 tabIndex={0}
                 role="button"
-                aria-label={`Detector ${b.detector}, effective wavelength ${b.wavelength_um.toFixed(3)} micrometers, flux ${b.flux_mjy_sr.toFixed(2)} plus minus ${b.flux_err_mjy_sr.toFixed(2)} MegaJanskys per steradian, SNR ${b.snr} sigma. ${b.is_observed ? 'Observed archive frame' : 'Interpolated model'}`}
+                aria-label={`Detector ${b.detector}, effective wavelength ${b.wavelength_um.toFixed(3)} micrometers, flux ${b.flux_mjy_sr.toFixed(2)} plus minus ${b.flux_err_mjy_sr.toFixed(2)} MegaJanskys per steradian, uncertainty source ${b.uncertainty_source ?? 'unknown'}, SNR ${b.snr} sigma. ${b.is_observed ? 'Observed archive frame' : 'Interpolated model'}`}
                 opacity={isDimmed ? 0.3 : 1.0}
                 onMouseEnter={() => {
                   setHoveredBand(b);
@@ -367,10 +367,11 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
             <div>
               <span className="text-slate-400">SNR:</span> {hoveredBand.snr}σ (±{hoveredBand.flux_err_mjy_sr.toFixed(2)})
             </div>
+            <div>Uncertainty: {hoveredBand.uncertainty_source?.replace(/_/g, ' ') ?? 'unknown'}</div>
             <div className="pt-0.5 text-[9px]">
               {hoveredBand.is_observed ? (
                 <span className="text-emerald-400 font-semibold">
-                  ✓ Observed SPHEREx Detector Band (Calibrated WCS)
+                  Observed detector band · wavelength calibration: {hoveredBand.calibration_source}
                 </span>
               ) : (
                 <span className="text-amber-300">○ Modeled SED Profile Continuum</span>
@@ -407,7 +408,7 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
             <span>View Accessible Data Table</span>
           </span>
           <span className="text-[9px] text-slate-400 font-mono">
-            ({bands.length} observed bands{channels_102 && channels_102.length > 0 ? ` · ${channels_102.length} modeled channels` : ''})
+            ({total_observed_bands} observed bands{channels_102 && channels_102.length > 0 ? ` · ${channels_102.length} modeled channels` : ''})
           </span>
         </summary>
 
@@ -424,7 +425,7 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            Observed Bands ({bands.length})
+            Observed Bands ({total_observed_bands})
           </button>
           {channels_102 && channels_102.length > 0 && (
             <button
@@ -453,17 +454,19 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
                   <th scope="col" className="py-1 px-1.5 font-semibold text-right">λ (µm)</th>
                   <th scope="col" className="py-1 px-1.5 font-semibold text-right">Flux (MJy/sr)</th>
                   <th scope="col" className="py-1 px-1.5 font-semibold text-right">± Err</th>
+                  <th scope="col" className="py-1 px-1.5 font-semibold">Uncertainty source</th>
                   <th scope="col" className="py-1 px-1.5 font-semibold text-right">SNR</th>
                   <th scope="col" className="py-1 px-1.5 font-semibold text-center">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 text-slate-300">
-                {bands.map((b) => (
+                {bands.filter((b) => b.is_observed).map((b) => (
                   <tr key={b.detector} className="hover:bg-slate-900/60 transition">
                     <td className="py-1 px-1.5 font-semibold" style={{ color: b.color }}>{b.detector}</td>
                     <td className="py-1 px-1.5 text-right font-mono">{b.wavelength_um.toFixed(3)}</td>
                     <td className="py-1 px-1.5 text-right font-mono font-medium text-slate-100">{b.flux_mjy_sr.toFixed(2)}</td>
                     <td className="py-1 px-1.5 text-right font-mono text-slate-400">±{b.flux_err_mjy_sr.toFixed(2)}</td>
+                    <td className="py-1 px-1.5">{b.uncertainty_source?.replace(/_/g, ' ') ?? 'unknown'}</td>
                     <td className="py-1 px-1.5 text-right font-mono text-cyan-300 font-semibold">{b.snr}σ</td>
                     <td className="py-1 px-1.5 text-center">
                       {b.is_observed ? (

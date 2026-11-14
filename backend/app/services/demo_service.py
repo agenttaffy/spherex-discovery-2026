@@ -134,6 +134,7 @@ class DemoService:
                     access_url=base_access_url,
                     ra=ra,
                     dec=dec,
+                    search_provenance="cached_demo",
                 )
                 self.demo_records.append(rec)
 

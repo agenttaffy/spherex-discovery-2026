@@ -145,13 +145,13 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({
                   Data Quality Flags
                 </label>
                 <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-3 space-y-1.5">
-                  <div className="flex justify-between items-center text-[11px]">
+                  {flag_summary.quality_state === 'documented_metadata' ? <div className="flex justify-between items-center text-[11px]">
                     <span className="text-slate-400">Flagged Pixels:</span>
                     <span className={flag_summary.flagged_pixels === 0 ? 'text-emerald-400 font-semibold' : 'text-amber-300 font-semibold'}>
                       {flag_summary.flagged_pixels} / {flag_summary.total_pixels}
                     </span>
-                  </div>
-                  {Object.entries(flag_summary.flag_breakdown).map(([key, val]) => (
+                  </div> : <p className="text-[11px] text-amber-300">Quality flags unavailable or their definitions are unknown.</p>}
+                  {flag_summary.quality_state === 'documented_metadata' && Object.entries(flag_summary.flag_breakdown).map(([key, val]) => (
                     val > 0 && (
                       <div key={key} className="flex justify-between items-center text-[10px] text-slate-300 pl-2">
                         <span className="capitalize">{key.replace('_', ' ')}:</span>
