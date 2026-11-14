@@ -319,6 +319,7 @@ export const App: React.FC = () => {
         photometry_data: lightCurve,
         observations: observations,
         notes: currentPreset?.description,
+        spectrum_data: spectrum,
       });
       setReportData(rep);
       setIsReportOpen(true);

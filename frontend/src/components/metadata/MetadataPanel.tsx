@@ -39,7 +39,7 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({
         <button
           role="tab"
           aria-selected={telemetryTab === 'spectrum'}
-          aria-label="Show 102-channel infrared SED spectrum"
+          aria-label="Show infrared SED spectrum and estimated continuum"
           onClick={() => setTelemetryTab('spectrum')}
           className={`flex-1 py-1.5 px-2 rounded flex items-center justify-center gap-1.5 transition focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${
             telemetryTab === 'spectrum'

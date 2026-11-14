@@ -512,10 +512,10 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
         </div>
       </details>
 
-      {/* Spectral Classification & Summary Bar */}
+      {/* Spectral Continuum Profile & Summary Bar */}
       <div className="bg-slate-900/80 border border-slate-800 rounded p-2 space-y-1.5 font-mono">
         <div className="flex items-center justify-between text-[10px]">
-          <span className="text-slate-400">Classification:</span>
+          <span className="text-slate-400">Continuum Profile:</span>
           <span className="text-indigo-300 font-semibold text-right truncate max-w-[170px]" title={summary.spectral_class}>
             {summary.spectral_class}
           </span>

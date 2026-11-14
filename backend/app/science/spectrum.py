@@ -146,10 +146,12 @@ def generate_spectrum_for_target(
                 from app.science.fits_processing import (
                     extract_variance_data,
                     extract_fatal_quality_mask,
+                    extract_source_mask,
                     extract_calibrated_wavelength,
                 )
                 var = extract_variance_data(hd)
                 mask = extract_fatal_quality_mask(hd)
+                src_mask = extract_source_mask(hd)
                 wave_cal = extract_calibrated_wavelength(hd, target_coord=(ra, dec))
 
                 phot = compute_aperture_photometry(
@@ -158,6 +160,7 @@ def generate_spectrum_for_target(
                     wcs=hdr,
                     variance=var,
                     mask=mask,
+                    source_mask=src_mask,
                 )
                 snr = phot.get("snr", 0.0)
 

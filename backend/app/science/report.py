@@ -11,6 +11,7 @@ def generate_discovery_report(
     photometry_data: Optional[Dict[str, Any]] = None,
     observations: Optional[list] = None,
     notes: Optional[str] = None,
+    spectrum_data: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Builds a structured scientific discovery report with J2000 sexagesimal formatting,
@@ -71,10 +72,32 @@ def generate_discovery_report(
             f"- **Flux Range (ΔF):** {photometry_data.get('amplitude_delta_mjy_sr', 0.0):.4f} MJy/sr",
         ])
 
-    if notes:
+    # Spectral Energy Distribution Analysis
+    if spectrum_data:
+        obs_bands = spectrum_data.get("observed_channels") or spectrum_data.get("observed_detector_bands") or []
+        total_obs = spectrum_data.get("total_observed_bands", len(obs_bands))
         md_lines.extend([
             "",
-            "## 5. Analyst Notes & Scientific Interpretation",
+            "## 5. Spectral Energy Distribution (SED)",
+            f"- **Observed Detector Bands:** {total_obs} of 6 bands (calibrated WCS-WAVE where available)",
+            "- **Spectrophotometric Continuum:** Estimated Continuum Model (Interpolated across 6 detector bandpasses)",
+            "- **Spectral Line Caveat:** The 102 individual channel values represent an interpolated continuum curve across the 6 SPHEREx detector arrays, not 102 independently resolved spectral line measurements. Unsupported empirical temperature or classification claims are omitted.",
+        ])
+        if obs_bands:
+            md_lines.append("")
+            md_lines.append("### Observed Detector Photometry")
+            md_lines.append("| Detector | λ_eff (μm) | Net Flux (MJy/sr) | ± Uncertainty | Calibration |")
+            md_lines.append("| :--- | :--- | :--- | :--- | :--- |")
+            for b in obs_bands:
+                md_lines.append(
+                    f"| {b.get('detector', 'N/A')} | {b.get('wavelength_um', 0.0):.3f} | {b.get('flux_mjy_sr', 0.0):.4f} | ±{b.get('flux_err_mjy_sr', 0.0):.4f} | {b.get('calibration_source', 'WCS-WAVE')} |"
+                )
+
+    if notes:
+        section_num = "6" if spectrum_data else "5"
+        md_lines.extend([
+            "",
+            f"## {section_num}. Analyst Notes & Scientific Interpretation",
             notes,
         ])
 
@@ -98,6 +121,7 @@ def generate_discovery_report(
         },
         "motion_analysis": motion_data,
         "photometry_analysis": photometry_data,
+        "spectrum_analysis": spectrum_data,
         "observations_summary": observations[:10] if observations else [],
         "markdown_report": markdown_content,
         "irsa_doi": "10.26131/IRSA678",

@@ -30,6 +30,7 @@ class ReportRequest(BaseModel):
     photometry_data: Optional[Dict[str, Any]] = None
     observations: Optional[List[Dict[str, Any]]] = None
     notes: Optional[str] = None
+    spectrum_data: Optional[Dict[str, Any]] = None
 
 @router.get("/science/catalogs")
 async def get_catalogs(
@@ -280,5 +281,6 @@ async def make_discovery_report(req: ReportRequest = Body(...)):
         photometry_data=req.photometry_data,
         observations=req.observations,
         notes=req.notes,
+        spectrum_data=req.spectrum_data,
     )
     return report

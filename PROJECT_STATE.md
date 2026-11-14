@@ -1,7 +1,7 @@
 # SPHEREx Discovery — Project State
 
-**Last Updated:** 2026-11-14T20:53:00Z  
-**Current Implementation Stage:** Phase 7 UI/UX Refinement & WCAG 2.2 AA Accessibility (Perceptually Balanced Diverging Difference Palettes, 102-Channel Accessible Spectrophotometric Continuum Tables, Semantic HTML Table Buttons, Dynamic Canvas Speech Announcements, Multi-Epoch ALL Survey Search, Deep-Link State Synchronization, Headless Visual Acceptance Screenshots, 82 Passing Pytest Tests, 41 Passing Accessibility Checks, Clean Production Build).
+**Last Updated:** 2026-11-14T21:58:00Z  
+**Current Implementation Stage:** Phase 7 UI/UX Refinement & Scientific Hardening (Source-Mask Background Exclusion without Aperture Rejection, Scientific Truthfulness in Spectrophotometric Continuum Modeling, Perceptually Balanced Diverging Difference Palettes, 102-Channel Accessible Spectrophotometric Continuum Tables, Semantic HTML Table Buttons, Dynamic Canvas Speech Announcements, Multi-Epoch ALL Survey Search, Deep-Link State Synchronization, Headless Visual Acceptance Screenshots, 84 Passing Pytest Tests, 41 Passing Accessibility Checks, Clean Production Build).
 
 ---
 
@@ -102,7 +102,7 @@
   - Formatted J2000 sexagesimal target reports with astrometric vectors, light curve stats, and verified IRSA DOI 10.26131/IRSA678 citations.
 - **Guided Educational Tour Modal (`GuidedTourModal.tsx`):**
   - 4-step interactive walkthrough explaining SPHEREx LVF optics, dipole vs monopole signatures, official targets, and judging criteria alignment.
-- **Comprehensive Automated Test Suite:** 81 passing pytest tests covering unit, science, 3D WCS reprojection, rotated WCS alignment, WebP, robust background co-addition/stacking, 102-channel SED, offline resilience, and scientific regression flows.
+- **Comprehensive Automated Test Suite:** 84 passing pytest tests covering unit, science, 3D WCS reprojection, rotated WCS alignment, WebP, robust background co-addition/stacking, 102-channel SED, offline resilience, and scientific regression flows.
 
 ---
 
@@ -119,5 +119,6 @@
 ---
 
 ## 3. Latest Build & Test Status
-- **Backend pytest:** 77 passed in 7.41s (0 failures).
-- **Frontend build:** `npm run build` succeeded in 2.42s (0 type errors, 0 warnings).
+- **Backend pytest:** 84 passed in 6.03s (0 failures).
+- **Frontend build:** `npm run build` succeeded in 2.64s (0 type errors, 0 warnings).
+- **Accessibility & Responsive:** 41 checks passed in `node scripts/verify_accessibility_and_responsive.mjs` (0 failures).

@@ -174,6 +174,7 @@ export async function generateDiscoveryReport(data: {
   photometry_data?: any;
   observations?: any[];
   notes?: string;
+  spectrum_data?: any;
 }): Promise<DiscoveryReport> {
   const resp = await fetch(`${API_BASE}/science/report`, {
     method: 'POST',

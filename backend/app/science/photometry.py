@@ -10,6 +10,7 @@ def compute_aperture_photometry(
     wcs: Optional[Any] = None,
     variance: Optional[np.ndarray] = None,
     mask: Optional[np.ndarray] = None,
+    source_mask: Optional[np.ndarray] = None,
     aperture_radius: float = 3.0,
     annulus_inner: float = 4.5,
     annulus_outer: float = 7.0,
@@ -21,6 +22,8 @@ def compute_aperture_photometry(
     celestial position into exact pixel coordinates (x, y) rather than peak-seeking.
     Uses VARIANCE array when available to compute real photometric flux uncertainties.
     Excludes fatal quality mask pixels from aperture and background calculations.
+    Distinguishes nominal source masks from fatal defects: source_mask is excluded
+    from the background annulus to prevent background inflation, but preserved in aperture.
     """
     h, w = image.shape
 
@@ -101,8 +104,12 @@ def compute_aperture_photometry(
     n_ap = int(np.sum(ap_mask))
     coverage_fraction = float(n_ap / max(1, n_geom))
 
-    # Background annulus mask
+    # Background annulus mask: exclude fatal mask and optionally exclude detected field sources
     ann_mask = (dist >= annulus_inner) & (dist <= annulus_outer) & valid_mask
+    if source_mask is not None and source_mask.shape == image.shape:
+        pure_bg_mask = ann_mask & (~source_mask)
+        if np.any(pure_bg_mask):
+            ann_mask = pure_bg_mask
     ann_pixels = clean_img[ann_mask]
     n_ann = int(np.sum(ann_mask))
 

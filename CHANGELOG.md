@@ -2,6 +2,12 @@
 
 All notable changes to the SPHEREx Discovery project will be documented in this file.
 
+## [1.4.2] - 2026-11-14
+### Added & Hardened — Scientific Truthfulness & Photometry Source Masking
+- **Source-Mask Background Exclusion in Aperture Photometry:** In `photometry.py`, enhanced `compute_aperture_photometry` to accept `source_mask`, excluding neighboring astronomical source detections from the background annulus to prevent background noise inflation while preserving nominal source flux in the target aperture. Wired in `spectrum.py`.
+- **Spectrophotometric Continuum Truthfulness & Discovery Report Hardening:** In `report.py`, added formal SED reporting section with explicit documentation that the 102 individual channel values represent an interpolated continuum model across 6 Linear Variable Filter detector bandpasses (not 102 independently measured spectral lines). Omitted unsupported empirical temperature or classification claims. Updated `SpectrumChart.tsx` label from "Classification:" to "Continuum Profile:" and refined `MetadataPanel.tsx` ARIA labels.
+- **Backend Test Suite Expansion & Documentation Reconciliation:** Added `test_priority_1_source_mask_background_exclusion_without_aperture_rejection` and `test_priority_2_discovery_report_sed_truthfulness` to `test_scientific_audit_regression.py`. Total verified tests: **84 backend pytest tests** (0 failures), **41 accessibility checks** (0 failures), and clean production build. Reconciled all documentation records.
+
 ## [1.4.1] - 2026-11-14
 ### Added & Hardened (Skeptical Review & Visual Acceptance Round)
 - **Perceptually Balanced Diverging Colormap for Difference Images:** Added `apply_diverging_colormap` in `fits_processing.py` (Cool-Warm: Blue -> Light Neutral -> Crimson Red) strictly centered at 128 (zero net flux residual) per NASA Data Visualization guidance. Exposed via `/api/frames/diff` (`colormapped_base64`) with interactive palette toggle and colorbar legend in `ComparisonView.tsx`.

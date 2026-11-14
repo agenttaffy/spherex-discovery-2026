@@ -1,25 +1,23 @@
 # Agent Handoff Document
 
 ## 1. Last Completed Work
-- **UI/UX Refinement, NASA Data Visualization & WCAG 2.2 AA Hardening:**
-  - **Perceptually Balanced Diverging Palettes for Difference Images:** Added `apply_diverging_colormap` in `fits_processing.py` (Cool-Warm: Blue -> Light Neutral -> Crimson Red) centered strictly at 128 (zero net flux residual) per NASA Data Visualization guidance. Exposed via `/api/frames/diff` (`colormapped_base64`) with interactive palette toggle and colorbar legend in `ComparisonView.tsx`.
-  - **102-Channel Spectrophotometric Model Accessible Data Table:** Enhanced `SpectrumChart.tsx`'s accessible data table disclosure with an accessible tab switcher (`role="tablist"` / `role="tab"` for `Observed Bands` vs `102-Channel Continuum Model`), enabling screen-reader and keyboard users to inspect all 102 synthesized channels with channel number, detector, wavelength, and modeled flux.
-  - **Strict HTML/ARIA Table Compliance:** Corrected table semantics in `LightCurveChart.tsx` by eliminating invalid `role="button"` on `<tr>` elements and encapsulating selection actions in semantic `<button type="button">` elements inside `<td className="...">`.
-  - **Dynamic Speech Announcement Feedback:** Enhanced `CanvasViewer.tsx` keyboard navigation to include dynamic coordinates in announcement strings (`Offset: X=..., Y=...`), preventing screen reader speech silence on consecutive arrow keypresses, and added zoom boundary limit vocalization (800% max, 40% min).
-  - **Proactive Incompatibility Alert & Smart Compatible Epoch Pairing:** In `ComparisonView.tsx`, added proactive warnings for incompatible detector bands and auto-paired compatible detector epochs upon mounting or target selection.
-  - **Multi-Epoch Survey Selection & Deep-Link State Synchronization:** Added `ALL (Multi-Epoch)` survey selection in `SearchControls.tsx` and updated `demo_service.py` to support multi-epoch matching. Synchronized active observation (`obs`) and tab (`tab`) with URL deep links.
-  - **Visual Acceptance Verification:** Captured real headless Chrome screenshots at desktop (1280x800) and mobile (320x640) viewports in `docs/screenshots/`. Expanded automated accessibility test suite to 41 passing checks; expanded backend pytest test suite to 82 passing tests.
-  - **Environment Script Portability:** Fixed `npm.cmd` Windows invocation bug in `scripts/verify_environment.py` with `shell=(sys.platform == "win32")`.
+- **Scientific Audit, Truthfulness & WCAG 2.2 AA Hardening:**
+  - **Source Mask vs Fatal Defect Distinction in Photometry:** In `photometry.py`, enhanced `compute_aperture_photometry` to accept `source_mask`, excluding neighboring astronomical source detections from the background annulus to prevent noise inflation without rejecting nominal source flux in the target aperture. Wired in `spectrum.py`.
+  - **Truthful Spectrophotometric Modeling & SED Export:** In `report.py`, added formal SED reporting section with explicit documentation that the 102 individual channel values represent an interpolated continuum model across 6 Linear Variable Filter detector bandpasses (not 102 independently measured spectral lines). Omitted unsupported empirical temperature or classification claims. Updated `SpectrumChart.tsx` label from "Classification:" to "Continuum Profile:".
+  - **Backend Regression Suite:** Added `test_priority_1_source_mask_background_exclusion_without_aperture_rejection` and `test_priority_2_discovery_report_sed_truthfulness` to `test_scientific_audit_regression.py`.
+  - **Full Suite Verification:** Expanded automated backend pytest test suite to **84 passing tests** in 6.03s; accessibility test suite passing all **41 checks**; frontend production build cleanly passing with 0 errors in 2.64s; 22/22 demonstration FITS assets verified.
 
 ## 2. Current Working State
-- **Backend:** Starts cleanly with `python -m uvicorn app.main:app --port 8000`. All 82 tests pass.
+- **Backend:** Starts cleanly with `python -m uvicorn app.main:app --port 8000`. All 84 pytest tests pass.
 - **Frontend:** Builds cleanly with `npm run build` (0 type errors, 0 warnings).
 - **Accessibility & Responsive:** All 41 automated checks pass in `node scripts/verify_accessibility_and_responsive.mjs`.
 - **Demo Mode:** Local caching of 22 verified FITS cutouts enables immediate offline presentation and judging with circuit breaker fallback on remote outages.
-- **Screenshots:** 4 real visual acceptance screenshots saved in `docs/screenshots/` (desktop and mobile 320px).
+- **Screenshots:** 4 visual acceptance screenshots preserved in `docs/screenshots/` (desktop and mobile 320px).
 
-## 3. Current Blocker
-- None. System is complete, verified end-to-end, and scientifically rigorous.
+## 3. Current Blocker / Limitations
+- None fatal.
+- Live NASA/IPAC IRSA SIA service occasionally returns HTTP 502 Proxy Error during upstream maintenance; automatically safeguarded by backend circuit breaker and offline demo cutouts.
+- Aladin Lite v3 context tiles require active internet connection to CDS servers; fallback to SPHEREx native HTML5 Canvas works 100% offline.
 
 ## 4. Verification Commands
 ```bash
@@ -29,7 +27,7 @@ python scripts/verify_environment.py
 # 2. Demonstration Assets Verification
 python scripts/verify_demo.py
 
-# 3. Backend Test Suite (82 tests)
+# 3. Backend Test Suite (84 tests)
 cd backend
 python -m pytest -v
 

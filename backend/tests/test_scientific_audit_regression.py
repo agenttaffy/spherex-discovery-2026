@@ -399,3 +399,90 @@ def test_priority_5_stacking_variance_with_masked_pixels():
     # For pixel (0, 0), only 1 frame contributed, so stacked variance should be 0.5, not (0.5+0.5)/1 = 1.0!
     # And overall propagated sigma should be well below 1.0
     assert stats["propagated_noise_sigma"] < 0.6
+
+
+def test_priority_1_source_mask_background_exclusion_without_aperture_rejection():
+    """
+    Priority 1 & 3: Ensure source masks (SOURCE plane) are distinguished from fatal pixel rejection:
+    source masks in the background annulus are excluded to prevent background noise contamination,
+    while nominal source pixels in the target aperture are NOT rejected.
+    """
+    img = np.ones((25, 25), dtype=np.float32) * 2.0
+    # Center target star (at 12, 12)
+    img[12, 12] = 20.0
+
+    # A bright contaminant field star in the background annulus
+    img[10:15, 15:20] = 50.0
+
+    # Fatal mask (bad pixel) elsewhere
+    fatal_mask = np.zeros((25, 25), dtype=bool)
+    fatal_mask[0, 0] = True
+
+    # Source mask marking the contaminant star
+    src_mask = np.zeros((25, 25), dtype=bool)
+    src_mask[10:15, 15:20] = True
+    # Also mark the target star itself as a detected source
+    src_mask[12, 12] = True
+
+    # Run without source_mask -> contaminant inflates background noise and ruins SNR
+    phot_unmasked = compute_aperture_photometry(
+        image=img,
+        center_y=12.0,
+        center_x=12.0,
+        mask=fatal_mask,
+        aperture_radius=2.5,
+        annulus_inner=4.0,
+        annulus_outer=7.0,
+    )
+
+    # Run with source_mask -> contaminant is excluded from annulus, target is NOT rejected in aperture
+    phot_clean = compute_aperture_photometry(
+        image=img,
+        center_y=12.0,
+        center_x=12.0,
+        mask=fatal_mask,
+        source_mask=src_mask,
+        aperture_radius=2.5,
+        annulus_inner=4.0,
+        annulus_outer=7.0,
+    )
+
+    # Contaminant source was excluded from annulus -> background noise is dramatically lower
+    assert phot_clean["background_std"] < phot_unmasked["background_std"]
+    assert phot_clean["snr"] > phot_unmasked["snr"]
+    # Target aperture flux is preserved (not rejected by source mask!)
+    assert phot_clean["net_flux"] > 0.0
+    assert phot_clean["coverage_fraction"] == 1.0
+
+
+def test_priority_2_discovery_report_sed_truthfulness():
+    """
+    Priority 2: Ensure generated discovery reports truthfully present spectrophotometry:
+    label interpolation as estimated continuum, distinguish observed bands from 102 channels,
+    and include WCS-WAVE calibration provenance without unsupported classification claims.
+    """
+    from app.science.report import generate_discovery_report
+
+    mock_spec = {
+        "total_observed_bands": 2,
+        "observed_channels": [
+            {"detector": "SPHEREx-D1", "wavelength_um": 0.935, "flux_mjy_sr": 1.25, "flux_err_mjy_sr": 0.05, "calibration_source": "WCS-WAVE"},
+            {"detector": "SPHEREx-D3", "wavelength_um": 2.050, "flux_mjy_sr": 2.40, "flux_err_mjy_sr": 0.08, "calibration_source": "WCS-WAVE"},
+        ],
+        "bands": [],
+    }
+
+    rep = generate_discovery_report(
+        target_name="WISE 0855 Test",
+        ra_deg=133.79513,
+        dec_deg=-7.24515,
+        spectrum_data=mock_spec,
+    )
+
+    md = rep["markdown_report"]
+    assert "## 5. Spectral Energy Distribution (SED)" in md
+    assert "Estimated Continuum Model (Interpolated across 6 detector bandpasses)" in md
+    assert "102 individual channel values represent an interpolated continuum curve" in md
+    assert "WCS-WAVE" in md
+    assert "SPHEREx-D1" in md
+    assert "SPHEREx-D3" in md

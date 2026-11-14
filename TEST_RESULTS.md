@@ -1,8 +1,8 @@
 # SPHEREx Discovery — Test Execution Record
 
-**Execution Timestamp:** 2026-11-14T20:36:00Z  
+**Execution Timestamp:** 2026-11-14T21:58:00Z  
 **Platform:** Windows 11 / Python 3.11.4 / Node.js v22.19.0  
-**Test Suite Status:** 81 backend pytest tests passed in 6.71s | 34 automated UI accessibility checks passed | Frontend Build: 0 errors in 2.52s
+**Test Suite Status:** 84 backend pytest tests passed in 6.03s | 41 automated UI accessibility checks passed | Frontend Build: 0 errors in 2.64s | Demo Assets: 22/22 verified
 
 ---
 
@@ -14,96 +14,99 @@ platform win32 -- Python 3.11.4, pytest-9.2.0, pluggy-1.7.0 -- C:\Users\haris\Ap
 cachedir: .pytest_cache
 rootdir: C:\SphereX\spherex-discovery-2026\backend
 plugins: anyio-4.12.1, zarr-3.1.6
-collecting ... collected 81 items
+collecting ... collected 84 items
 
 tests/test_comparison.py::test_comparison_eligibility PASSED             [  1%]
 tests/test_comparison.py::test_comparison_ra_boundary_wrapping PASSED    [  2%]
 tests/test_comparison.py::test_compute_difference_frame PASSED           [  3%]
-tests/test_comparison.py::test_compute_difference_frame_nan_handling PASSED [  5%]
-tests/test_comparison.py::test_compute_difference_frame_wcs_reproject PASSED [  6%]
+tests/test_comparison.py::test_compute_difference_frame_nan_handling PASSED [  4%]
+tests/test_comparison.py::test_compute_difference_frame_wcs_reproject PASSED [  5%]
 tests/test_comparison.py::test_compute_difference_frame_fft_shift_fallback PASSED [  7%]
-tests/test_comparison.py::test_compute_difference_frame_spectral_3d_wcs PASSED [  9%]
-tests/test_comparison.py::test_compute_difference_frame_rotated_wcs PASSED [ 10%]
-tests/test_coordinates.py::test_parse_decimal_coordinates PASSED         [ 11%]
-tests/test_coordinates.py::test_parse_string_decimal PASSED              [ 12%]
-tests/test_coordinates.py::test_parse_sexagesimal_hms PASSED             [ 14%]
-tests/test_coordinates.py::test_parse_sexagesimal_colon_format PASSED    [ 15%]
-tests/test_coordinates.py::test_parse_sexagesimal_space_format PASSED    [ 16%]
-tests/test_coordinates.py::test_parse_challenge_prompt_unicode_coordinates PASSED [ 18%]
-tests/test_coordinates.py::test_empty_coordinate_input PASSED            [ 19%]
-tests/test_coordinates.py::test_ra_wrapping PASSED                       [ 20%]
-tests/test_coordinates.py::test_dec_out_of_range PASSED                  [ 22%]
-tests/test_coordinates.py::test_invalid_input PASSED                     [ 23%]
-tests/test_coordinates.py::test_format_sexagesimal PASSED                [ 24%]
-tests/test_demo_resilience.py::test_demo_manifest_endpoint PASSED        [ 25%]
-tests/test_demo_resilience.py::test_offline_observation_discovery_fallback PASSED [ 27%]
-tests/test_demo_resilience.py::test_diff_on_demo_epochs PASSED           [ 28%]
-tests/test_demo_resilience.py::test_webp_frame_and_diff_endpoints PASSED [ 29%]
-tests/test_fits_processing.py::test_load_and_extract_image PASSED        [ 31%]
-tests/test_fits_processing.py::test_extract_wcs PASSED                   [ 32%]
-tests/test_fits_processing.py::test_evaluate_quality_flags PASSED        [ 33%]
-tests/test_fits_processing.py::test_calculate_pixel_stats PASSED         [ 35%]
-tests/test_fits_processing.py::test_asinh_and_zscale_stretch PASSED      [ 36%]
-tests/test_fits_processing.py::test_render_image_to_base64_png PASSED    [ 37%]
-tests/test_fits_processing.py::test_render_image_to_base64_webp PASSED   [ 38%]
-tests/test_fits_processing.py::test_extract_astropy_wcs_celestial PASSED [ 40%]
-tests/test_fits_processing.py::test_render_image_to_base64_float_sanitization PASSED [ 41%]
-tests/test_fits_processing.py::test_spherex_documented_flags_distinguish_source_mask PASSED [ 42%]
-tests/test_health.py::test_root PASSED                                   [ 44%]
-tests/test_health.py::test_health PASSED                                 [ 45%]
-tests/test_health.py::test_demo_presets PASSED                           [ 46%]
-tests/test_image_registration.py::test_identical_images PASSED           [ 48%]
-tests/test_image_registration.py::test_known_shift_recovery PASSED       [ 49%]
-tests/test_image_registration.py::test_different_dimensions PASSED       [ 50%]
-tests/test_image_registration.py::test_nan_and_inf_robustness PASSED     [ 51%]
-tests/test_image_registration.py::test_constant_image PASSED             [ 53%]
-tests/test_integration.py::test_full_explorer_flow PASSED                [ 54%]
-tests/test_integration.py::test_invalid_coordinates_flow PASSED          [ 55%]
-tests/test_irsa_client.py::test_irsa_client_parse PASSED                 [ 57%]
-tests/test_irsa_client.py::test_observation_registry_insertion PASSED    [ 58%]
-tests/test_science.py::test_aperture_photometry_gaussian_source PASSED   [ 59%]
-tests/test_science.py::test_lightcurve_variability_classification PASSED [ 61%]
-tests/test_science.py::test_astrometric_motion_measurement PASSED        [ 62%]
-tests/test_science.py::test_catalog_endpoint_barnard PASSED              [ 63%]
-tests/test_science.py::test_photometry_endpoint_demo PASSED              [ 64%]
-tests/test_science.py::test_motion_endpoint_on_demo_epochs PASSED        [ 66%]
-tests/test_science.py::test_discovery_report_endpoint PASSED             [ 67%]
-tests/test_science.py::test_photometry_preset_differentiation PASSED     [ 65%]
-tests/test_scientific_audit_regression.py::test_priority_1_flags_metadata_and_source_mask_distinction PASSED [ 66%]
-tests/test_scientific_audit_regression.py::test_priority_2_photometry_wcs_target_measurement_and_variance PASSED [ 67%]
-tests/test_scientific_audit_regression.py::test_priority_2_spectrum_interpolation_labeled_correctly PASSED [ 69%]
-tests/test_scientific_audit_regression.py::test_priority_3_astrometric_motion_wcs_target_tracking PASSED [ 70%]
-tests/test_scientific_audit_regression.py::test_priority_4_differencing_lvf_compatibility_and_reprojection_error PASSED [ 71%]
-tests/test_scientific_audit_regression.py::test_priority_5_stacking_detector_compatibility_and_variance PASSED [ 72%]
-tests/test_scientific_audit_regression.py::test_priority_6_gaia_provenance_explicit_labeling PASSED [ 74%]
-tests/test_scientific_audit_regression.py::test_priority_1_extract_source_mask PASSED [ 75%]
-tests/test_scientific_audit_regression.py::test_priority_2_aperture_photometry_boundary_and_wcs_wave PASSED [ 76%]
-tests/test_scientific_audit_regression.py::test_priority_3_astrometric_vector_components_and_no_wandering PASSED [ 77%]
-tests/test_scientific_audit_regression.py::test_priority_5_stacking_variance_with_masked_pixels PASSED [ 79%]
+tests/test_comparison.py::test_compute_difference_frame_spectral_3d_wcs PASSED [  8%]
+tests/test_comparison.py::test_compute_difference_frame_rotated_wcs PASSED [  9%]
+tests/test_coordinates.py::test_parse_decimal_coordinates PASSED         [ 10%]
+tests/test_coordinates.py::test_parse_string_decimal PASSED              [ 11%]
+tests/test_coordinates.py::test_parse_sexagesimal_hms PASSED             [ 13%]
+tests/test_coordinates.py::test_parse_sexagesimal_colon_format PASSED    [ 14%]
+tests/test_coordinates.py::test_parse_sexagesimal_space_format PASSED    [ 15%]
+tests/test_coordinates.py::test_parse_challenge_prompt_unicode_coordinates PASSED [ 16%]
+tests/test_coordinates.py::test_empty_coordinate_input PASSED            [ 17%]
+tests/test_coordinates.py::test_ra_wrapping PASSED                       [ 19%]
+tests/test_coordinates.py::test_dec_out_of_range PASSED                  [ 20%]
+tests/test_coordinates.py::test_invalid_input PASSED                     [ 21%]
+tests/test_coordinates.py::test_format_sexagesimal PASSED                [ 22%]
+tests/test_demo_resilience.py::test_demo_manifest_endpoint PASSED        [ 23%]
+tests/test_demo_resilience.py::test_offline_observation_discovery_fallback PASSED [ 25%]
+tests/test_demo_resilience.py::test_diff_on_demo_epochs PASSED           [ 26%]
+tests/test_demo_resilience.py::test_webp_frame_and_diff_endpoints PASSED [ 27%]
+tests/test_fits_processing.py::test_load_and_extract_image PASSED        [ 28%]
+tests/test_fits_processing.py::test_extract_wcs PASSED                   [ 29%]
+tests/test_fits_processing.py::test_evaluate_quality_flags PASSED        [ 30%]
+tests/test_fits_processing.py::test_calculate_pixel_stats PASSED         [ 32%]
+tests/test_fits_processing.py::test_asinh_and_zscale_stretch PASSED      [ 33%]
+tests/test_fits_processing.py::test_render_image_to_base64_png PASSED    [ 34%]
+tests/test_fits_processing.py::test_render_image_to_base64_webp PASSED   [ 35%]
+tests/test_fits_processing.py::test_extract_astropy_wcs_celestial PASSED [ 36%]
+tests/test_fits_processing.py::test_render_image_to_base64_float_sanitization PASSED [ 38%]
+tests/test_fits_processing.py::test_spherex_documented_flags_distinguish_source_mask PASSED [ 39%]
+tests/test_fits_processing.py::test_apply_diverging_colormap PASSED      [ 40%]
+tests/test_health.py::test_root PASSED                                   [ 41%]
+tests/test_health.py::test_health PASSED                                 [ 42%]
+tests/test_health.py::test_demo_presets PASSED                           [ 44%]
+tests/test_image_registration.py::test_identical_images PASSED           [ 45%]
+tests/test_image_registration.py::test_known_shift_recovery PASSED       [ 46%]
+tests/test_image_registration.py::test_different_dimensions PASSED       [ 47%]
+tests/test_image_registration.py::test_nan_and_inf_robustness PASSED     [ 48%]
+tests/test_image_registration.py::test_constant_image PASSED             [ 50%]
+tests/test_integration.py::test_full_explorer_flow PASSED                [ 51%]
+tests/test_integration.py::test_invalid_coordinates_flow PASSED          [ 52%]
+tests/test_irsa_client.py::test_irsa_client_parse PASSED                 [ 53%]
+tests/test_irsa_client.py::test_observation_registry_insertion PASSED    [ 54%]
+tests/test_science.py::test_aperture_photometry_gaussian_source PASSED   [ 55%]
+tests/test_science.py::test_lightcurve_variability_classification PASSED [ 57%]
+tests/test_science.py::test_astrometric_motion_measurement PASSED        [ 58%]
+tests/test_science.py::test_catalog_endpoint_barnard PASSED              [ 59%]
+tests/test_science.py::test_photometry_endpoint_demo PASSED              [ 60%]
+tests/test_science.py::test_motion_endpoint_on_demo_epochs PASSED        [ 61%]
+tests/test_science.py::test_discovery_report_endpoint PASSED             [ 63%]
+tests/test_science.py::test_photometry_preset_differentiation PASSED     [ 64%]
+tests/test_scientific_audit_regression.py::test_priority_1_flags_metadata_and_source_mask_distinction PASSED [ 65%]
+tests/test_scientific_audit_regression.py::test_priority_2_photometry_wcs_target_measurement_and_variance PASSED [ 66%]
+tests/test_scientific_audit_regression.py::test_priority_2_spectrum_interpolation_labeled_correctly PASSED [ 67%]
+tests/test_scientific_audit_regression.py::test_priority_3_astrometric_motion_wcs_target_tracking PASSED [ 69%]
+tests/test_scientific_audit_regression.py::test_priority_4_differencing_lvf_compatibility_and_reprojection_error PASSED [ 70%]
+tests/test_scientific_audit_regression.py::test_priority_5_stacking_detector_compatibility_and_variance PASSED [ 71%]
+tests/test_scientific_audit_regression.py::test_priority_6_gaia_provenance_explicit_labeling PASSED [ 72%]
+tests/test_scientific_audit_regression.py::test_priority_1_extract_source_mask PASSED [ 73%]
+tests/test_scientific_audit_regression.py::test_priority_2_aperture_photometry_boundary_and_wcs_wave PASSED [ 75%]
+tests/test_scientific_audit_regression.py::test_priority_3_astrometric_vector_components_and_no_wandering PASSED [ 76%]
+tests/test_scientific_audit_regression.py::test_priority_5_stacking_variance_with_masked_pixels PASSED [ 77%]
+tests/test_scientific_audit_regression.py::test_priority_1_source_mask_background_exclusion_without_aperture_rejection PASSED [ 78%]
+tests/test_scientific_audit_regression.py::test_priority_2_discovery_report_sed_truthfulness PASSED [ 79%]
 tests/test_stacking_and_spectrum.py::test_compute_coadd_stack_mean_median_sum PASSED [ 80%]
-tests/test_stacking_and_spectrum.py::test_compute_coadd_stack_nan_handling PASSED [ 81%]
-tests/test_stacking_and_spectrum.py::test_compute_coadd_stack_wcs_reproject PASSED [ 82%]
-tests/test_stacking_and_spectrum.py::test_spectrum_generation_102_channels PASSED [ 83%]
+tests/test_stacking_and_spectrum.py::test_compute_coadd_stack_nan_handling PASSED [ 82%]
+tests/test_stacking_and_spectrum.py::test_compute_coadd_stack_wcs_reproject PASSED [ 83%]
+tests/test_stacking_and_spectrum.py::test_spectrum_generation_102_channels PASSED [ 84%]
 tests/test_stacking_and_spectrum.py::test_spectrum_endpoint_barnard PASSED [ 85%]
 tests/test_stacking_and_spectrum.py::test_spectrum_endpoint_wise0855_brown_dwarf PASSED [ 86%]
-tests/test_stacking_and_spectrum.py::test_spectrum_endpoint_sexagesimal PASSED [ 87%]
-tests/test_stacking_and_spectrum.py::test_spectrum_endpoint_invalid_coords PASSED [ 88%]
-tests/test_stacking_and_spectrum.py::test_stack_frames_endpoint_on_demo_epochs PASSED [ 89%]
-tests/test_stacking_and_spectrum.py::test_stack_frames_endpoint_validation PASSED [ 90%]
+tests/test_stacking_and_spectrum.py::test_spectrum_endpoint_sexagesimal PASSED [ 88%]
+tests/test_stacking_and_spectrum.py::test_spectrum_endpoint_invalid_coords PASSED [ 89%]
+tests/test_stacking_and_spectrum.py::test_stack_frames_endpoint_on_demo_epochs PASSED [ 90%]
+tests/test_stacking_and_spectrum.py::test_stack_frames_endpoint_validation PASSED [ 91%]
 tests/test_stacking_and_spectrum.py::test_stack_frames_endpoint_webp_and_median PASSED [ 92%]
-tests/test_stacking_and_spectrum.py::test_compute_coadd_stack_edge_cases PASSED [ 93%]
+tests/test_stacking_and_spectrum.py::test_compute_coadd_stack_edge_cases PASSED [ 94%]
 tests/test_stacking_and_spectrum.py::test_stack_frames_endpoint_duplicate_frames_rejected PASSED [ 95%]
 tests/test_stacking_and_spectrum.py::test_compute_coadd_stack_non_overlapping_wcs_raises PASSED [ 96%]
 tests/test_stacking_and_spectrum.py::test_stack_frames_endpoint_distant_pointings_rejected PASSED [ 97%]
-tests/test_spectrum_endpoint_fov_validation PASSED [ 98%]
+tests/test_stacking_and_spectrum.py::test_spectrum_endpoint_fov_validation PASSED [ 98%]
 tests/test_stacking_and_spectrum.py::test_robust_noise_sigma_point_source_insensitivity PASSED [100%]
 
-============================= 81 passed in 6.95s ==============================
+============================= 84 passed in 6.03s ==============================
 ```
 
 ---
 
-## 2. Frontend Production Build (`npm run build`)
+## 2. Frontend Production Build (`cd frontend && npm run build`)
 
 ```text
 > spherex-discovery@1.0.0 build
@@ -115,9 +118,9 @@ transforming...
 rendering chunks...
 computing gzip size...
 dist/index.html                   0.96 kB │ gzip:  0.60 kB
-dist/assets/index-BgS7o9yA.css   32.90 kB │ gzip:  6.56 kB
-dist/assets/index-Bgrcvlw6.js   288.62 kB │ gzip: 78.19 kB
-✓ built in 2.52s
+dist/assets/index-CJZY0b5Z.css   33.27 kB │ gzip:  6.61 kB
+dist/assets/index-g2aTQiDA.js   300.18 kB │ gzip: 80.16 kB
+✓ built in 2.64s
 ```
 
 ---
@@ -161,10 +164,90 @@ SPHEREx Discovery Accessibility & Responsive Verification
 [PASS] MetadataPanel uses responsive full width on mobile and 320px on desktop
 [PASS] ComparisonView operation mode switcher uses role="tablist"
 [PASS] ComparisonView operation mode buttons use role="tab"
+[PASS] ComparisonView includes accessible metrics table disclosure
+[PASS] ComparisonView supports diverging colormap toggle for difference frames
 [PASS] GuidedTourModal has role="dialog" and aria-modal="true"
 [PASS] DiscoveryReportModal has role="dialog" and aria-modal="true"
+[PASS] SpectrumChart includes 102-channel spectrophotometric continuum accessible table toggle
+[PASS] SpectrumChart manages accessible table dataset state between observed bands and continuum channels
+[PASS] CanvasViewer generates dynamic offset coordinates in announcements to prevent consecutive speech silence
+[PASS] CanvasViewer announces zoom limit boundaries to screen readers
+[PASS] App synchronizes active observation with URL search params on timeline navigation
 
 ============================================================
-Results: 34 passed, 0 failed
+Results: 41 passed, 0 failed
+============================================================
+```
+
+---
+
+## 4. Demonstration Assets Verification (`python scripts/verify_demo.py`)
+
+```text
+============================================================
+VERIFYING SPHEREx DISCOVERY DEMONSTRATION DATASET
+============================================================
+Total entries in manifest: 22
+
+[1/22] Documentation Example (spherex_dr1 | SPHEREx-D1) - [OK] FITS Shape: (8, 20), Mean Flux: 0.6486 MJy/sr
+[2/22] Documentation Example (spherex_dr1 | SPHEREx-D4) - [OK] FITS Shape: (20, 20), Mean Flux: 0.4505 MJy/sr
+[3/22] Documentation Example (spherex_qr3 | SPHEREx-D4) - [OK] FITS Shape: (20, 20), Mean Flux: 0.2939 MJy/sr
+[4/22] Documentation Example (spherex_qr3 | SPHEREx-D1) - [OK] FITS Shape: (20, 20), Mean Flux: 2.0423 MJy/sr
+[5/22] WISE 0855 (spherex_dr1 | SPHEREx-D3) - [OK] FITS Shape: (20, 20), Mean Flux: 0.1788 MJy/sr
+[6/22] WISE 0855 (spherex_dr1 | SPHEREx-D6) - [OK] FITS Shape: (20, 20), Mean Flux: 0.7434 MJy/sr
+[7/22] Barnard's Star (spherex_dr1 | SPHEREx-D6) - [OK] FITS Shape: (20, 20), Mean Flux: 0.4104 MJy/sr
+[8/22] Barnard's Star (spherex_dr1 | SPHEREx-D3) - [OK] FITS Shape: (20, 20), Mean Flux: 0.4072 MJy/sr
+[9/22] Barnard's Star (spherex_qr3 | SPHEREx-D3) - [OK] FITS Shape: (20, 20), Mean Flux: 0.6118 MJy/sr
+[10/22] Barnard's Star (spherex_qr3 | SPHEREx-D6) - [OK] FITS Shape: (20, 20), Mean Flux: 3.2555 MJy/sr
+[11/22] Epsilon Indi B (spherex_dr1 | SPHEREx-D6) - [OK] FITS Shape: (20, 20), Mean Flux: 0.7249 MJy/sr
+[12/22] Epsilon Indi B (spherex_dr1 | SPHEREx-D3) - [OK] FITS Shape: (20, 20), Mean Flux: 5.0138 MJy/sr
+[13/22] Epsilon Indi B (spherex_qr3 | SPHEREx-D3) - [OK] FITS Shape: (20, 20), Mean Flux: 1.4518 MJy/sr
+[14/22] Epsilon Indi B (spherex_qr3 | SPHEREx-D6) - [OK] FITS Shape: (20, 20), Mean Flux: 0.6907 MJy/sr
+[15/22] RW Aurigae (spherex_dr1 | SPHEREx-D1) - [OK] FITS Shape: (20, 20), Mean Flux: 1.6113 MJy/sr
+[16/22] RW Aurigae (spherex_dr1 | SPHEREx-D4) - [OK] FITS Shape: (20, 21), Mean Flux: 4.9404 MJy/sr
+[17/22] RW Aurigae (spherex_qr3 | SPHEREx-D1) - [OK] FITS Shape: (20, 20), Mean Flux: 1.1126 MJy/sr
+[18/22] RW Aurigae (spherex_qr3 | SPHEREx-D4) - [OK] FITS Shape: (20, 20), Mean Flux: 2.9775 MJy/sr
+[19/22] R Draconis (spherex_dr1 | SPHEREx-D6) - [OK] FITS Shape: (20, 20), Mean Flux: 0.1325 MJy/sr
+[20/22] R Draconis (spherex_dr1 | SPHEREx-D3) - [OK] FITS Shape: (20, 20), Mean Flux: 0.2633 MJy/sr
+[21/22] R Draconis (spherex_qr3 | SPHEREx-D3) - [OK] FITS Shape: (20, 20), Mean Flux: 0.2092 MJy/sr
+[22/22] R Draconis (spherex_qr3 | SPHEREx-D6) - [OK] FITS Shape: (20, 20), Mean Flux: 0.2830 MJy/sr
+
+============================================================
+[SUCCESS] All demonstration assets verified and valid!
+============================================================
+```
+
+---
+
+## 5. Environment & Remote Connectivity (`python scripts/verify_environment.py`)
+
+```text
+============================================================
+SPHEREx Discovery Environment Verification
+============================================================
+
+--- System Tools ---
+[OK] Python: Python 3.11.4
+[OK] Node.js: v22.19.0
+[OK] npm: 10.9.3
+[OK] Git: git version 2.54.0.windows.1
+
+--- Python Dependencies ---
+[OK] Python package 'fastapi': 0.128.8
+[OK] Python package 'uvicorn': 0.54.0
+[OK] Python package 'httpx': 0.28.1
+[OK] Python package 'astropy': 8.0.2
+[OK] Python package 'numpy': 2.4.6
+[OK] Python package 'scipy': 1.15.3
+[OK] Python package 'PIL': 12.1.1
+[OK] Python package 'pytest': 9.2.0
+[OK] Python package 'certifi': 2026.01.04
+
+--- NASA/IPAC Connectivity ---
+Testing IRSA SIA connectivity to: https://irsa.ipac.caltech.edu/SIA?COLLECTION=spherex_dr1&POS...
+[OK] IRSA SIA endpoint reachable and returned valid CSV data (status 200)
+
+============================================================
+[SUCCESS] All environment requirements passed!
 ============================================================
 ```
