@@ -47,7 +47,7 @@ class CutoutService:
 
         # 3. Fetch live from NASA IRSA IBE
         ssl_ctx = ssl.create_default_context(cafile=certifi.where())
-        async with httpx.AsyncClient(verify=ssl_ctx, timeout=30.0) as client:
+        async with httpx.AsyncClient(verify=ssl_ctx, timeout=5.0) as client:
             resp = await client.get(cutout_url, headers={"User-Agent": "SPHEREx-Discovery/1.0"})
             if resp.status_code != 200:
                 raise ValueError(f"IRSA IBE cutout returned status {resp.status_code}: {resp.text[:120]}")

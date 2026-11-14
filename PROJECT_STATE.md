@@ -38,7 +38,7 @@
   - `.github/workflows/ci.yml` running pytest and frontend build.
   - Docker configurations (`backend/Dockerfile`, `frontend/Dockerfile`, `docker-compose.yml`, `frontend/nginx.conf`).
   - Cloud configurations (`render.yaml`, `frontend/vercel.json`).
-- **Comprehensive Automated Test Suite:** 43 passing pytest tests covering unit, science, offline resilience, and integration flows.
+- **Comprehensive Automated Test Suite:** 44 passing pytest tests covering unit, science, offline resilience, and integration flows.
 
 ---
 

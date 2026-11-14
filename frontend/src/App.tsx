@@ -25,6 +25,7 @@ import {
   fetchDemoPresets,
   fetchCatalogs,
   fetchPhotometry,
+  computeMotion,
   generateDiscoveryReport,
 } from './services/api';
 
@@ -87,15 +88,25 @@ export const App: React.FC = () => {
           const urlFov = params.get('fov');
           const urlStretch = params.get('stretch');
           const urlColormap = params.get('colormap');
+          const urlTarget = params.get('target');
 
           if (urlStretch) setStretch(urlStretch);
           if (urlColormap) setColormap(urlColormap);
 
-          if (urlRa && urlDec) {
+          const targetPreset = urlTarget ? p.find((x) => x.id === urlTarget) : null;
+          if (targetPreset) {
+            setSelectedPresetId(targetPreset.id);
+            setRa(String(targetPreset.ra));
+            setDec(String(targetPreset.dec));
+            setCollection(targetPreset.default_collection);
+            searchWithCoords(targetPreset.ra, targetPreset.dec, 0.04, targetPreset.default_collection);
+          } else if (urlRa && urlDec) {
             setRa(urlRa);
             setDec(urlDec);
+            const searchColl = params.get('collection') || 'spherex_dr1';
+            setCollection(searchColl);
             if (urlFov) setFov(Number(urlFov));
-            searchWithCoords(urlRa, urlDec, urlFov ? Number(urlFov) : 0.04, 'spherex_dr1');
+            searchWithCoords(urlRa, urlDec, urlFov ? Number(urlFov) : 0.04, searchColl);
           } else {
             // Load default preset (Barnard's Star)
             const def = p[0];
@@ -203,6 +214,12 @@ export const App: React.FC = () => {
 
   const handleManualSearch = () => {
     searchWithCoords(ra, dec, fov, collection);
+    const url = new URL(window.location.href);
+    url.searchParams.set('ra', ra);
+    url.searchParams.set('dec', dec);
+    url.searchParams.set('fov', String(fov));
+    url.searchParams.set('collection', collection);
+    window.history.replaceState({}, '', url.toString());
   };
 
   // Share URL Deep Link
@@ -227,12 +244,34 @@ export const App: React.FC = () => {
     const targetName = currentPreset ? currentPreset.name : `SPHEREx Target (RA ${ra}, Dec ${dec})`;
     const targetType = currentPreset ? currentPreset.target_type : 'Astronomical Source';
 
+    // Calculate motion data across compatible epochs if available
+    let motionData = null;
+    if (observations.length >= 2) {
+      for (let i = 0; i < observations.length; i++) {
+        for (let j = i + 1; j < observations.length; j++) {
+          if (observations[i].detector === observations[j].detector) {
+            try {
+              const mRes = await computeMotion(observations[i].id, observations[j].id);
+              if (mRes?.motion) {
+                motionData = mRes.motion;
+                break;
+              }
+            } catch {
+              // ignore
+            }
+          }
+        }
+        if (motionData) break;
+      }
+    }
+
     try {
       const rep = await generateDiscoveryReport({
         target_name: targetName,
         ra: Number(ra),
         dec: Number(dec),
         target_type: targetType,
+        motion_data: motionData,
         photometry_data: lightCurve,
         observations: observations,
         notes: currentPreset?.description,

@@ -48,9 +48,10 @@ export const LightCurveChart: React.FC<LightCurveChartProps> = ({
   const plotW = width - padLeft - padRight;
   const plotH = height - padTop - padBottom;
 
-  const yMin = Math.max(0, min_flux_mjy_sr - 0.5);
-  const yMax = max_flux_mjy_sr + 0.5 === yMin ? yMin + 1.0 : max_flux_mjy_sr + 0.5;
-  const yRange = yMax - yMin;
+  const paddingFlux = Math.max(0.5, (max_flux_mjy_sr - min_flux_mjy_sr) * 0.1);
+  const yMin = min_flux_mjy_sr - paddingFlux;
+  const yMax = max_flux_mjy_sr + paddingFlux;
+  const yRange = Math.max(1e-4, yMax - yMin);
 
   const xCoords = points.map((_, i) => {
     return points.length === 1 ? padLeft + plotW / 2 : padLeft + (i / (points.length - 1)) * plotW;

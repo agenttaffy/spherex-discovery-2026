@@ -90,16 +90,18 @@ def test_photometry_endpoint_demo():
 def test_motion_endpoint_on_demo_epochs():
     barnard_recs = demo_service.find_matching_observations(269.45208, 4.69339, radius_deg=0.1)
     d3_recs = [r for r in barnard_recs if "D3" in r.detector]
-    if len(d3_recs) >= 2:
-        resp = client.post("/api/science/motion", json={
-            "frame_id_1": d3_recs[0].id,
-            "frame_id_2": d3_recs[1].id,
-        })
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["eligible"] is True
-        assert "motion" in data
-        assert "proper_motion_arcsec_yr" in data["motion"]
+    assert len(d3_recs) >= 2
+    resp = client.post("/api/science/motion", json={
+        "frame_id_1": d3_recs[0].id,
+        "frame_id_2": d3_recs[1].id,
+    })
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["eligible"] is True
+    assert "motion" in data
+    assert "proper_motion_arcsec_yr" in data["motion"]
+    assert "centroid_1" in data["motion"]
+    assert "centroid_2" in data["motion"]
 
 def test_discovery_report_endpoint():
     req = {
@@ -126,3 +128,18 @@ def test_discovery_report_endpoint():
     assert "10.26131/IRSA678" in data["irsa_doi"]
     assert "## 1. Astronomical Target Information" in data["markdown_report"]
     assert "Barnard's Star" in data["markdown_report"]
+
+def test_photometry_preset_differentiation():
+    # RW Aurigae (76.95420, 30.40140) should be variable across epochs
+    resp_rw = client.get("/api/science/photometry?ra=76.95420&dec=30.40140")
+    assert resp_rw.status_code == 200
+    data_rw = resp_rw.json()
+    assert data_rw["total_points"] >= 2
+    assert data_rw["is_variable"] is True
+
+    # Barnard's Star (269.45208, 4.69339) is a stable red dwarf within its bands
+    resp_b = client.get("/api/science/photometry?ra=269.45208&dec=4.69339&detector=SPHEREx-D3")
+    assert resp_b.status_code == 200
+    data_b = resp_b.json()
+    assert data_b["total_points"] >= 2
+    assert data_b["is_variable"] is False

@@ -13,11 +13,11 @@ def test_known_shift_recovery():
     img1 = np.zeros((30, 30), dtype=np.float32)
     img1[15, 15] = 100.0
     img2 = np.zeros((30, 30), dtype=np.float32)
-    img2[17, 18] = 100.0  # shifted +2 y, +3 x
+    img2[17, 18] = 100.0  # shifted +2 y, +3 x relative to img1
     
     dy, dx = estimate_pixel_shift(img1, img2)
-    assert dy == -2.0
-    assert dx == -3.0
+    assert dy == 2.0
+    assert dx == 3.0
 
 def test_different_dimensions():
     img1 = np.zeros((25, 20), dtype=np.float32)

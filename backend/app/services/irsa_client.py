@@ -1,6 +1,7 @@
 import csv
 import io
 import ssl
+import time
 import certifi
 import httpx
 from typing import List, Dict, Any, Optional
@@ -14,6 +15,7 @@ OBSERVATION_REGISTRY: Dict[str, Dict[str, Any]] = {}
 class IRSAClient:
     def __init__(self, sia_base_url: str = IRSA_SIA_BASE_URL):
         self.sia_base_url = sia_base_url
+        self._offline_until = 0.0
 
     def _mjd_to_utc(self, mjd_str: Optional[str]) -> Optional[str]:
         if not mjd_str:
@@ -30,24 +32,39 @@ class IRSAClient:
         ra: float,
         dec: float,
         radius_deg: float = 0.05,
-        collection: str = "spherex_dr1",
+        collection: Optional[str] = "spherex_dr1",
         detector: Optional[str] = None,
         limit: int = 50,
     ) -> List[ObservationRecord]:
         """
         Queries NASA IRSA SIA2 service for SPHEREx observations.
+        Includes circuit breaker for remote outages and instant offline demo fallback.
         """
+        now = time.time()
+        if now < self._offline_until:
+            from app.services.demo_service import demo_service
+            fallback = demo_service.find_matching_observations(
+                ra=ra,
+                dec=dec,
+                radius_deg=max(radius_deg, 0.15),
+                collection=collection,
+                detector=detector,
+            )
+            if fallback:
+                return fallback[:limit]
+
         params = {
-            "COLLECTION": collection,
             "POS": f"circle {ra:.6f} {dec:.6f} {radius_deg:.4f}",
             "RESPONSEFORMAT": "CSV",
         }
+        if collection and collection != "ALL":
+            params["COLLECTION"] = collection
 
         records: List[ObservationRecord] = []
         ssl_ctx = ssl.create_default_context(cafile=certifi.where())
 
         try:
-            async with httpx.AsyncClient(verify=ssl_ctx, timeout=25.0) as client:
+            async with httpx.AsyncClient(verify=ssl_ctx, timeout=3.5) as client:
                 resp = await client.get(self.sia_base_url, params=params)
                 if resp.status_code == 200:
                     reader = csv.DictReader(io.StringIO(resp.text))
@@ -77,8 +94,10 @@ class IRSAClient:
                             "em_min": float(row["em_min"]) if row.get("em_min") else None,
                             "em_max": float(row["em_max"]) if row.get("em_max") else None,
                             "access_url": access_url,
-                            "ra": float(row.get("s_ra", ra)),
-                            "dec": float(row.get("s_dec", dec)),
+                            "ra": ra,
+                            "dec": dec,
+                            "pointing_ra": float(row["s_ra"]) if row.get("s_ra") else ra,
+                            "pointing_dec": float(row["s_dec"]) if row.get("s_dec") else dec,
                         }
 
                         # Store in registry for frame fetching
@@ -89,8 +108,10 @@ class IRSAClient:
                         if len(records) >= limit:
                             break
                 else:
+                    self._offline_until = time.time() + 30.0
                     print(f"[IRSAClient] IRSA SIA returned status {resp.status_code}")
         except Exception as e:
+            self._offline_until = time.time() + 30.0
             print(f"[IRSAClient] Error querying IRSA SIA: {e}")
 
         # If archive is offline or query returned no records, check verified demonstration dataset
@@ -122,7 +143,7 @@ class IRSAClient:
                 "RESPONSEFORMAT": "CSV",
             }
             ssl_ctx = ssl.create_default_context(cafile=certifi.where())
-            async with httpx.AsyncClient(verify=ssl_ctx, timeout=8.0) as client:
+            async with httpx.AsyncClient(verify=ssl_ctx, timeout=3.0) as client:
                 resp = await client.get(self.sia_base_url, params=params)
                 return resp.status_code == 200
         except Exception:

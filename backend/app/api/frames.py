@@ -76,6 +76,7 @@ async def diff_frames(req: DiffRequest = Body(...)):
             "frame_1": req.frame_id_1,
             "frame_2": req.frame_id_2,
             "diff_stats": stats,
+            "dimensions": [int(diff_u8.shape[0]), int(diff_u8.shape[1])],
             "image_base64": diff_b64,
         }
     except Exception as e:

@@ -91,7 +91,10 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
       const meanDecRad = (crval2 * Math.PI) / 180.0;
 
       catalogSources.forEach((src) => {
-        const deltaRaDeg = (src.ra - crval1) * Math.cos(meanDecRad);
+        // Safely wrap RA difference across 0/360 boundary to [-180, +180]
+        const rawDeltaRa = src.ra - crval1;
+        const wrappedDeltaRa = ((rawDeltaRa + 180) % 360 + 360) % 360 - 180;
+        const deltaRaDeg = wrappedDeltaRa * Math.cos(meanDecRad);
         const deltaDecDeg = src.dec - crval2;
 
         const deltaRaArcsec = deltaRaDeg * 3600.0;

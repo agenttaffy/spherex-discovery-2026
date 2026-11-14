@@ -49,3 +49,13 @@
 - **Date:** 2026-11-14
 - **Decision:** Provide an export endpoint (`/api/science/report`) and UI modal generating structured JSON and formatted Markdown reports with J2000 sexagesimal formatting and official IRSA DOI (10.26131/IRSA678) citations.
 - **Rationale:** Enables judges and citizen scientists to immediately export formal discovery reports suitable for submission, peer review, or integration into follow-up observing proposals.
+
+## ADR-011: Image Registration Fourier Phase Shift Direction & Centroid Consistency
+- **Date:** 2026-11-14
+- **Decision:** In `estimate_pixel_shift(img1, img2)`, compute `cross_corr = np.real(ifft2(f2 * conj(f1)))` so the peak corresponds directly to $(\Delta y, \Delta x)$ of `img2` relative to `img1`.
+- **Rationale:** Ensures mathematical direction of 2D cross-correlation peak exactly matches primary sub-pixel centroid displacement $(y_2 - y_1, x_2 - x_1)$, eliminating 180° inversion in fallback astrometric vector calculations.
+
+## ADR-012: In-Band Photometric Variability & Outage Circuit Breaker
+- **Date:** 2026-11-14
+- **Decision:** Evaluate light-curve variability within consistent detector bands (e.g. D1 vs D1) and require flux amplitude to exceed background noise before flagging variability; enforce a 3.5s timeout with a 30s circuit breaker on live IRSA queries.
+- **Rationale:** SPHEREx detectors have distinct spectral energy bandpasses; comparing D3 to D6 fluxes across wavelengths created false variability on stable stars. Circuit breaker ensures zero-latency offline demo presentation when remote IPAC servers return 502/Proxy Error.

@@ -14,9 +14,9 @@
 - Created Docker configurations (`backend/Dockerfile`, `frontend/Dockerfile`, `docker-compose.yml`, `frontend/nginx.conf`) and cloud configs (`render.yaml`, `frontend/vercel.json`).
 
 ## 2. Current Working State
-- **Backend:** Starts cleanly with `python -m uvicorn app.main:app --port 8000`. All 43 tests pass in 3.32s.
-- **Frontend:** Builds cleanly with `npm run build` in 1.94s (0 type errors, 0 warnings).
-- **Demo Mode:** Instantaneous local caching of 22 real FITS cutouts enables immediate offline presentation and judging.
+- **Backend:** Starts cleanly with `python -m uvicorn app.main:app --port 8000`. All 44 tests pass in 1.87s.
+- **Frontend:** Builds cleanly with `npm run build` in 1.93s (0 type errors, 0 warnings).
+- **Demo Mode:** Instantaneous local caching of 22 real FITS cutouts enables immediate offline presentation and judging with circuit breaker fallback on remote outages.
 
 ## 3. Current Blocker
 - None. System is complete, verified end-to-end, and resilient.
@@ -29,7 +29,7 @@ python scripts/verify_environment.py
 # 2. Demonstration Assets Verification
 python scripts/verify_demo.py
 
-# 3. Backend Test Suite (43 tests)
+# 3. Backend Test Suite (44 tests)
 cd backend
 python -m pytest -v
 

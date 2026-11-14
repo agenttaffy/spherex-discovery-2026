@@ -15,8 +15,13 @@ def compute_aperture_photometry(
     """
     h, w = image.shape
     if center_y is None or center_x is None:
-        center_y = (h - 1) / 2.0
-        center_x = (w - 1) / 2.0
+        from app.science.motion import _find_brightest_centroid
+        cen = _find_brightest_centroid(image)
+        if cen is not None:
+            center_y, center_x, _ = cen
+        else:
+            center_y = (h - 1) / 2.0
+            center_x = (w - 1) / 2.0
 
     y_indices, x_indices = np.indices((h, w))
     dist_sq = (y_indices - center_y) ** 2 + (x_indices - center_x) ** 2
@@ -119,29 +124,44 @@ def build_lightcurve_series(
     # Sort chronologically by MJD
     points.sort(key=lambda p: p["mjd"] or 0.0)
 
-    # Variability stats
+    # Overall series statistics
     net_fluxes = [p["net_flux_mjy_sr"] for p in points if p["net_flux_mjy_sr"] is not None]
-    if len(net_fluxes) >= 2:
+    if net_fluxes:
         mean_flux = float(np.mean(net_fluxes))
         std_flux = float(np.std(net_fluxes))
         min_flux = float(np.min(net_fluxes))
         max_flux = float(np.max(net_fluxes))
         amplitude_delta = max_flux - min_flux
-        var_index = std_flux / abs(mean_flux) if abs(mean_flux) > 1e-4 else 0.0
-        is_variable = bool(var_index > 0.12 or amplitude_delta > 1.5)
     else:
-        mean_flux = net_fluxes[0] if net_fluxes else 0.0
-        std_flux = 0.0
-        min_flux = mean_flux
-        max_flux = mean_flux
-        amplitude_delta = 0.0
-        var_index = 0.0
-        is_variable = False
+        mean_flux = std_flux = min_flux = max_flux = amplitude_delta = 0.0
+
+    # Group by detector to evaluate photometric variability within consistent spectral bands
+    from collections import defaultdict
+    by_detector = defaultdict(list)
+    for p in points:
+        if p["net_flux_mjy_sr"] is not None:
+            by_detector[p.get("detector", "SPHEREx")].append(p["net_flux_mjy_sr"])
+
+    is_variable = False
+    max_var_index = 0.0
+
+    for det, fluxes in by_detector.items():
+        if len(fluxes) >= 2:
+            m = float(np.mean(fluxes))
+            s = float(np.std(fluxes))
+            d_amp = float(np.max(fluxes) - np.min(fluxes))
+            # Require mean to exceed background noise floor (> 1.0 MJy/sr) for fractional variability
+            v_idx = s / abs(m) if abs(m) > 1.0 else 0.0
+            if v_idx > max_var_index:
+                max_var_index = v_idx
+            # Confirm variability if significant relative variation (>20%) and amplitude (>25.0 MJy/sr) OR large amplitude (>60.0 MJy/sr)
+            if (v_idx > 0.20 and d_amp > 25.0) or d_amp > 60.0:
+                is_variable = True
 
     return {
         "total_points": len(points),
         "is_variable": is_variable,
-        "variability_index": round(var_index, 3),
+        "variability_index": round(max_var_index, 3),
         "mean_flux_mjy_sr": round(mean_flux, 4),
         "std_flux_mjy_sr": round(std_flux, 4),
         "min_flux_mjy_sr": round(min_flux, 4),

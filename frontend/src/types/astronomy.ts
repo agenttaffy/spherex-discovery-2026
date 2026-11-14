@@ -74,6 +74,7 @@ export interface DiffResult {
     peak_negative_flux: number;
     sigma_mjy_sr: number;
   };
+  dimensions?: [number, number];
   image_base64: string;
 }
 
@@ -134,6 +135,8 @@ export interface AstrometricMotion {
   proper_motion_mas_yr: number;
   motion_class: string;
   centroid_detected: boolean;
+  centroid_1?: [number, number] | null;
+  centroid_2?: [number, number] | null;
   pixel_scale_arcsec: number;
   confidence_score: number;
 }

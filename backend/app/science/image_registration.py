@@ -40,10 +40,10 @@ def estimate_pixel_shift(
     i1_zero = i1 - np.mean(i1)
     i2_zero = i2 - np.mean(i2)
 
-    # 2D FFT Cross-correlation
+    # 2D FFT Cross-correlation: f2 * conj(f1) gives the shift of img2 relative to img1
     f1 = np.fft.fft2(i1_zero)
     f2 = np.fft.fft2(i2_zero)
-    cross_corr = np.real(np.fft.ifft2(f1 * np.conj(f2)))
+    cross_corr = np.real(np.fft.ifft2(f2 * np.conj(f1)))
 
     # Find peak
     y_peak, x_peak = np.unravel_index(np.argmax(cross_corr), cross_corr.shape)

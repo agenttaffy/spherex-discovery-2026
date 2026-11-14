@@ -73,11 +73,15 @@ def measure_astrometric_motion(
         dy_pix = y2 - y1
         centroid_detected = True
         confidence = min(1.0, max(0.2, (snr1 + snr2) / 20.0))
+        centroid_1 = [round(x1, 2), round(y1, 2)]
+        centroid_2 = [round(x2, 2), round(y2, 2)]
     else:
         dx_pix = fft_dx
         dy_pix = fft_dy
         centroid_detected = False
         confidence = 0.5 if abs(fft_dx) > 0.05 or abs(fft_dy) > 0.05 else 0.1
+        centroid_1 = None
+        centroid_2 = None
 
     # Total displacement
     disp_pix = float(np.hypot(dx_pix, dy_pix))
@@ -117,6 +121,8 @@ def measure_astrometric_motion(
         "proper_motion_mas_yr": round(proper_motion_mas_yr, 1),
         "motion_class": motion_class,
         "centroid_detected": centroid_detected,
+        "centroid_1": centroid_1,
+        "centroid_2": centroid_2,
         "pixel_scale_arcsec": pixel_scale_arcsec,
         "confidence_score": round(confidence, 2),
     }

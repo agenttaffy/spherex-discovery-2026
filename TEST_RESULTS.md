@@ -1,8 +1,8 @@
 # SPHEREx Discovery — Test Execution Record
 
-**Execution Timestamp:** 2026-11-14T17:05:00Z  
+**Execution Timestamp:** 2026-11-14T17:10:00Z  
 **Platform:** Windows 11 / Python 3.11.4 / Node.js v22.19.0  
-**Test Suite Status:** 43 passed in 3.32s | Frontend Build: 0 errors in 1.94s
+**Test Suite Status:** 44 passed in 1.87s | Frontend Build: 0 errors in 1.93s
 
 ---
 
@@ -56,10 +56,11 @@ tests/test_science.py::test_lightcurve_variability_classification PASSED [ 88%]
 tests/test_science.py::test_astrometric_motion_measurement PASSED        [ 90%]
 tests/test_science.py::test_catalog_endpoint_barnard PASSED              [ 93%]
 tests/test_science.py::test_photometry_endpoint_demo PASSED              [ 95%]
-tests/test_science.py::test_motion_endpoint_on_demo_epochs PASSED        [ 97%]
-tests/test_science.py::test_discovery_report_endpoint PASSED             [100%]
+tests/test_science.py::test_motion_endpoint_on_demo_epochs PASSED        [ 95%]
+tests/test_science.py::test_discovery_report_endpoint PASSED             [ 97%]
+tests/test_science.py::test_photometry_preset_differentiation PASSED     [100%]
 
-============================= 43 passed in 3.32s ==============================
+============================= 44 passed in 1.87s ==============================
 ```
 
 ---

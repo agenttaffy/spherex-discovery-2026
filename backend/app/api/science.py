@@ -62,7 +62,7 @@ async def get_catalogs(
 async def get_photometry(
     ra: str = Query(..., description="Right Ascension in decimal degrees or sexagesimal"),
     dec: str = Query(..., description="Declination in decimal degrees or sexagesimal"),
-    collection: str = Query("spherex_dr1", description="SPHEREx collection"),
+    collection: Optional[str] = Query(None, description="SPHEREx collection (or None/ALL for all surveys)"),
     detector: Optional[str] = Query(None, description="Detector filter (e.g. SPHEREx-D1)"),
     fov: float = Query(0.04, description="Cutout radius in degrees"),
 ):
@@ -74,17 +74,19 @@ async def get_photometry(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+    coll_filter = None if (not collection or collection.lower() in ("all", "none")) else collection
+
     # 1. Fetch matching observation records
     observations = await irsa_client.query_observations(
         ra=ra_deg,
         dec=dec_deg,
         radius_deg=fov,
-        collection=collection,
+        collection=coll_filter,
         detector=detector,
         limit=20,
     )
 
-    if not observations:
+    if not observations and coll_filter is not None:
         # Also check without collection filter
         observations = await irsa_client.query_observations(
             ra=ra_deg,

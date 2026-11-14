@@ -219,21 +219,35 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations }) 
                   className="w-full h-full object-contain [image-rendering:pixelated]"
                 />
                 {/* Visual Dipole Vector Overlay */}
-                {motionResult && motionResult.displacement_pixels > 0.4 && (
+                {motionResult && motionResult.displacement_pixels >= 0.1 && (
                   <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                    <svg className="w-full h-full" viewBox="-20 -20 40 40">
-                      <line
-                        x1={-motionResult.dx_pixels * 5}
-                        y1={-motionResult.dy_pixels * 5}
-                        x2={motionResult.dx_pixels * 5}
-                        y2={motionResult.dy_pixels * 5}
-                        stroke="#38bdf8"
-                        strokeWidth="1.5"
-                        strokeDasharray="2,2"
-                      />
-                      <circle cx={-motionResult.dx_pixels * 5} cy={-motionResult.dy_pixels * 5} r="2" fill="#f43f5e" />
-                      <circle cx={motionResult.dx_pixels * 5} cy={motionResult.dy_pixels * 5} r="2" fill="#10b981" />
-                    </svg>
+                    {(() => {
+                      const imgW = diffResult.dimensions?.[1] || 20;
+                      const imgH = diffResult.dimensions?.[0] || 20;
+                      const hasCentroids = motionResult.centroid_1 && motionResult.centroid_2;
+                      const x1 = hasCentroids ? motionResult.centroid_1![0] : imgW / 2 - motionResult.dx_pixels / 2;
+                      const y1 = hasCentroids ? motionResult.centroid_1![1] : imgH / 2 - motionResult.dy_pixels / 2;
+                      const x2 = hasCentroids ? motionResult.centroid_2![0] : imgW / 2 + motionResult.dx_pixels / 2;
+                      const y2 = hasCentroids ? motionResult.centroid_2![1] : imgH / 2 + motionResult.dy_pixels / 2;
+
+                      return (
+                        <svg className="w-full h-full" viewBox={`0 0 ${imgW} ${imgH}`}>
+                          <line
+                            x1={x1}
+                            y1={y1}
+                            x2={x2}
+                            y2={y2}
+                            stroke="#38bdf8"
+                            strokeWidth="0.7"
+                            strokeDasharray="1,1"
+                          />
+                          {/* Epoch 1 centroid marker (negative dipole lobe / departure) */}
+                          <circle cx={x1} cy={y1} r="0.7" fill="#f43f5e" />
+                          {/* Epoch 2 centroid marker (positive dipole lobe / arrival) */}
+                          <circle cx={x2} cy={y2} r="0.7" fill="#10b981" />
+                        </svg>
+                      );
+                    })()}
                   </div>
                 )}
               </div>

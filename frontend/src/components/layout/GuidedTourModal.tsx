@@ -120,6 +120,17 @@ export const GuidedTourModal: React.FC<GuidedTourModalProps> = ({
               </div>
               <ChevronRight className="w-4 h-4 text-cyan-400 shrink-0" />
             </div>
+
+            <div
+              onClick={() => { onSelectPreset?.('epsilon_indi_b'); onClose(); }}
+              className="p-2.5 rounded-lg bg-slate-950 hover:bg-cyan-950/40 border border-slate-800 hover:border-cyan-800/80 cursor-pointer flex justify-between items-center transition"
+            >
+              <div>
+                <span className="font-bold text-teal-300 block">5. Epsilon Indi B</span>
+                <span className="text-[10px] text-slate-400 font-sans">Binary brown dwarf system • Significant proper motion (4.7″/yr) & brown dwarf spectra</span>
+              </div>
+              <ChevronRight className="w-4 h-4 text-cyan-400 shrink-0" />
+            </div>
           </div>
         </div>
       ),
