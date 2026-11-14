@@ -168,12 +168,11 @@ def measure_astrometric_motion(
         except Exception:
             used_wcs = False
 
-    # Centroid tracking fallback only when NO target coordinates were specified
-    if target_coord is None:
-        if c1 is None:
-            c1 = _find_brightest_centroid(img1)
-        if c2 is None:
-            c2 = _find_brightest_centroid(img2)
+    # Centroid tracking fallback when WCS tracking was not used or centroids not yet found
+    if c1 is None:
+        c1 = _find_brightest_centroid(img1)
+    if c2 is None:
+        c2 = _find_brightest_centroid(img2)
 
     celestial_shift_arcsec = None
     celestial_pa_deg = None
@@ -202,12 +201,9 @@ def measure_astrometric_motion(
     if c1 is not None and c2 is not None:
         y1, x1, snr1 = c1
         y2, x2, snr2 = c2
-        dx_pix = x2 - x1
-        dy_pix = y2 - y1
         centroid_detected = True
         confidence = min(1.0, max(0.2, (snr1 + snr2) / 20.0))
         centroid_1 = [round(x1, 2), round(y1, 2)]
-        centroid_2 = [round(x2, 2), round(y2, 2)]
 
         # Transform sub-pixel centroids through celestial WCS
         if w_obj1 is not None and w_obj2 is not None:
@@ -226,37 +222,59 @@ def measure_astrometric_motion(
                 if dt_years > 0:
                     pm_ra_cosdec_mas_yr = float((d_ra_cosdec_arcsec / dt_years) * 1000.0)
                     pm_dec_mas_yr = float((d_dec_arcsec / dt_years) * 1000.0)
+
+                # Project epoch 2 celestial position back into epoch 1 (reference) WCS grid.
+                # This ensures target displacement (dx_pix, dy_pix) reflects TRUE physical motion on the sky,
+                # completely isolating it from telescope pointing/registration shifts between epochs.
+                proj_x2, proj_y2 = w_obj1.world_to_pixel(sky2)
+                if np.isfinite(proj_x2) and np.isfinite(proj_y2):
+                    dx_pix = float(proj_x2 - x1)
+                    dy_pix = float(proj_y2 - y1)
+                    centroid_2 = [round(float(proj_x2), 2), round(float(proj_y2), 2)]
+                else:
+                    dx_pix = x2 - x1
+                    dy_pix = y2 - y1
+                    centroid_2 = [round(x2, 2), round(y2, 2)]
             except Exception:
-                pass
+                dx_pix = x2 - x1
+                dy_pix = y2 - y1
+                centroid_2 = [round(x2, 2), round(y2, 2)]
+        else:
+            dx_pix = x2 - x1
+            dy_pix = y2 - y1
+            centroid_2 = [round(x2, 2), round(y2, 2)]
     else:
-        dx_pix = fft_dx
-        dy_pix = fft_dy
+        # Centroid was not detected for the target in both epochs.
+        # Do NOT attribute overall image registration / pointing shift (fft_dx, fft_dy) to target motion!
+        dx_pix = 0.0
+        dy_pix = 0.0
         centroid_detected = False
-        confidence = 0.5 if abs(fft_dx) > 0.05 or abs(fft_dy) > 0.05 else 0.1
+        confidence = 0.0
         centroid_1 = None
         centroid_2 = None
 
     # Total displacement
-    disp_pix = float(np.hypot(dx_pix, dy_pix))
     if celestial_shift_arcsec is not None:
         disp_arcsec = celestial_shift_arcsec
+        disp_pix = float(disp_arcsec / pixel_scale_arcsec) if pixel_scale_arcsec > 0 else float(np.hypot(dx_pix, dy_pix))
     else:
+        disp_pix = float(np.hypot(dx_pix, dy_pix))
         disp_arcsec = float(disp_pix * pixel_scale_arcsec)
 
     # Position Angle
     if celestial_pa_deg is not None:
         pa_deg = celestial_pa_deg
     else:
-        pa_deg = float((np.degrees(np.arctan2(-dx_pix, -dy_pix)) + 360.0) % 360.0)
+        pa_deg = float((np.degrees(np.arctan2(-dx_pix, -dy_pix)) + 360.0) % 360.0) if (abs(dx_pix) > 1e-4 or abs(dy_pix) > 1e-4) else 0.0
 
     # Annual proper motion rate
     proper_motion_arcsec_yr = float(disp_arcsec / dt_years) if dt_days > 1e-4 else 0.0
     proper_motion_mas_yr = float(proper_motion_arcsec_yr * 1000.0)
 
-    # Classification
-    if disp_pix >= 0.3 and proper_motion_arcsec_yr > 0.5:
+    # Classification: require detected centroid and significant physical celestial motion
+    if centroid_detected and disp_arcsec >= (0.3 * pixel_scale_arcsec) and proper_motion_arcsec_yr > 0.5:
         motion_class = "High Proper Motion Candidate"
-    elif disp_pix >= 0.15 and proper_motion_arcsec_yr > 0.1:
+    elif centroid_detected and disp_arcsec >= (0.15 * pixel_scale_arcsec) and proper_motion_arcsec_yr > 0.1:
         motion_class = "Moderate Proper Motion Source"
     else:
         motion_class = "Stationary / Sub-threshold"
@@ -278,6 +296,7 @@ def measure_astrometric_motion(
         "pixel_scale_arcsec": pixel_scale_arcsec,
         "confidence_score": round(confidence, 2),
         "wcs_tracking": used_wcs,
+        "frame_registration_shift_pixels": [round(fft_dx, 3), round(fft_dy, 3)],
     }
 
     if d_ra_cosdec_arcsec is not None:

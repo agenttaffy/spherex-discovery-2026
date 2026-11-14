@@ -2,6 +2,13 @@
 
 All notable changes to the SPHEREx Discovery project will be documented in this file.
 
+## [1.4.3] - 2026-11-14
+### Fixed & Hardened — Astrometric Pointing Registration Isolation & Lightcurve Source Masking
+- **Pointing Registration Isolation in Astrometric Motion:** In `motion.py`, projected epoch 2 celestial position `sky2` back into epoch 1 reference frame WCS grid (`w_obj1.world_to_pixel(sky2)`). This ensures target displacement (`dx_pixels`, `dy_pixels`) reflects true physical celestial motion on the sky, completely preventing telescope pointing registration offsets between epochs from being falsely classified as target proper motion (`Stationary / Sub-threshold` preserved). Centroids in diff overlays are registered to the difference frame coordinates. Added `frame_registration_shift_pixels` telemetry.
+- **Source Mask Background Exclusion in Multi-Epoch Light Curves:** In `photometry.py` (`build_lightcurve_series`) and `science.py` (`/science/photometry`), extracted `source_mask` and wired it into epoch frames so neighboring field stars are excluded from the background annulus across multi-epoch light curves without rejecting target aperture flux.
+- **Discovery Report Astrometric Provenance:** In `report.py`, added equatorial vector proper motion components ($\mu_\alpha \cos\delta$, $\mu_\delta$) and WCS-anchored centroiding calibration provenance.
+- **Regression Suite Expansion:** Added `test_priority_3_pointing_shift_not_presented_as_target_motion` and `test_priority_1_lightcurve_source_mask_background_exclusion` to `test_scientific_audit_regression.py`. Total verified tests: **86 backend pytest tests** (0 failures), **41 accessibility checks** (0 failures), and clean production build. Reconciled all documentation records.
+
 ## [1.4.2] - 2026-11-14
 ### Added & Hardened — Scientific Truthfulness & Photometry Source Masking
 - **Source-Mask Background Exclusion in Aperture Photometry:** In `photometry.py`, enhanced `compute_aperture_photometry` to accept `source_mask`, excluding neighboring astronomical source detections from the background annulus to prevent background noise inflation while preserving nominal source flux in the target aperture. Wired in `spectrum.py`.

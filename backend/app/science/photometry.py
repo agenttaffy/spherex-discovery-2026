@@ -202,6 +202,7 @@ def build_lightcurve_series(
         wcs = item.get("wcs") or item.get("header")
         var = item.get("variance")
         mask = item.get("mask")
+        source_mask = item.get("source_mask")
 
         phot = compute_aperture_photometry(
             image=img,
@@ -209,6 +210,7 @@ def build_lightcurve_series(
             wcs=wcs,
             variance=var,
             mask=mask,
+            source_mask=source_mask,
         )
         points.append({
             "obs_id": item.get("obs_id", "unknown"),

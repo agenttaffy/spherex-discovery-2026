@@ -58,6 +58,12 @@ def generate_discovery_report(
             f"- **Calculated Proper Motion:** **{motion_data.get('proper_motion_arcsec_yr', 0.0):.3f} arcsec/year** ({motion_data.get('proper_motion_mas_yr', 0.0):.1f} mas/yr)",
             f"- **Centroid Detection Confidence:** {float(motion_data.get('confidence_score', 0.0))*100:.0f}%",
         ])
+        if "pm_ra_cosdec_mas_yr" in motion_data and "pm_dec_mas_yr" in motion_data:
+            md_lines.append(
+                f"- **Equatorial Vector Components:** μα* = {motion_data['pm_ra_cosdec_mas_yr']:.1f} mas/yr, μδ = {motion_data['pm_dec_mas_yr']:.1f} mas/yr"
+            )
+        if motion_data.get("wcs_tracking"):
+            md_lines.append("- **Astrometric Calibration:** WCS-anchored centroiding with pointing-shift isolation")
 
     # Photometric Variability Analysis
     if photometry_data:

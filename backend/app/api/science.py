@@ -126,9 +126,14 @@ async def get_photometry(
             try:
                 hd = load_fits_cutout(b)
                 img, hdr = extract_primary_image(hd)
-                from app.science.fits_processing import extract_variance_data, extract_fatal_quality_mask
+                from app.science.fits_processing import (
+                    extract_variance_data,
+                    extract_fatal_quality_mask,
+                    extract_source_mask,
+                )
                 var = extract_variance_data(hd)
                 mask = extract_fatal_quality_mask(hd)
+                src_mask = extract_source_mask(hd)
                 epoch_frames.append({
                     "frame_id": obs.id,
                     "obs_id": obs.obs_id,
@@ -140,6 +145,7 @@ async def get_photometry(
                     "header": hdr,
                     "variance": var,
                     "mask": mask,
+                    "source_mask": src_mask,
                 })
             except Exception:
                 pass

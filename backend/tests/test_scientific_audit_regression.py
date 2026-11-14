@@ -486,3 +486,115 @@ def test_priority_2_discovery_report_sed_truthfulness():
     assert "WCS-WAVE" in md
     assert "SPHEREx-D1" in md
     assert "SPHEREx-D3" in md
+
+
+def test_priority_3_pointing_shift_not_presented_as_target_motion():
+    """
+    Priority 3: Ensure telescope pointing registration shifts between observation epochs
+    are NEVER presented as target proper motion. A stationary celestial source must
+    remain classified as stationary with near-zero displacement even when the telescope
+    pointing offset is several pixels.
+    """
+    from astropy.coordinates import SkyCoord
+    import astropy.units as u
+
+    # Epoch 1: Pointing centered at (100.0, 10.0), target at (100.0, 10.0) -> pixel (9, 9)
+    w1 = WCS(naxis=2)
+    w1.wcs.crpix = [10.0, 10.0]
+    w1.wcs.cdelt = [-0.001722, 0.001722] # ~6.2 arcsec/pixel
+    w1.wcs.crval = [100.0, 10.0]
+    w1.wcs.ctype = ['RA---TAN', 'DEC--TAN']
+
+    # Epoch 2: Pointing shifted by ~3 pixels in X and ~3 pixels in Y
+    w2 = WCS(naxis=2)
+    w2.wcs.crpix = [10.0, 10.0]
+    w2.wcs.cdelt = [-0.001722, 0.001722]
+    w2.wcs.crval = [100.0 + 3 * 0.001722, 10.0 + 3 * 0.001722]
+    w2.wcs.ctype = ['RA---TAN', 'DEC--TAN']
+
+    sc = SkyCoord(100.0 * u.deg, 10.0 * u.deg, frame="icrs")
+    px1, py1 = w1.world_to_pixel(sc)
+    px2, py2 = w2.world_to_pixel(sc)
+
+    img1 = np.zeros((20, 20), dtype=np.float32)
+    img2 = np.zeros((20, 20), dtype=np.float32)
+    img1[int(round(float(py1))), int(round(float(px1)))] = 50.0
+    img2[int(round(float(py2))), int(round(float(px2)))] = 50.0
+
+    meta1 = {"mjd": 60000.0, "ra": 100.0, "dec": 10.0}
+    meta2 = {"mjd": 60365.25, "ra": 100.0, "dec": 10.0}  # 1.0 year later
+
+    motion = measure_astrometric_motion(
+        img1=img1,
+        img2=img2,
+        meta1=meta1,
+        meta2=meta2,
+        wcs1=w1,
+        wcs2=w2,
+        target_coord=(100.0, 10.0),
+    )
+
+    # Stationary target must NOT inherit telescope pointing shift!
+    assert motion["wcs_tracking"] is True
+    assert motion["displacement_arcsec"] < 0.5  # true celestial displacement ~ 0
+    assert motion["displacement_pixels"] < 0.1  # projected reference pixel displacement ~ 0
+    assert motion["proper_motion_arcsec_yr"] < 0.5
+    assert motion["motion_class"] == "Stationary / Sub-threshold"
+    assert "frame_registration_shift_pixels" in motion
+
+    # Centroid 2 must be projected into Epoch 1's reference frame (matching difference frame)
+    assert motion["centroid_1"] == [9.0, 9.0]
+    assert motion["centroid_2"][0] == pytest.approx(9.0, abs=0.1)
+    assert motion["centroid_2"][1] == pytest.approx(9.0, abs=0.1)
+
+
+def test_priority_1_lightcurve_source_mask_background_exclusion():
+    """
+    Priority 1: Ensure build_lightcurve_series respects source_mask on epoch frames,
+    excluding neighboring sources from the background annulus to prevent background inflation.
+    """
+    from app.science.photometry import build_lightcurve_series
+
+    h, w = 25, 25
+    img = np.ones((h, w), dtype=np.float32) * 5.0
+    # Target at center (12, 12)
+    img[12, 12] = 80.0
+    # Contaminant source at (12, 17) in background annulus
+    img[12, 17] = 200.0
+
+    fatal_mask = np.zeros((h, w), dtype=bool)
+    src_mask = np.zeros((h, w), dtype=bool)
+    src_mask[12, 12] = True
+    src_mask[12, 17] = True
+
+    # Frame without source_mask
+    frame_unmasked = {
+        "obs_id": "OBS_1",
+        "mjd": 60000.0,
+        "utc_date": "2026-01-01T00:00:00Z",
+        "detector": "SPHEREx-D1",
+        "collection": "spherex_dr1",
+        "image": img,
+        "mask": fatal_mask,
+    }
+
+    # Frame with source_mask
+    frame_masked = {
+        "obs_id": "OBS_2",
+        "mjd": 60100.0,
+        "utc_date": "2026-04-11T00:00:00Z",
+        "detector": "SPHEREx-D1",
+        "collection": "spherex_dr1",
+        "image": img,
+        "mask": fatal_mask,
+        "source_mask": src_mask,
+    }
+
+    res = build_lightcurve_series([frame_unmasked, frame_masked])
+    pts = res["points"]
+    assert len(pts) == 2
+
+    # Frame 2 (with source_mask) must have lower background noise and higher SNR
+    assert pts[1]["snr"] > pts[0]["snr"]
+    assert pts[1]["net_flux_mjy_sr"] > 0.0
+

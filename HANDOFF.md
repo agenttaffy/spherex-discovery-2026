@@ -1,14 +1,15 @@
 # Agent Handoff Document
 
 ## 1. Last Completed Work
-- **Scientific Audit, Truthfulness & WCAG 2.2 AA Hardening:**
-  - **Source Mask vs Fatal Defect Distinction in Photometry:** In `photometry.py`, enhanced `compute_aperture_photometry` to accept `source_mask`, excluding neighboring astronomical source detections from the background annulus to prevent noise inflation without rejecting nominal source flux in the target aperture. Wired in `spectrum.py`.
-  - **Truthful Spectrophotometric Modeling & SED Export:** In `report.py`, added formal SED reporting section with explicit documentation that the 102 individual channel values represent an interpolated continuum model across 6 Linear Variable Filter detector bandpasses (not 102 independently measured spectral lines). Omitted unsupported empirical temperature or classification claims. Updated `SpectrumChart.tsx` label from "Classification:" to "Continuum Profile:".
-  - **Backend Regression Suite:** Added `test_priority_1_source_mask_background_exclusion_without_aperture_rejection` and `test_priority_2_discovery_report_sed_truthfulness` to `test_scientific_audit_regression.py`.
-  - **Full Suite Verification:** Expanded automated backend pytest test suite to **84 passing tests** in 6.03s; accessibility test suite passing all **41 checks**; frontend production build cleanly passing with 0 errors in 2.64s; 22/22 demonstration FITS assets verified.
+- **Scientific Audit, Astrometric Motion Hardening & Source Mask Wiring:**
+  - **Pointing Registration Isolation in Astrometric Motion:** In `motion.py`, projected epoch 2 celestial position `sky2` back into epoch 1 reference frame WCS grid (`w_obj1.world_to_pixel(sky2)`). This ensures target displacement (`dx_pixels`, `dy_pixels`) reflects true physical celestial motion on the sky, completely preventing telescope pointing registration offsets between epochs from being falsely classified as target proper motion (`Stationary / Sub-threshold` preserved). Centroids in diff overlays are registered to the difference frame coordinates. Added `frame_registration_shift_pixels` telemetry.
+  - **Source Mask Background Exclusion in Light Curves:** In `photometry.py` (`build_lightcurve_series`) and `science.py` (`/science/photometry`), extracted `source_mask` and wired it into epoch frames so neighboring field stars are excluded from the background annulus across multi-epoch light curves without rejecting target aperture flux.
+  - **Astrometric Provenance in Discovery Reports:** In `report.py`, added equatorial vector proper motion components ($\mu_\alpha \cos\delta$, $\mu_\delta$) and WCS-anchored centroiding calibration provenance.
+  - **Backend Regression Suite:** Added `test_priority_3_pointing_shift_not_presented_as_target_motion` and `test_priority_1_lightcurve_source_mask_background_exclusion` to `test_scientific_audit_regression.py`.
+  - **Full Suite Verification:** Expanded automated backend pytest test suite to **86 passing tests** in 6.70s; accessibility test suite passing all **41 checks**; frontend production build cleanly passing with 0 errors in 2.70s; 22/22 demonstration FITS assets verified.
 
 ## 2. Current Working State
-- **Backend:** Starts cleanly with `python -m uvicorn app.main:app --port 8000`. All 84 pytest tests pass.
+- **Backend:** Starts cleanly with `python -m uvicorn app.main:app --port 8000`. All 86 pytest tests pass.
 - **Frontend:** Builds cleanly with `npm run build` (0 type errors, 0 warnings).
 - **Accessibility & Responsive:** All 41 automated checks pass in `node scripts/verify_accessibility_and_responsive.mjs`.
 - **Demo Mode:** Local caching of 22 verified FITS cutouts enables immediate offline presentation and judging with circuit breaker fallback on remote outages.
@@ -27,7 +28,7 @@ python scripts/verify_environment.py
 # 2. Demonstration Assets Verification
 python scripts/verify_demo.py
 
-# 3. Backend Test Suite (84 tests)
+# 3. Backend Test Suite (86 tests)
 cd backend
 python -m pytest -v
 
