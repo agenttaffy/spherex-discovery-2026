@@ -1,0 +1,12 @@
+# SPHEREx Discovery — Challenge Requirements Traceability Matrix
+
+| Req ID | Requirement Statement | Architectural Implementation | Verification Method | Status |
+|---|---|---|---|---|
+| **REQ-01** | Accept Right Ascension and Declination coordinates | Coordinates service (`coordinates.py`) supporting decimal degrees (`133.795, -7.245`) and sexagesimal string format (`08h55m10.831s, -07d14m42.53s`). Frontend input validation with real-time feedback. | Unit test `test_coordinates.py`, manual UI input tests. | VERIFIED & IMPLEMENTED |
+| **REQ-02** | Query and display a series of images of the sky patch | IRSA SIA2 integration (`irsa_client.py`) fetching observations across DR1 and QR3 collections. Cutout service (`cutout_service.py`) fetching accurate FITS sub-arrays. | Integration test `test_irsa_client.py`, live API probe. | VERIFIED & IMPLEMENTED |
+| **REQ-03** | Play images like a short video or animation | Interactive HTML5 Canvas animation timeline (`Timeline.tsx`, `Viewer.tsx`). Supports play/pause, loop, variable FPS (1–10 fps), step forward/backward. | Automated component tests & UI rendering check. | VERIFIED & IMPLEMENTED |
+| **REQ-04** | Enable easy identification of objects that change position or brightness | Blink comparison mode (toggling consecutive epochs), side-by-side mode, opacity slider, and real-time difference frame computation ($I_2 - I_1$). | Automated comparison test `test_comparison.py`. | VERIFIED & IMPLEMENTED |
+| **REQ-05** | Test with 5 official astronomical targets | Target presets built directly into explorer controls: Barnard's Star, Epsilon Indi B, WISE 0855, RW Aurigae, R Draconis. | `probe_irsa.py` live metadata verification and fixture testing. | VERIFIED & IMPLEMENTED |
+| **REQ-06** | Handle multiple infrared bands & detectors | Detector filtering (D1–D6) and wavelength metadata display (0.75–5.0 µm) parsed from FITS `WCS-WAVE` and SIA2 energy columns. | Schema validation and metadata parser tests. | VERIFIED & IMPLEMENTED |
+| **REQ-07** | Display metadata & data quality flags | Information panel displaying observation ID, UTC timestamp, detector, wavelength range, flag statistics, variance summary, and direct NASA IRSA link. | Frontend metadata inspection component (`MetadataPanel.tsx`). | VERIFIED & IMPLEMENTED |
+| **REQ-08** | Shareable coordinate URLs | React router / URL query parameter synchronization (`/explore?ra=...&dec=...&fov=...`). | Browser URL loading test. | VERIFIED & IMPLEMENTED |

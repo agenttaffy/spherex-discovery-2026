@@ -1,0 +1,1 @@
+# SPHEREx Discovery Application Package

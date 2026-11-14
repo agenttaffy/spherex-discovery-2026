@@ -1,0 +1,118 @@
+import csv
+import io
+import ssl
+import certifi
+import httpx
+from typing import List, Dict, Any, Optional
+from astropy.time import Time
+from app.config import IRSA_SIA_BASE_URL
+from app.models.schemas import ObservationRecord
+
+# In-memory registry of queried observations so /api/frames/{frame_id} can resolve them
+OBSERVATION_REGISTRY: Dict[str, Dict[str, Any]] = {}
+
+class IRSAClient:
+    def __init__(self, sia_base_url: str = IRSA_SIA_BASE_URL):
+        self.sia_base_url = sia_base_url
+
+    def _mjd_to_utc(self, mjd_str: Optional[str]) -> Optional[str]:
+        if not mjd_str:
+            return None
+        try:
+            val = float(mjd_str)
+            t = Time(val, format="mjd")
+            return t.utc.isot
+        except Exception:
+            return None
+
+    async def query_observations(
+        self,
+        ra: float,
+        dec: float,
+        radius_deg: float = 0.05,
+        collection: str = "spherex_dr1",
+        detector: Optional[str] = None,
+        limit: int = 50,
+    ) -> List[ObservationRecord]:
+        """
+        Queries NASA IRSA SIA2 service for SPHEREx observations.
+        """
+        params = {
+            "COLLECTION": collection,
+            "POS": f"circle {ra:.6f} {dec:.6f} {radius_deg:.4f}",
+            "RESPONSEFORMAT": "CSV",
+        }
+
+        records: List[ObservationRecord] = []
+        ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+
+        try:
+            async with httpx.AsyncClient(verify=ssl_ctx, timeout=25.0) as client:
+                resp = await client.get(self.sia_base_url, params=params)
+                if resp.status_code != 200:
+                    return records
+
+                reader = csv.DictReader(io.StringIO(resp.text))
+                for row in reader:
+                    obs_id = row.get("obs_id", "unknown")
+                    band = row.get("energy_bandpassname", "SPHEREx")
+                    access_url = row.get("access_url", "")
+                    mjd_raw = row.get("t_min")
+                    mjd_float = float(mjd_raw) if mjd_raw else None
+                    utc_date = self._mjd_to_utc(mjd_raw)
+
+                    # Optional detector filtering
+                    if detector and detector.lower() not in band.lower():
+                        continue
+
+                    # Generate stable unique ID
+                    clean_band = band.replace("-", "_").replace(" ", "_")
+                    record_id = f"{collection}_{obs_id}_{clean_band}".replace("/", "_")
+
+                    record_dict = {
+                        "id": record_id,
+                        "obs_id": obs_id,
+                        "collection": collection,
+                        "detector": band,
+                        "mjd": mjd_float,
+                        "utc_date": utc_date,
+                        "em_min": float(row["em_min"]) if row.get("em_min") else None,
+                        "em_max": float(row["em_max"]) if row.get("em_max") else None,
+                        "access_url": access_url,
+                        "ra": float(row.get("s_ra", ra)),
+                        "dec": float(row.get("s_dec", dec)),
+                    }
+
+                    # Store in registry for frame fetching
+                    OBSERVATION_REGISTRY[record_id] = record_dict
+
+                    records.append(ObservationRecord(**record_dict))
+
+                    if len(records) >= limit:
+                        break
+
+        except Exception as e:
+            print(f"[IRSAClient] Error querying IRSA SIA: {e}")
+
+        # Sort chronologically by UTC / MJD
+        records.sort(key=lambda x: x.mjd or 0.0)
+        return records
+
+    async def check_connectivity(self) -> bool:
+        """
+        Quick probe to check if IRSA SIA is responding.
+        """
+        try:
+            params = {
+                "COLLECTION": "spherex_dr1",
+                "POS": "circle 127.69444 -39.17760 0.01",
+                "RESPONSEFORMAT": "CSV",
+            }
+            ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+            async with httpx.AsyncClient(verify=ssl_ctx, timeout=8.0) as client:
+                resp = await client.get(self.sia_base_url, params=params)
+                return resp.status_code == 200
+        except Exception:
+            return False
+
+irsa_client = IRSAClient()
