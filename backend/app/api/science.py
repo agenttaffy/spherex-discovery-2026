@@ -17,6 +17,8 @@ router = APIRouter()
 class MotionRequest(BaseModel):
     frame_id_1: str
     frame_id_2: str
+    target_ra: Optional[float] = None
+    target_dec: Optional[float] = None
     pixel_scale_arcsec: Optional[float] = 6.2
 
 class ReportRequest(BaseModel):
@@ -241,6 +243,10 @@ async def compute_astrometric_motion(req: MotionRequest = Body(...)):
     i1, h1 = extract_primary_image(load_fits_cutout(b1))
     i2, h2 = extract_primary_image(load_fits_cutout(b2))
 
+    tgt_coord = None
+    if req.target_ra is not None and req.target_dec is not None:
+        tgt_coord = (req.target_ra, req.target_dec)
+
     motion = measure_astrometric_motion(
         img1=i1,
         img2=i2,
@@ -248,6 +254,7 @@ async def compute_astrometric_motion(req: MotionRequest = Body(...)):
         meta2=meta2,
         wcs1=h1,
         wcs2=h2,
+        target_coord=tgt_coord,
         pixel_scale_arcsec=req.pixel_scale_arcsec or 6.2,
     )
 

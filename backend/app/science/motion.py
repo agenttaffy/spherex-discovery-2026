@@ -157,18 +157,47 @@ def measure_astrometric_motion(
             if np.isfinite(px1) and np.isfinite(py1) and np.isfinite(px2) and np.isfinite(py2):
                 c1 = _find_local_centroid(img1, float(py1), float(px1), search_radius=4)
                 c2 = _find_local_centroid(img2, float(py2), float(px2), search_radius=4)
+                
+                # If target peak is faint in local window, anchor strictly to expected WCS target coordinates
+                # rather than wandering off to arbitrary brightest field stars
+                if c1 is None:
+                    c1 = (float(py1), float(px1), 1.0)
+                if c2 is None:
+                    c2 = (float(py2), float(px2), 1.0)
                 used_wcs = True
         except Exception:
             used_wcs = False
 
-    # Centroid tracking fallback if WCS target centroid was not found
-    if c1 is None:
-        c1 = _find_brightest_centroid(img1)
-    if c2 is None:
-        c2 = _find_brightest_centroid(img2)
+    # Centroid tracking fallback only when NO target coordinates were specified
+    if target_coord is None:
+        if c1 is None:
+            c1 = _find_brightest_centroid(img1)
+        if c2 is None:
+            c2 = _find_brightest_centroid(img2)
 
     celestial_shift_arcsec = None
     celestial_pa_deg = None
+    d_ra_cosdec_arcsec = None
+    d_dec_arcsec = None
+    pm_ra_cosdec_mas_yr = None
+    pm_dec_mas_yr = None
+
+    # Temporal separation using true epoch baselines
+    mjd1 = float(meta1.get("mjd") or 0.0)
+    mjd2 = float(meta2.get("mjd") or 0.0)
+    dt_days = abs(mjd2 - mjd1)
+
+    if dt_days < 1e-4:
+        utc1 = meta1.get("utc_date")
+        utc2 = meta2.get("utc_date")
+        if utc1 and utc2:
+            try:
+                from astropy.time import Time
+                dt_days = abs((Time(utc2) - Time(utc1)).jd)
+            except Exception:
+                pass
+
+    dt_years = dt_days / 365.25 if dt_days > 0 else 1.0
 
     if c1 is not None and c2 is not None:
         y1, x1, snr1 = c1
@@ -187,6 +216,16 @@ def measure_astrometric_motion(
                 sky2 = w_obj2.pixel_to_world(x2, y2)
                 celestial_shift_arcsec = float(sky1.separation(sky2).arcsec)
                 celestial_pa_deg = float(sky1.position_angle(sky2).degree)
+
+                # Convert shifts through WCS to celestial (delta_ra * cos(dec), delta_dec)
+                d_ra_deg = (sky2.ra.deg - sky1.ra.deg + 180.0) % 360.0 - 180.0
+                mean_dec_rad = np.radians((sky1.dec.deg + sky2.dec.deg) / 2.0)
+                d_ra_cosdec_arcsec = float(d_ra_deg * np.cos(mean_dec_rad) * 3600.0)
+                d_dec_arcsec = float((sky2.dec.deg - sky1.dec.deg) * 3600.0)
+
+                if dt_years > 0:
+                    pm_ra_cosdec_mas_yr = float((d_ra_cosdec_arcsec / dt_years) * 1000.0)
+                    pm_dec_mas_yr = float((d_dec_arcsec / dt_years) * 1000.0)
             except Exception:
                 pass
     else:
@@ -210,23 +249,6 @@ def measure_astrometric_motion(
     else:
         pa_deg = float((np.degrees(np.arctan2(-dx_pix, -dy_pix)) + 360.0) % 360.0)
 
-    # Temporal separation using true epoch baselines
-    mjd1 = float(meta1.get("mjd") or 0.0)
-    mjd2 = float(meta2.get("mjd") or 0.0)
-    dt_days = abs(mjd2 - mjd1)
-
-    if dt_days < 1e-4:
-        utc1 = meta1.get("utc_date")
-        utc2 = meta2.get("utc_date")
-        if utc1 and utc2:
-            try:
-                from astropy.time import Time
-                dt_days = abs((Time(utc2) - Time(utc1)).jd)
-            except Exception:
-                pass
-
-    dt_years = dt_days / 365.25 if dt_days > 0 else 1.0
-
     # Annual proper motion rate
     proper_motion_arcsec_yr = float(disp_arcsec / dt_years) if dt_days > 1e-4 else 0.0
     proper_motion_mas_yr = float(proper_motion_arcsec_yr * 1000.0)
@@ -239,7 +261,7 @@ def measure_astrometric_motion(
     else:
         motion_class = "Stationary / Sub-threshold"
 
-    return {
+    res = {
         "dx_pixels": round(dx_pix, 3),
         "dy_pixels": round(dy_pix, 3),
         "displacement_pixels": round(disp_pix, 3),
@@ -257,3 +279,12 @@ def measure_astrometric_motion(
         "confidence_score": round(confidence, 2),
         "wcs_tracking": used_wcs,
     }
+
+    if d_ra_cosdec_arcsec is not None:
+        res["d_ra_cosdec_arcsec"] = round(d_ra_cosdec_arcsec, 4)
+        res["d_dec_arcsec"] = round(d_dec_arcsec, 4)
+    if pm_ra_cosdec_mas_yr is not None:
+        res["pm_ra_cosdec_mas_yr"] = round(pm_ra_cosdec_mas_yr, 1)
+        res["pm_dec_mas_yr"] = round(pm_dec_mas_yr, 1)
+
+    return res

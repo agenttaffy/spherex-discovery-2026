@@ -329,6 +329,9 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
             </div>
             <div>
               <span className="text-slate-400">λ_eff:</span> {hoveredBand.wavelength_um.toFixed(3)} µm
+              {hoveredBand.calibration_source ? (
+                <span className="text-slate-400 text-[8.5px] ml-1">({hoveredBand.calibration_source})</span>
+              ) : null}
             </div>
             <div>
               <span className="text-slate-400">Flux:</span> {hoveredBand.flux_mjy_sr.toFixed(2)} MJy/sr ({hoveredBand.flux_density_mjy.toFixed(2)} mJy)
@@ -338,7 +341,9 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
             </div>
             <div className="pt-0.5 text-[9px]">
               {hoveredBand.is_observed ? (
-                <span className="text-emerald-400 font-semibold">✓ Observed SPHEREx Channel (Calibrated WCS)</span>
+                <span className="text-emerald-400 font-semibold">
+                  ✓ Observed SPHEREx Detector Band (Calibrated WCS)
+                </span>
               ) : (
                 <span className="text-amber-300">○ Modeled SED Profile Continuum</span>
               )}
@@ -353,14 +358,14 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
               Estimated Continuum Model (Interpolated)
             </div>
             <div className="flex items-center gap-1.5 font-bold" style={{ color: hoveredChannel.color }}>
-              <span>Chan #{hoveredChannel.channel_index} / 102</span>
+              <span>Estimated Channel #{hoveredChannel.channel_index} / 102</span>
               <span className="text-[9px] text-slate-400">({hoveredChannel.detector})</span>
             </div>
             <div>
               <span className="text-slate-400">Wavelength λ:</span> {hoveredChannel.wavelength_um.toFixed(4)} µm
             </div>
             <div>
-              <span className="text-slate-400">Modeled Flux:</span> {hoveredChannel.flux_mjy_sr.toFixed(2)} MJy/sr
+              <span className="text-slate-400">Estimated Flux:</span> {hoveredChannel.flux_mjy_sr.toFixed(2)} MJy/sr (Interpolated)
             </div>
           </div>
         )}

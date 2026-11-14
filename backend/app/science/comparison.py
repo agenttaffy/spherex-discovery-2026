@@ -83,9 +83,9 @@ def compute_difference_frame(
     i2 = img2.copy().astype(np.float32)
 
     # Apply quality masks before subtraction
-    if mask1 is not None:
+    if mask1 is not None and mask1.shape == i1.shape:
         i1[mask1] = np.nan
-    if mask2 is not None:
+    if mask2 is not None and mask2.shape == i2.shape:
         i2[mask2] = np.nan
 
     # 1. Scientific WCS Reprojection via reproject_interp
@@ -170,6 +170,8 @@ def compute_difference_frame(
         "peak_negative_flux": round(max_neg, 4),
         "sigma_mjy_sr": round(sigma, 4),
         "alignment_method": alignment_method,
+        "overlap_pixels_count": int(np.count_nonzero(finite_mask)),
+        "masked_pixels_count": int(np.count_nonzero(~finite_mask)),
     }
 
     return u8_diff, stats

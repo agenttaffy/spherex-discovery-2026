@@ -1,12 +1,12 @@
 # SPHEREx Discovery — Test Execution Record
 
-**Execution Timestamp:** 2026-11-14T19:30:00Z  
+**Execution Timestamp:** 2026-11-14T20:18:00Z  
 **Platform:** Windows 11 / Python 3.11.4 / Node.js v22.19.0  
-**Test Suite Status:** 77 passed in 7.41s | Frontend Build: 0 errors in 2.42s
+**Test Suite Status:** 81 passed in 6.95s | Frontend Build: 0 errors in 2.63s
 
 ---
 
-## 1. Automated Backend Test Suite (`pytest -v`)
+## 1. Automated Backend Test Suite (`python -m pytest -v`)
 
 ```text
 ============================= test session starts =============================
@@ -14,7 +14,7 @@ platform win32 -- Python 3.11.4, pytest-9.2.0, pluggy-1.7.0 -- C:\Users\haris\Ap
 cachedir: .pytest_cache
 rootdir: C:\SphereX\spherex-discovery-2026\backend
 plugins: anyio-4.12.1, zarr-3.1.6
-collecting ... collected 77 items
+collecting ... collected 81 items
 
 tests/test_comparison.py::test_comparison_eligibility PASSED             [  1%]
 tests/test_comparison.py::test_comparison_ra_boundary_wrapping PASSED    [  2%]
@@ -68,33 +68,37 @@ tests/test_science.py::test_catalog_endpoint_barnard PASSED              [ 63%]
 tests/test_science.py::test_photometry_endpoint_demo PASSED              [ 64%]
 tests/test_science.py::test_motion_endpoint_on_demo_epochs PASSED        [ 66%]
 tests/test_science.py::test_discovery_report_endpoint PASSED             [ 67%]
-tests/test_science.py::test_photometry_preset_differentiation PASSED     [ 68%]
-tests/test_scientific_audit_regression.py::test_priority_1_flags_metadata_and_source_mask_distinction PASSED [ 70%]
-tests/test_scientific_audit_regression.py::test_priority_2_photometry_wcs_target_measurement_and_variance PASSED [ 71%]
-tests/test_scientific_audit_regression.py::test_priority_2_spectrum_interpolation_labeled_correctly PASSED [ 72%]
-tests/test_scientific_audit_regression.py::test_priority_3_astrometric_motion_wcs_target_tracking PASSED [ 74%]
-tests/test_scientific_audit_regression.py::test_priority_4_differencing_lvf_compatibility_and_reprojection_error PASSED [ 75%]
-tests/test_scientific_audit_regression.py::test_priority_5_stacking_detector_compatibility_and_variance PASSED [ 76%]
-tests/test_scientific_audit_regression.py::test_priority_6_gaia_provenance_explicit_labeling PASSED [ 77%]
-tests/test_stacking_and_spectrum.py::test_compute_coadd_stack_mean_median_sum PASSED [ 79%]
-tests/test_stacking_and_spectrum.py::test_compute_coadd_stack_nan_handling PASSED [ 80%]
-tests/test_stacking_and_spectrum.py::test_compute_coadd_stack_wcs_reproject PASSED [ 81%]
+tests/test_science.py::test_photometry_preset_differentiation PASSED     [ 65%]
+tests/test_scientific_audit_regression.py::test_priority_1_flags_metadata_and_source_mask_distinction PASSED [ 66%]
+tests/test_scientific_audit_regression.py::test_priority_2_photometry_wcs_target_measurement_and_variance PASSED [ 67%]
+tests/test_scientific_audit_regression.py::test_priority_2_spectrum_interpolation_labeled_correctly PASSED [ 69%]
+tests/test_scientific_audit_regression.py::test_priority_3_astrometric_motion_wcs_target_tracking PASSED [ 70%]
+tests/test_scientific_audit_regression.py::test_priority_4_differencing_lvf_compatibility_and_reprojection_error PASSED [ 71%]
+tests/test_scientific_audit_regression.py::test_priority_5_stacking_detector_compatibility_and_variance PASSED [ 72%]
+tests/test_scientific_audit_regression.py::test_priority_6_gaia_provenance_explicit_labeling PASSED [ 74%]
+tests/test_scientific_audit_regression.py::test_priority_1_extract_source_mask PASSED [ 75%]
+tests/test_scientific_audit_regression.py::test_priority_2_aperture_photometry_boundary_and_wcs_wave PASSED [ 76%]
+tests/test_scientific_audit_regression.py::test_priority_3_astrometric_vector_components_and_no_wandering PASSED [ 77%]
+tests/test_scientific_audit_regression.py::test_priority_5_stacking_variance_with_masked_pixels PASSED [ 79%]
+tests/test_stacking_and_spectrum.py::test_compute_coadd_stack_mean_median_sum PASSED [ 80%]
+tests/test_stacking_and_spectrum.py::test_compute_coadd_stack_nan_handling PASSED [ 81%]
+tests/test_stacking_and_spectrum.py::test_compute_coadd_stack_wcs_reproject PASSED [ 82%]
 tests/test_stacking_and_spectrum.py::test_spectrum_generation_102_channels PASSED [ 83%]
-tests/test_stacking_and_spectrum.py::test_spectrum_endpoint_barnard PASSED [ 84%]
-tests/test_stacking_and_spectrum.py::test_spectrum_endpoint_wise0855_brown_dwarf PASSED [ 85%]
+tests/test_stacking_and_spectrum.py::test_spectrum_endpoint_barnard PASSED [ 85%]
+tests/test_stacking_and_spectrum.py::test_spectrum_endpoint_wise0855_brown_dwarf PASSED [ 86%]
 tests/test_stacking_and_spectrum.py::test_spectrum_endpoint_sexagesimal PASSED [ 87%]
 tests/test_stacking_and_spectrum.py::test_spectrum_endpoint_invalid_coords PASSED [ 88%]
 tests/test_stacking_and_spectrum.py::test_stack_frames_endpoint_on_demo_epochs PASSED [ 89%]
 tests/test_stacking_and_spectrum.py::test_stack_frames_endpoint_validation PASSED [ 90%]
-tests/test_stacking_and_spectrum.py::test_stack_frames_endpoint_webp_and_median PASSED [ 91%]
-tests/test_stacking_and_spectrum.py::test_compute_coadd_stack_edge_cases PASSED [ 92%]
-tests/test_stacking_and_spectrum.py::test_stack_frames_endpoint_duplicate_frames_rejected PASSED [ 94%]
-tests/test_stacking_and_spectrum.py::test_compute_coadd_stack_non_overlapping_wcs_raises PASSED [ 95%]
+tests/test_stacking_and_spectrum.py::test_stack_frames_endpoint_webp_and_median PASSED [ 92%]
+tests/test_stacking_and_spectrum.py::test_compute_coadd_stack_edge_cases PASSED [ 93%]
+tests/test_stacking_and_spectrum.py::test_stack_frames_endpoint_duplicate_frames_rejected PASSED [ 95%]
+tests/test_stacking_and_spectrum.py::test_compute_coadd_stack_non_overlapping_wcs_raises PASSED [ 96%]
 tests/test_stacking_and_spectrum.py::test_stack_frames_endpoint_distant_pointings_rejected PASSED [ 97%]
 tests/test_spectrum_endpoint_fov_validation PASSED [ 98%]
 tests/test_stacking_and_spectrum.py::test_robust_noise_sigma_point_source_insensitivity PASSED [100%]
 
-============================= 77 passed in 7.41s ==============================
+============================= 81 passed in 6.95s ==============================
 ```
 
 ---
@@ -111,7 +115,7 @@ transforming...
 rendering chunks...
 computing gzip size...
 dist/index.html                   0.96 kB │ gzip:  0.60 kB
-dist/assets/index-DfkXhypl.css   29.83 kB │ gzip:  5.93 kB
-dist/assets/index-Bd1_mFoP.js   265.23 kB │ gzip: 73.49 kB
-✓ built in 2.21s
+dist/assets/index-Dj4VbrJv.css   29.89 kB │ gzip:  5.95 kB
+dist/assets/index-UQN39fzA.js   266.14 kB │ gzip: 73.81 kB
+✓ built in 2.63s
 ```

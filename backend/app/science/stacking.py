@@ -219,20 +219,28 @@ def compute_coadd_stack(
             stacked = np.nanmean(cube, axis=0)
 
     # Propagate Variance: Var_stack = (1/N^2) * sum(Var_i) for mean coaddition
-    valid_counts = np.sum(np.isfinite(cube), axis=0)
+    valid_data_mask = np.isfinite(cube)
+    valid_counts = np.sum(valid_data_mask, axis=0)
     safe_n = np.maximum(1, valid_counts).astype(np.float32)
     var_cube = np.stack(aligned_vars, axis=0)
-    var_cube = np.where(np.isfinite(var_cube) & (var_cube >= 0), var_cube, ref_sigma**2)
+    # Mask out variance of pixels that were invalid/masked in the image cube
+    var_cube = np.where(valid_data_mask & np.isfinite(var_cube) & (var_cube >= 0), var_cube, np.nan)
 
     if method == "sum":
-        stacked_var = np.nansum(var_cube, axis=0)
+        stacked_var = np.where(valid_counts > 0, np.nansum(var_cube, axis=0), np.nan)
     elif method == "median":
         # Median coadd variance has asymptotic factor ~ pi / (2 * N)
-        stacked_var = (np.pi / (2.0 * safe_n**2)) * np.nansum(var_cube, axis=0)
+        stacked_var = np.where(valid_counts > 0, (np.pi / (2.0 * safe_n**2)) * np.nansum(var_cube, axis=0), np.nan)
     else:  # "mean"
-        stacked_var = (1.0 / (safe_n**2)) * np.nansum(var_cube, axis=0)
+        stacked_var = np.where(valid_counts > 0, (1.0 / (safe_n**2)) * np.nansum(var_cube, axis=0), np.nan)
 
-    propagated_sigma = float(np.sqrt(max(1e-6, float(np.nanmedian(stacked_var)))))
+    finite_var = stacked_var[np.isfinite(stacked_var)]
+    propagated_sigma = float(np.sqrt(max(1e-6, float(np.nanmedian(finite_var))))) if len(finite_var) > 0 else float(ref_sigma)
+
+    # Propagate data quality masks: bitwise / boolean OR across overlapping frames
+    mask_cube = np.stack(aligned_masks, axis=0)
+    propagated_mask_any = np.any(mask_cube, axis=0)
+    propagated_mask_all = np.all(mask_cube, axis=0)
 
     # Replace remaining NaNs with background median
     finite_mask = np.isfinite(stacked)
@@ -272,6 +280,9 @@ def compute_coadd_stack(
         "max_flux_mjy_sr": round(float(np.nanmax(stacked)), 4),
         "min_flux_mjy_sr": round(float(np.nanmin(stacked)), 4),
         "alignment_method": primary_alignment,
+        "flagged_pixels_count": int(np.count_nonzero(propagated_mask_any)),
+        "unusable_pixels_count": int(np.count_nonzero(propagated_mask_all)),
+        "propagated_mask": propagated_mask_any,
     }
 
     return stacked, stats

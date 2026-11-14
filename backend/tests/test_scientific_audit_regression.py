@@ -8,7 +8,9 @@ import astropy.units as u
 from app.science.fits_processing import (
     evaluate_quality_flags,
     extract_fatal_quality_mask,
+    extract_source_mask,
     extract_variance_data,
+    extract_calibrated_wavelength,
     parse_spherex_mask_planes,
 )
 from app.science.photometry import compute_aperture_photometry, build_lightcurve_series
@@ -245,3 +247,155 @@ def test_priority_6_gaia_provenance_explicit_labeling():
         assert "provenance" in s
         assert s["provenance"] in (PROVENANCE_DEMO, PROVENANCE_LIVE_GAIA)
         assert "catalog_source" in s
+
+
+def test_priority_1_extract_source_mask():
+    """
+    Priority 1: Ensure extract_source_mask correctly identifies nominal source detections
+    without classifying them as fatal defects.
+    """
+    hdr = fits.Header()
+    hdr["MSKN0000"] = "SOURCE"
+    hdr["MSKM0000"] = 2097152
+    hdr["MSKN0001"] = "FULLSAMPLE"
+    hdr["MSKM0001"] = 4096
+    hdr["MSKN0002"] = "OVERFLOW"
+    hdr["MSKM0002"] = 2
+
+    flags = np.array([[0, 2097152], [4096, 2]], dtype=np.int32)
+    hdul = fits.HDUList([fits.PrimaryHDU(), fits.ImageHDU(data=flags, header=hdr, name="FLAGS")])
+
+    src_mask = extract_source_mask(hdul)
+    assert src_mask is not None
+    assert src_mask[0, 0] is np.False_ or src_mask[0, 0] == False
+    assert src_mask[0, 1] == True  # SOURCE
+    assert src_mask[1, 0] == True  # FULLSAMPLE
+    assert src_mask[1, 1] == False  # OVERFLOW is not a source mask
+
+
+def test_priority_2_aperture_photometry_boundary_and_wcs_wave():
+    """
+    Priority 2: Ensure aperture photometry applies boundary clipping area correction when target
+    is near the edge, and extract_calibrated_wavelength reads WCS-WAVE extension.
+    """
+    # 1. Boundary clipping test
+    img = np.ones((20, 20), dtype=np.float32) * 2.0
+    img[0, 0] = 50.0  # star right at the corner (0, 0)
+
+    phot_corner = compute_aperture_photometry(
+        image=img,
+        center_x=0.0,
+        center_y=0.0,
+        aperture_radius=3.0,
+        annulus_inner=4.0,
+        annulus_outer=6.0,
+    )
+    assert phot_corner["coverage_fraction"] < 1.0
+    assert phot_corner["coverage_fraction"] > 0.1
+    assert phot_corner["net_flux"] > 0.0
+
+    # 2. WCS-WAVE wavelength calibration extraction test
+    wcs_wave_hdr = fits.Header()
+    # Dummy WCS-WAVE bintable
+    x_col = fits.Column(name="X", format="9J", dim="(9)", array=np.array([[1, 256, 511, 766, 1021, 1275, 1530, 1785, 2040]]))
+    y_col = fits.Column(name="Y", format="9J", dim="(9)", array=np.array([[1, 256, 511, 766, 1021, 1275, 1530, 1785, 2040]]))
+    # 9x9 grid of [4.7, 0.035]
+    vals = np.zeros((1, 9, 9, 2), dtype=np.float32)
+    vals[0, :, :, 0] = 4.75
+    vals[0, :, :, 1] = 0.035
+    v_col = fits.Column(name="VALUES", format="162E", dim="(2,9,9)", array=vals)
+    wcs_wave_hdu = fits.BinTableHDU.from_columns([x_col, y_col, v_col], name="WCS-WAVE")
+
+    img_hdr = fits.Header()
+    img_hdr["CRPIX1W"] = 0.0
+    img_hdr["CRPIX2W"] = 0.0
+    img_hdr["CRVAL1W"] = 1000.0
+    img_hdr["CRVAL2W"] = 1000.0
+    img_hdu = fits.ImageHDU(data=np.ones((12, 12), dtype=np.float32), header=img_hdr, name="IMAGE")
+
+    hdul_test = fits.HDUList([fits.PrimaryHDU(), img_hdu, wcs_wave_hdu])
+    wave_info = extract_calibrated_wavelength(hdul_test)
+    assert wave_info is not None
+    assert wave_info["calibration_method"] == "WCS-WAVE"
+    assert wave_info["wavelength_um"] == pytest.approx(4.75, rel=1e-3)
+    assert wave_info["bandwidth_um"] == pytest.approx(0.035, rel=1e-3)
+
+
+def test_priority_3_astrometric_vector_components_and_no_wandering():
+    """
+    Priority 3: Ensure measure_astrometric_motion computes celestial vector components
+    (d_ra_cosdec_arcsec, d_dec_arcsec, pm_ra_cosdec_mas_yr, pm_dec_mas_yr) and does NOT
+    wander off to a brighter distracter star when target_coord is given.
+    """
+    w1 = WCS(naxis=2)
+    w1.wcs.crpix = [10.0, 10.0]
+    w1.wcs.cdelt = [-0.001722, 0.001722]
+    w1.wcs.crval = [100.0, 10.0]
+    w1.wcs.ctype = ['RA---TAN', 'DEC--TAN']
+
+    w2 = WCS(naxis=2)
+    w2.wcs.crpix = [10.0, 10.0]
+    w2.wcs.cdelt = [-0.001722, 0.001722]
+    w2.wcs.crval = [100.0, 10.0]
+    w2.wcs.ctype = ['RA---TAN', 'DEC--TAN']
+
+    # Faint target at center (9, 9), giant stationary distracter star at (2, 2)
+    img1 = np.zeros((20, 20), dtype=np.float32)
+    img2 = np.zeros((20, 20), dtype=np.float32)
+    img1[9, 9] = 10.0
+    img2[11, 9] = 10.0  # shifted by 2 pixels along y (Dec)
+    img1[2, 2] = 500.0  # bright star
+    img2[2, 2] = 500.0  # bright star
+
+    meta1 = {"mjd": 60000.0}
+    meta2 = {"mjd": 60365.25}  # 1 year
+
+    motion = measure_astrometric_motion(
+        img1=img1,
+        img2=img2,
+        meta1=meta1,
+        meta2=meta2,
+        wcs1=w1,
+        wcs2=w2,
+        target_coord=(100.0, 10.0),
+    )
+
+    assert motion["wcs_tracking"] is True
+    assert motion["displacement_pixels"] > 1.5
+    assert "d_ra_cosdec_arcsec" in motion
+    assert "d_dec_arcsec" in motion
+    assert "pm_ra_cosdec_mas_yr" in motion
+    assert "pm_dec_mas_yr" in motion
+    # Motion is along Dec (+y in TAN projection with cdelt2 > 0)
+    assert abs(motion["pm_dec_mas_yr"]) > 5000.0
+
+
+def test_priority_5_stacking_variance_with_masked_pixels():
+    """
+    Priority 5: Ensure coaddition variance propagation excludes masked pixels from the
+    variance sum rather than inflating the variance of unmasked pixels.
+    """
+    i1 = np.ones((10, 10), dtype=np.float32) * 5.0
+    i2 = np.ones((10, 10), dtype=np.float32) * 5.0
+    v1 = np.full((10, 10), 0.5, dtype=np.float32)
+    v2 = np.full((10, 10), 0.5, dtype=np.float32)
+
+    # Pixel (0, 0) is masked (fatal defect) in frame 2 only
+    m1 = np.zeros((10, 10), dtype=bool)
+    m2 = np.zeros((10, 10), dtype=bool)
+    m2[0, 0] = True
+
+    stacked, stats = compute_coadd_stack(
+        images=[i1, i2],
+        variances=[v1, v2],
+        masks=[m1, m2],
+        method="mean",
+    )
+
+    # Frame count is 2
+    assert stats["frame_count"] == 2
+    # Flagged pixels should be tracked
+    assert stats["flagged_pixels_count"] >= 1
+    # For pixel (0, 0), only 1 frame contributed, so stacked variance should be 0.5, not (0.5+0.5)/1 = 1.0!
+    # And overall propagated sigma should be well below 1.0
+    assert stats["propagated_noise_sigma"] < 0.6

@@ -125,9 +125,91 @@ def extract_fatal_quality_mask(hdul: fits.HDUList) -> Optional[np.ndarray]:
                 fatal_mask_val |= planes[name]
         return (flags & fatal_mask_val) != 0
     else:
-        # Fallback for synthetic / mock FITS where bits 1, 2, 4, 8, 16 are used
+        # Fallback for synthetic / mock FITS where bits 1, 2, 4, 8 are used
         legacy_fatal_bits = 1 | 2 | 4 | 8
         return (flags & legacy_fatal_bits) != 0
+
+def extract_source_mask(hdul: fits.HDUList) -> Optional[np.ndarray]:
+    """
+    Returns a boolean 2D numpy array where True indicates a nominal astronomical source detection
+    (e.g. SOURCE mask plane or FULLSAMPLE) rather than a fatal defect.
+    Returns None if no FLAGS extension is present.
+    """
+    if "FLAGS" not in hdul or hdul["FLAGS"].data is None:
+        return None
+
+    flags = hdul["FLAGS"].data.astype(np.int32)
+    hdr = hdul["FLAGS"].header
+    planes = parse_spherex_mask_planes(hdr)
+
+    if planes:
+        source_bitmask = 0
+        for name in SPHEREX_INFORMATIONAL_FLAG_NAMES:
+            if name in planes:
+                source_bitmask |= planes[name]
+        return (flags & source_bitmask) != 0
+    else:
+        # Default mock: bit 32 for source detection if present
+        return (flags & 32) != 0
+
+def extract_calibrated_wavelength(
+    hdul: fits.HDUList,
+    target_coord: Optional[Tuple[float, float]] = None,
+) -> Optional[Dict[str, Any]]:
+    """
+    Extracts calibrated wavelength and bandwidth from the official SPHEREx WCS-WAVE
+    tabular extension. Evaluates the 2D dispersion calibration at the target's celestial
+    coordinates (or image center) on the detector focal plane.
+    """
+    if "WCS-WAVE" not in hdul or hdul["WCS-WAVE"].data is None:
+        return None
+
+    try:
+        from scipy.interpolate import RegularGridInterpolator
+        tb = hdul["WCS-WAVE"].data
+        x_grid = np.asarray(tb["X"][0], dtype=np.float64)
+        y_grid = np.asarray(tb["Y"][0], dtype=np.float64)
+        vals = np.asarray(tb["VALUES"][0], dtype=np.float64)
+
+        img_hdr = hdul["IMAGE"].header if "IMAGE" in hdul else hdul[1].header
+        w = extract_astropy_wcs(img_hdr)
+
+        px, py = None, None
+        if target_coord is not None and w is not None:
+            try:
+                px, py = w.world_to_pixel_values(target_coord[0], target_coord[1])
+            except Exception:
+                pass
+
+        if px is None or not np.isfinite(px) or py is None or not np.isfinite(py):
+            naxis1 = img_hdr.get("NAXIS1", 12)
+            naxis2 = img_hdr.get("NAXIS2", 12)
+            px = (naxis1 - 1.0) / 2.0
+            py = (naxis2 - 1.0) / 2.0
+
+        crpix1w = float(img_hdr.get("CRPIX1W", 0.0))
+        crpix2w = float(img_hdr.get("CRPIX2W", 0.0))
+        crval1w = float(img_hdr.get("CRVAL1W", 1.0))
+        crval2w = float(img_hdr.get("CRVAL2W", 1.0))
+
+        full_x = (float(px) + 1.0 - crpix1w) + crval1w - 1.0
+        full_y = (float(py) + 1.0 - crpix2w) + crval2w - 1.0
+
+        interp_wave = RegularGridInterpolator((y_grid, x_grid), vals[:, :, 0], bounds_error=False, fill_value=None)
+        interp_dwave = RegularGridInterpolator((y_grid, x_grid), vals[:, :, 1], bounds_error=False, fill_value=None)
+
+        wave = float(interp_wave([[full_y, full_x]])[0])
+        dwave = float(interp_dwave([[full_y, full_x]])[0])
+
+        return {
+            "wavelength_um": round(wave, 4),
+            "bandwidth_um": round(dwave, 4),
+            "calibration_method": "WCS-WAVE",
+            "full_detector_x": round(float(full_x), 1),
+            "full_detector_y": round(float(full_y), 1),
+        }
+    except Exception:
+        return None
 
 def extract_variance_data(hdul: fits.HDUList) -> Optional[np.ndarray]:
     """

@@ -45,13 +45,20 @@ def compute_aperture_photometry(
                 pass
 
     if center_y is None or center_x is None:
-        from app.science.motion import _find_brightest_centroid
-        cen = _find_brightest_centroid(image)
-        if cen is not None:
-            center_y, center_x, _ = cen
-        else:
+        if target_coord is not None:
+            # Celestial target was requested but WCS failed to project to valid pixels;
+            # remain at frame center without wandering off to arbitrary brightest field stars
             center_y = (h - 1) / 2.0
             center_x = (w - 1) / 2.0
+        else:
+            # Blind peak-seeking only when no target coordinates were specified
+            from app.science.motion import _find_brightest_centroid
+            cen = _find_brightest_centroid(image)
+            if cen is not None:
+                center_y, center_x, _ = cen
+            else:
+                center_y = (h - 1) / 2.0
+                center_x = (w - 1) / 2.0
 
     y_indices, x_indices = np.indices((h, w))
     dist_sq = (y_indices - center_y) ** 2 + (x_indices - center_x) ** 2
@@ -59,7 +66,7 @@ def compute_aperture_photometry(
 
     # Valid pixel mask: must be finite and not flagged by fatal quality mask
     valid_mask = np.isfinite(image)
-    if mask is not None:
+    if mask is not None and mask.shape == image.shape:
         valid_mask &= (~mask)
 
     if not np.any(valid_mask):
@@ -72,6 +79,9 @@ def compute_aperture_photometry(
             "flux_err": 0.0,
             "peak_flux": 0.0,
             "snr": 0.0,
+            "coverage_fraction": 0.0,
+            "aperture_area_pixels": 0,
+            "valid_pixel_count": 0,
         }
 
     # Clean array for safe evaluation
@@ -79,10 +89,17 @@ def compute_aperture_photometry(
     fill_val = float(np.median(image[valid_mask]))
     clean_img[~valid_mask] = fill_val
 
-    # Aperture mask
-    ap_mask = (dist <= aperture_radius) & valid_mask
+    # Theoretical full circular aperture area
+    r_int = int(np.ceil(aperture_radius))
+    dy_grid, dx_grid = np.ogrid[-r_int:r_int+1, -r_int:r_int+1]
+    n_geom = int(np.sum(dy_grid**2 + dx_grid**2 <= aperture_radius**2))
+
+    # Aperture mask on image pixels
+    geom_ap_mask = dist <= aperture_radius
+    ap_mask = geom_ap_mask & valid_mask
     ap_pixels = clean_img[ap_mask]
     n_ap = int(np.sum(ap_mask))
+    coverage_fraction = float(n_ap / max(1, n_geom))
 
     # Background annulus mask
     ann_mask = (dist >= annulus_inner) & (dist <= annulus_outer) & valid_mask
@@ -104,19 +121,29 @@ def compute_aperture_photometry(
         ap_mean = float(np.mean(ap_pixels))
         peak_val = float(np.max(ap_pixels))
         # Net flux = aperture sum minus background contribution
-        net_flux = float(ap_sum - (bg_med * n_ap))
+        raw_net_flux = float(ap_sum - (bg_med * n_ap))
 
         # Real Photometric Flux Uncertainty Propagation (sigma_F = sqrt(sum(sigma_i^2)))
-        if variance is not None:
+        if variance is not None and variance.shape == image.shape:
             # Clean variance
             var_clean = np.where(np.isfinite(variance) & (variance >= 0), variance, 0.0)
             ap_var_sum = float(np.sum(var_clean[ap_mask]))
             ann_var_mean = float(np.mean(var_clean[ann_mask])) if n_ann > 0 else (bg_std ** 2)
             bg_var_contrib = (n_ap ** 2 / max(1, n_ann)) * ann_var_mean
-            flux_err = float(np.sqrt(max(0.0, ap_var_sum + bg_var_contrib)))
+            raw_flux_err = float(np.sqrt(max(0.0, ap_var_sum + bg_var_contrib)))
         else:
             # Poisson + background uncertainty estimate
-            flux_err = float(np.sqrt(n_ap * (bg_std ** 2) + (n_ap ** 2 / max(1, n_ann)) * (bg_std ** 2)))
+            raw_flux_err = float(np.sqrt(n_ap * (bg_std ** 2) + (n_ap ** 2 / max(1, n_ann)) * (bg_std ** 2)))
+
+        # Astronomical aperture boundary clipping correction:
+        # If the target is located near the frame border or has masked pixels within the aperture,
+        # scale the net flux and error by the aperture coverage fraction (1 / f_cov)
+        if coverage_fraction >= 0.15:
+            net_flux = float(raw_net_flux / coverage_fraction)
+            flux_err = float(raw_flux_err / coverage_fraction)
+        else:
+            net_flux = raw_net_flux
+            flux_err = raw_flux_err
 
         snr = float(net_flux / flux_err) if flux_err > 1e-6 else float((peak_val - bg_med) / bg_std)
     else:
@@ -136,6 +163,9 @@ def compute_aperture_photometry(
         "flux_err": round(flux_err, 4),
         "peak_flux": round(peak_val, 4),
         "snr": round(max(0.0, snr), 2),
+        "coverage_fraction": round(coverage_fraction, 3),
+        "aperture_area_pixels": n_geom,
+        "valid_pixel_count": n_ap,
     }
 
 def build_lightcurve_series(
@@ -221,8 +251,8 @@ def build_lightcurve_series(
             v_idx = s / abs(m) if abs(m) > 1.0 else 0.0
             if v_idx > max_var_index:
                 max_var_index = v_idx
-            # Confirm variability if significant relative variation (>20%) and amplitude (>25.0 MJy/sr) OR large amplitude (>60.0 MJy/sr)
-            if (v_idx > 0.20 and d_amp > 25.0) or d_amp > 60.0:
+            # Confirm variability if significant relative variation (>15%) and amplitude (>20.0 MJy/sr) OR large amplitude (>50.0 MJy/sr)
+            if (v_idx > 0.15 and d_amp > 20.0) or d_amp > 50.0:
                 is_variable = True
 
     return {

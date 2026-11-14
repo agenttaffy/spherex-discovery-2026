@@ -143,9 +143,15 @@ def generate_spectrum_for_target(
             try:
                 hd = load_fits_cutout(b)
                 img, hdr = extract_primary_image(hd)
-                from app.science.fits_processing import extract_variance_data, extract_fatal_quality_mask
+                from app.science.fits_processing import (
+                    extract_variance_data,
+                    extract_fatal_quality_mask,
+                    extract_calibrated_wavelength,
+                )
                 var = extract_variance_data(hd)
                 mask = extract_fatal_quality_mask(hd)
+                wave_cal = extract_calibrated_wavelength(hd, target_coord=(ra, dec))
+
                 phot = compute_aperture_photometry(
                     image=img,
                     target_coord=(ra, dec),
@@ -156,7 +162,7 @@ def generate_spectrum_for_target(
                 snr = phot.get("snr", 0.0)
 
                 if det_key not in measured_by_detector or snr > measured_by_detector[det_key]["snr"]:
-                    measured_by_detector[det_key] = {
+                    meas_entry = {
                         "flux_mjy_sr": phot["net_flux"],
                         "peak_flux_mjy_sr": phot["peak_flux"],
                         "flux_err_mjy_sr": phot.get("flux_err", phot["background_std"]),
@@ -164,6 +170,12 @@ def generate_spectrum_for_target(
                         "obs_id": obs_id,
                         "observed": True,
                     }
+                    if wave_cal is not None:
+                        meas_entry["calibrated_wave_um"] = wave_cal["wavelength_um"]
+                        meas_entry["bandwidth_um"] = wave_cal["bandwidth_um"]
+                        meas_entry["calibration_source"] = wave_cal["calibration_method"]
+
+                    measured_by_detector[det_key] = meas_entry
             except Exception:
                 pass
 
@@ -256,6 +268,10 @@ def generate_spectrum_for_target(
         det_name = cfg["detector"]
         wave_eff = cfg["wave_eff"]
         
+        calibrated_wave = None
+        bandwidth_val = None
+        cal_source = "Detector Nominal Bandpass"
+
         if det_name in measured_by_detector:
             meas = measured_by_detector[det_name]
             flux = float(meas["flux_mjy_sr"])
@@ -264,6 +280,11 @@ def generate_spectrum_for_target(
             snr = float(meas["snr"])
             is_obs = True
             obs_id_val = meas.get("obs_id")
+            if "calibrated_wave_um" in meas:
+                wave_eff = float(meas["calibrated_wave_um"])
+                calibrated_wave = wave_eff
+                bandwidth_val = meas.get("bandwidth_um")
+                cal_source = meas.get("calibration_source", "WCS-WAVE")
         else:
             # Model synthetic flux based on physical profile
             if preset_type == "wise_0855":
@@ -296,9 +317,11 @@ def generate_spectrum_for_target(
         bands_output.append({
             "detector": det_name,
             "band_idx": cfg["band_idx"],
-            "wavelength_um": wave_eff,
+            "wavelength_um": round(wave_eff, 4),
             "wavelength_min_um": cfg["wave_min"],
             "wavelength_max_um": cfg["wave_max"],
+            "bandwidth_um": bandwidth_val,
+            "calibration_source": cal_source,
             "color": cfg["color"],
             "flux_mjy_sr": round(flux, 4),
             "flux_density_mjy": round(flux_density_mjy, 4),
@@ -395,6 +418,7 @@ def generate_spectrum_for_target(
         "total_observed_bands": len(measured_by_detector),
         "total_observed_channels": len(observed_channels),
         "observed_channels": observed_channels,
+        "observed_detector_bands": observed_channels,
         "bands": bands_output,
         "channels_102": channels_102,
         "estimated_channels_102": channels_102,
@@ -408,7 +432,9 @@ def generate_spectrum_for_target(
             "spectral_class": spec_class,
             "integrated_flux_mjy_sr_um": round(total_flux_integral, 3),
             "total_channels": len(channels_102),
+            "estimated_channels_count": len(channels_102),
             "continuum_model_label": "Estimated Continuum Model (Interpolated)",
             "observed_channels_count": len(observed_channels),
+            "observed_bands_count": len(observed_channels),
         },
     }

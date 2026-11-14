@@ -93,3 +93,13 @@
   4. **LVF Wavelength Compatibility & Mask-Preserving Differencing:** Verify Linear Variable Filter wavelength overlap in `check_comparison_eligibility`. Mask fatal quality pixels to mid-gray (128) in difference frames. Return clear descriptive errors when reprojection fails or celestial coverage does not overlap.
   5. **Detector Band Stacking & Variance Propagation:** Enforce compatible detector arrays in co-addition. Propagate variance ($\text{Var}_{\text{stack}} = \frac{1}{N^2} \sum \text{Var}_i$ for mean co-addition) and propagate bitwise OR of fatal quality masks.
   6. **Catalog Provenance Disambiguation:** In `catalogs.py`, `catalog_service.py`, and `CanvasViewer.tsx`, explicitly label fallback reference stars as "Curated Reference Catalog (Demo)" vs "Live ESA Gaia TAP".
+
+## ADR-019: Rigorous WCS-WAVE Dispersion Calibration, Boundary Aperture Correction, Mask-Aware Stacking Variance, and Celestial Vector Astrometry
+- **Date:** 2026-11-14
+- **Decision:** Further scientific hardening following skeptical adversarial review:
+  1. **Official SPHEREx WCS-WAVE Calibration:** Extract per-pixel wavelength and bandwidth from the official FITS binary table extension `WCS-WAVE` using focal plane pixel mapping (`CRPIX1W`, `CRPIX2W`, `CRVAL1W`, `CRVAL2W`) and 2D bilinear interpolation, replacing static band-center wavelengths with true dispersed wavelengths.
+  2. **Boundary Aperture Correction:** Implement discrete geometric circle area baseline ($A_{\text{circle}} = \sum (dx^2 + dy^2 \le r^2)$) to compute exact aperture coverage fractions ($f_{\text{cov}}$) when targets lie near frame borders or encompass masked pixels, applying $1 / f_{\text{cov}}$ flux and error corrections.
+  3. **Strict Target Coordinate Anchoring in Photometry & Astrometry:** When target coordinates `(ra, dec)` are requested, strictly anchor to expected WCS coordinates rather than peak-seeking, preventing wandering off to brighter field stars.
+  4. **Celestial Astrometric Motion Components:** Calculate and report equatorial vector components $(\Delta\alpha \cos\delta, \Delta\delta)$ and proper motion vector rates $(\mu_\alpha \cos\delta, \mu_\delta)$ in mas/yr matching Gaia DR3 conventions.
+  5. **Mask-Aware Co-Addition Variance Propagation:** In `stacking.py`, explicitly mask out variances for pixels that are invalid/masked in individual frames, preventing non-contributing masked pixels from inflating stacked variance. Track and report propagated boolean OR quality masks.
+  6. **Labeling Precision:** Correct frontend tooltip in `SpectrumChart.tsx` to label observed arrays as "Observed SPHEREx Detector Band" rather than "Observed SPHEREx Channel", preserving clear distinction between broad detector array bands and spectroscopic channels.

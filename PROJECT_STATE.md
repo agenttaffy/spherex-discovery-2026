@@ -1,7 +1,7 @@
 # SPHEREx Discovery — Project State
 
-**Last Updated:** 2026-11-14T19:30:00Z  
-**Current Implementation Stage:** Phase 6 Scientific Audit & Codebase Hardening (Documented SPHEREx FLAGS Bit Definitions, Nominal SOURCE Mask Distinction, WCS-Transformed Photometry & VARIANCE Error Propagation, 102-Channel Estimated Continuum Modeling Separation, WCS Celestial Target Astrometric Tracking across Epochs, LVF Passband Compatibility & Mask-Preserving Differencing, Compatible Stacking with Variance Propagation, Catalog Provenance Labeling, 77 Passing Pytest Tests, Clean Production Build).
+**Last Updated:** 2026-11-14T20:18:00Z  
+**Current Implementation Stage:** Phase 6 Scientific Audit & Codebase Hardening (Documented SPHEREx FLAGS Bit Definitions, Nominal SOURCE Mask Distinction, WCS-Transformed Photometry & VARIANCE Error Propagation, WCS-WAVE Dispersion Tabular Calibration, Boundary Aperture Area Coverage Correction, 102-Channel Estimated Continuum Modeling Separation, WCS Celestial Target Astrometric Tracking with Equatorial Proper Motion Vectors, LVF Passband Compatibility & Mask-Preserving Differencing, Mask-Aware Compatible Stacking with Variance Propagation, Catalog Provenance Labeling, 81 Passing Pytest Tests, Clean Production Build).
 
 ---
 
@@ -90,7 +90,7 @@
   - Formatted J2000 sexagesimal target reports with astrometric vectors, light curve stats, and verified IRSA DOI 10.26131/IRSA678 citations.
 - **Guided Educational Tour Modal (`GuidedTourModal.tsx`):**
   - 4-step interactive walkthrough explaining SPHEREx LVF optics, dipole vs monopole signatures, official targets, and judging criteria alignment.
-- **Comprehensive Automated Test Suite:** 69 passing pytest tests covering unit, science, 3D WCS reprojection, rotated WCS alignment, WebP, robust background co-addition/stacking, 102-channel SED, offline resilience, and integration flows.
+- **Comprehensive Automated Test Suite:** 81 passing pytest tests covering unit, science, 3D WCS reprojection, rotated WCS alignment, WebP, robust background co-addition/stacking, 102-channel SED, offline resilience, and scientific regression flows.
 
 ---
 

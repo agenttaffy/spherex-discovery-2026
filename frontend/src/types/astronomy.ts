@@ -167,6 +167,8 @@ export interface SpectrumBandPoint {
   wavelength_um: number;
   wavelength_min_um: number;
   wavelength_max_um: number;
+  bandwidth_um?: number;
+  calibration_source?: string;
   color: string;
   flux_mjy_sr: number;
   flux_density_mjy: number;

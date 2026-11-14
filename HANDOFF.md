@@ -24,12 +24,12 @@
     - Explicitly labeled fallback catalog sources as "Curated Reference Catalog (Demo)" vs "Live ESA Gaia TAP" in `catalogs.py`, `catalog_service.py`, `CanvasViewer.tsx`, and `astronomy.ts`.
   - **Testing & Verification:**
     - Created `backend/tests/test_scientific_audit_regression.py` covering all 6 priorities.
-    - All 77 backend tests pass in 7.41s (`python -m pytest -v`).
-    - Frontend compiles cleanly with `npm run build` in 2.42s (0 errors, 0 warnings).
+    - All 81 backend tests pass in 6.95s (`python -m pytest -v`).
+    - Frontend compiles cleanly with `npm run build` in 2.63s (0 errors, 0 warnings).
 
 ## 2. Current Working State
-- **Backend:** Starts cleanly with `python -m uvicorn app.main:app --port 8000`. All 77 tests pass.
-- **Frontend:** Builds cleanly with `npm run build` in 2.42s (0 type errors, 0 warnings).
+- **Backend:** Starts cleanly with `python -m uvicorn app.main:app --port 8000`. All 81 tests pass.
+- **Frontend:** Builds cleanly with `npm run build` in 2.63s (0 type errors, 0 warnings).
 - **Demo Mode:** Local caching of 22 verified FITS cutouts enables immediate offline presentation and judging with circuit breaker fallback on remote outages.
 
 ## 3. Current Blocker
@@ -43,7 +43,7 @@ python scripts/verify_environment.py
 # 2. Demonstration Assets Verification
 python scripts/verify_demo.py
 
-# 3. Backend Test Suite (77 tests)
+# 3. Backend Test Suite (81 tests)
 cd backend
 python -m pytest -v
 
