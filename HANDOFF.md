@@ -1,17 +1,15 @@
 # Agent Handoff Document
 
 ## 1. Last Completed Work
-- **Scientific Truthfulness Review Pass (5 Audit Items + Edge-Case Hardening):**
-  - **Astrometric Motion Target Tracking Without Blind Substitution:** In `motion.py` (`measure_astrometric_motion`), ensured that when a celestial target is requested (`target_coord`), failed WCS projection or undetectable target centroids strictly return `centroid_detected: False` with zero motion instead of silently substituting the blind brightest peak in the frame. Removed duplicate dead code in `_find_local_centroid`.
-  - **Quality Flags Metadata Truthfulness & Elimination of Hardcoded Bit Guesses:** In `fits_processing.py` (`evaluate_quality_flags`), added `allow_legacy_synthetic=False` parameter. Preserves an explicit unknown/missing state (`quality_state: "unknown_metadata_missing"`) when FITS headers lack `MSKN`/`MSKM` cards rather than guessing flag semantics from undocumented bits. Removed hardcoded fallback integers in mask planes.
-  - **3D Celestial WCS Support & Cutout Boundary Protection in Dispersion Extraction:** In `fits_processing.py` (`extract_calibrated_wavelength`), extracted 2D sub-WCS via `w.celestial` for multi-axis spectral cubes (`NAXIS=3`), and verified target coordinates lie within cutout boundaries (`[0, NAXIS1)`, `[0, NAXIS2)`) before evaluating 2D dispersion calibration tables, returning `None` (`unavailable`) for targets outside the frame.
-  - **Planck Blackbody Continuum Robustness & Classification Metadata:** In `spectrum.py` (`fit_blackbody_continuum`), guarded against `TypeError` when input flux errors are `None` or non-positive. Enforced a minimum of 2 distinct observed wavelengths/bands (returning `status: "unavailable"` for zero spectral baseline). Set `degrees_of_freedom = 0` and `reduced_chi2 = None` for 2-point fits. Added documented `continuum_classification` reporting profile method, inputs, and limitations.
-  - **Default NaN Preservation in FITS Image Extraction:** In `fits_processing.py` (`extract_primary_image`), set `preserve_nan: bool = True` as default across all scientific analysis pipelines, preserving non-finite pixels as masks while providing `preserve_nan=False` for display backwards compatibility.
-  - **Coadd Stack RuntimeWarning Cleanliness:** In `stacking.py` (`compute_coadd_stack`), wrapped `np.nanmean` with a targeted RuntimeWarning filter for all-NaN empty slices. In `ComparisonView.tsx`, prevented negative gain percentages from rendering as `+-20%`. Exposed `snr_gain_status` and `theoretical_gain_model` via `/science/stack`.
-  - **Regression Suite:** Added new regression test `test_audit_motion_requested_target_never_substitutes_brightest_peak`. Total backend tests: **92 passed in 7.82s**; accessibility checks: **41 passed**; production build cleanly passing with 0 errors in 2.62s; 22/22 demonstration FITS assets verified; IRSA SIA endpoint reachable (status 200).
+- **Scientific Truthfulness Follow-up Pass (Spectrum & Temperature Fit):**
+  - **Neutral Broadband Continuum Shape Descriptions:** Replaced broad-band slope inferred astrophysical classifications ("Brown Dwarf Candidate", "Cool Stellar Atmosphere", etc.) with neutral measured-shape descriptions ("flux rises toward longer measured bands", "flux falls toward longer measured bands", "peak among measured detector bands", "insufficient observed coverage"). Added `continuum_shape` field to summary.
+  - **Strict Temperature Fit Conditions:** In `fit_blackbody_continuum`, two-parameter fit requires at least 3 distinct measured detector bands with valid propagated photometric errors ($\text{dof} \ge 1$). Removed 10% error substitution. If inputs lack error, or bands $< 3$, or curvature is unconstrained, returns `status: "unavailable"` and no temperature.
+  - **Zero-Observation Unavailable Metrics:** When zero archive bands exist, peak wavelength, peak detector, peak flux, estimated temperature, and integrated flux are set to `None`. No synthetic peaks are reported as measured.
+  - **Frontend & Discovery Report Updates:** `SpectrumChart.tsx` displays "Continuum Shape:" and caveat; `report.py` clearly documents single-temperature continuum fit without presenting it as verified physical temperature.
+  - **Regression Test Coverage:** Full backend suite passing **93 tests** in 10.11s; accessibility checks passing **41/41**; clean frontend build in 2.55s; 22/22 demonstration cutouts verified; IRSA SIA endpoint verified (HTTP 200).
 
 ## 2. Current Working State
-- **Backend:** Starts cleanly with `python -m uvicorn app.main:app --port 8000`. All 92 pytest tests pass.
+- **Backend:** Starts cleanly with `python -m uvicorn app.main:app --port 8000`. All 93 pytest tests pass.
 - **Frontend:** Builds cleanly with `npm run build` (0 type errors, 0 warnings).
 - **Accessibility & Responsive:** All 41 automated checks pass in `node scripts/verify_accessibility_and_responsive.mjs`.
 - **Demo Mode:** Local caching of 22 verified FITS cutouts enables immediate offline presentation and judging with circuit breaker fallback on remote outages.
@@ -30,7 +28,7 @@ python scripts/verify_environment.py
 # 2. Demonstration Assets Verification
 python scripts/verify_demo.py
 
-# 3. Backend Test Suite (91 tests)
+# 3. Backend Test Suite (93 tests)
 $env:PYTHONPATH="backend"
 python -m pytest -v
 

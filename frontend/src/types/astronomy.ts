@@ -196,13 +196,15 @@ export interface SpectralChannel {
 }
 
 export interface SpectrumSummary {
-  peak_wavelength_um: number;
-  peak_detector: string;
-  peak_flux_mjy_sr: number;
+  peak_wavelength_um?: number | null;
+  peak_detector?: string | null;
+  peak_flux_mjy_sr?: number | null;
+  peak_is_measured?: boolean;
   estimated_temperature_k?: number | null;
+  continuum_shape?: string;
   spectral_class: string;
   spectral_class_limitations?: string;
-  integrated_flux_mjy_sr_um: number;
+  integrated_flux_mjy_sr_um?: number | null;
   total_channels: number;
   temperature_fit?: any;
 }

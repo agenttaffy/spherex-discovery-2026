@@ -149,7 +149,7 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
         <svg
           viewBox={`0 0 ${width} ${height}`}
           role="img"
-          aria-label={`SPHEREx Spectral Energy Distribution Chart. Observed across ${total_observed_bands} detector bands with wavelength range 0.75 to 5.0 micrometers. Peak wavelength ${summary.peak_wavelength_um.toFixed(2)} micrometers in band ${summary.peak_detector}.`}
+          aria-label={`SPHEREx Spectral Energy Distribution Chart. Observed across ${total_observed_bands} detector bands with wavelength range 0.75 to 5.0 micrometers. ${summary.peak_wavelength_um != null && summary.peak_detector ? `Peak wavelength ${summary.peak_wavelength_um.toFixed(2)} micrometers in band ${summary.peak_detector}.` : 'Peak wavelength and band unavailable (no observed archive bands).'}`}
           className="w-full h-32 bg-slate-900/60 rounded border border-slate-800 select-none overflow-hidden"
         >
           {/* Detector Range Color Bands Background */}
@@ -515,25 +515,38 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
       {/* Spectral Continuum Profile & Summary Bar */}
       <div className="bg-slate-900/80 border border-slate-800 rounded p-2 space-y-1.5 font-mono">
         <div className="flex items-center justify-between text-[10px]">
-          <span className="text-slate-400">Continuum Profile:</span>
-          <span className="text-indigo-300 font-semibold text-right truncate max-w-[170px]" title={summary.spectral_class}>
-            {summary.spectral_class}
+          <span className="text-slate-400">Continuum Shape:</span>
+          <span className="text-indigo-300 font-semibold text-right truncate max-w-[170px]" title={summary.continuum_shape || summary.spectral_class}>
+            {summary.continuum_shape || summary.spectral_class}
           </span>
+        </div>
+        <div className="text-[8.5px] text-slate-500 italic">
+          Broadband continuum shape only; not an astrophysical classification.
         </div>
         <div className="grid grid-cols-3 gap-1 pt-1 text-center">
           <div className="bg-slate-950/60 p-1 rounded border border-slate-800/80">
             <span className="text-[9px] text-slate-400 block">Peak λ</span>
-            <span className="text-[11px] text-amber-300 font-bold">{summary.peak_wavelength_um.toFixed(2)} µm</span>
+            <span className="text-[11px] text-amber-300 font-bold">
+              {summary.peak_wavelength_um != null ? `${summary.peak_wavelength_um.toFixed(2)} µm` : 'Unavailable'}
+            </span>
           </div>
           <div className="bg-slate-950/60 p-1 rounded border border-slate-800/80">
             <span className="text-[9px] text-slate-400 block">Peak Band</span>
-            <span className="text-[11px] text-cyan-300 font-bold">{summary.peak_detector.replace('SPHEREx-', '')}</span>
+            <span className="text-[11px] text-cyan-300 font-bold">
+              {summary.peak_detector ? summary.peak_detector.replace('SPHEREx-', '') : 'Unavailable'}
+            </span>
           </div>
           <div className="bg-slate-950/60 p-1 rounded border border-slate-800/80">
             <span className="text-[9px] text-slate-400 block">Observed</span>
             <span className="text-[11px] text-emerald-300 font-bold">{total_observed_bands} / 6</span>
           </div>
         </div>
+        {summary.estimated_temperature_k != null && (
+          <div className="flex items-center justify-between text-[9px] pt-1 border-t border-slate-800/60">
+            <span className="text-slate-400">Single-T Continuum Fit:</span>
+            <span className="text-amber-300 font-semibold">{summary.estimated_temperature_k} K (Broadband approx)</span>
+          </div>
+        )}
       </div>
     </div>
   );

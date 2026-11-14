@@ -1,8 +1,8 @@
 # SPHEREx Discovery — Test Execution Record
 
-**Execution Timestamp:** 2026-11-14T23:12:00Z  
+**Execution Timestamp:** 2026-11-14T23:27:00Z  
 **Platform:** Windows 11 / Python 3.11.4 / Node.js v22.19.0  
-**Test Suite Status:** 92 backend pytest tests passed in 7.82s | 41 automated UI accessibility checks passed | Frontend Build: 0 errors in 2.62s | Demo Assets: 22/22 verified | NASA/IPAC IRSA SIA: 200 OK
+**Test Suite Status:** 93 backend pytest tests passed in 10.11s | 41 automated UI accessibility checks passed | Frontend Build: 0 errors in 2.55s | Demo Assets: 22/22 verified | NASA/IPAC IRSA SIA: 200 OK
 
 ---
 
@@ -85,17 +85,19 @@ backend/tests/test_scientific_audit_regression.py::test_priority_1_source_mask_b
 backend/tests/test_scientific_audit_regression.py::test_priority_2_discovery_report_sed_truthfulness PASSED [ 73%]
 backend/tests/test_scientific_audit_regression.py::test_priority_3_pointing_shift_not_presented_as_target_motion PASSED [ 74%]
 backend/tests/test_scientific_audit_regression.py::test_priority_1_lightcurve_source_mask_background_exclusion PASSED [ 75%]
-backend/tests/test_scientific_audit_regression.py::test_audit_photometry_target_wcs_failure_returns_unavailable PASSED [ 76%]
-backend/tests/test_scientific_audit_regression.py::test_audit_fits_processing_wavelength_and_mask_semantics PASSED [ 78%]
-backend/tests/test_scientific_audit_regression.py::test_audit_spectrum_truthfulness_and_documented_bb_fit PASSED [ 79%]
-backend/tests/test_scientific_audit_regression.py::test_audit_stacking_snr_improvement_uncensored PASSED [ 80%]
-backend/tests/test_scientific_audit_regression.py::test_audit_nan_inf_preserved_as_masks_not_fabricated PASSED [ 81%]
+backend/tests/test_scientific_audit_regression.py::test_audit_photometry_target_wcs_failure_returns_unavailable PASSED [ 75%]
+backend/tests/test_scientific_audit_regression.py::test_audit_fits_processing_wavelength_and_mask_semantics PASSED [ 76%]
+backend/tests/test_scientific_audit_regression.py::test_audit_spectrum_truthfulness_and_documented_bb_fit PASSED [ 77%]
+backend/tests/test_scientific_audit_regression.py::test_audit_spectrum_truthfulness_tightened_temperature_and_neutral_shapes PASSED [ 78%]
+backend/tests/test_scientific_audit_regression.py::test_audit_stacking_snr_improvement_uncensored PASSED [ 79%]
+backend/tests/test_scientific_audit_regression.py::test_audit_nan_inf_preserved_as_masks_not_fabricated PASSED [ 80%]
+backend/tests/test_scientific_audit_regression.py::test_audit_motion_requested_target_never_substitutes_brightest_peak PASSED [ 81%]
 backend/tests/test_stacking_and_spectrum.py::test_compute_coadd_stack_mean_median_sum PASSED [ 82%]
 backend/tests/test_stacking_and_spectrum.py::test_compute_coadd_stack_nan_handling PASSED [ 83%]
 backend/tests/test_stacking_and_spectrum.py::test_compute_coadd_stack_wcs_reproject PASSED [ 84%]
-backend/tests/test_stacking_and_spectrum.py::test_spectrum_generation_102_channels PASSED [ 85%]
-backend/tests/test_stacking_and_spectrum.py::test_spectrum_endpoint_barnard PASSED [ 86%]
-backend/tests/test_stacking_and_spectrum.py::test_spectrum_endpoint_wise0855_brown_dwarf PASSED [ 87%]
+backend/tests/test_stacking_and_spectrum.py::test_spectrum_generation_102_channels PASSED [ 86%]
+backend/tests/test_stacking_and_spectrum.py::test_spectrum_endpoint_barnard PASSED [ 87%]
+backend/tests/test_stacking_and_spectrum.py::test_spectrum_endpoint_wise0855_brown_dwarf PASSED [ 88%]
 backend/tests/test_stacking_and_spectrum.py::test_spectrum_endpoint_sexagesimal PASSED [ 89%]
 backend/tests/test_stacking_and_spectrum.py::test_spectrum_endpoint_invalid_coords PASSED [ 90%]
 backend/tests/test_stacking_and_spectrum.py::test_stack_frames_endpoint_on_demo_epochs PASSED [ 91%]
@@ -108,7 +110,7 @@ backend/tests/test_stacking_and_spectrum.py::test_stack_frames_endpoint_distant_
 backend/tests/test_stacking_and_spectrum.py::test_spectrum_endpoint_fov_validation PASSED [ 98%]
 backend/tests/test_stacking_and_spectrum.py::test_robust_noise_sigma_point_source_insensitivity PASSED [100%]
 
-======================= 92 passed, 2 warnings in 7.82s ========================
+======================= 93 passed, 2 warnings in 10.11s ========================
 ```
 
 ---

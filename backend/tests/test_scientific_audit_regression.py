@@ -762,70 +762,166 @@ def test_audit_fits_processing_wavelength_and_mask_semantics():
 
 def test_audit_spectrum_truthfulness_and_documented_bb_fit():
     """
-    Scientific Truthfulness Audit Pass 3:
+    Scientific Truthfulness Audit Pass:
     Remove unsupported physical claims (e.g. hardcoded 260K, 3150K temperatures or preset identity heuristics).
-    Return documented blackbody fit with inputs, uncertainty, and limitations when >= 2 bands exist,
-    or None when < 2 bands exist. 102 channels must be labeled as illustrative estimated continuum.
+    Return documented single-temperature blackbody continuum fit with inputs, uncertainty, and limitations
+    only when >= 3 distinct bands exist with valid propagated errors (positive residual dof >= 1).
+    102 channels must be labeled as illustrative estimated continuum, never observed channels/resolution.
     """
     from app.science.spectrum import fit_blackbody_continuum, generate_spectrum_for_target
 
-    # 1. Fit with insufficient bands (< 2)
+    # 1. Fit with insufficient bands (< 3)
     fit_single = fit_blackbody_continuum([
         {"detector": "SPHEREx-D1", "wavelength_um": 0.935, "flux_mjy_sr": 10.0, "flux_err_mjy_sr": 0.5}
     ])
     assert fit_single["status"] == "unavailable"
     assert fit_single["temperature_k"] is None
-    assert "minimum of 2 observed detector bands" in fit_single["limitations"]
+    assert "minimum 3 distinct bands" in fit_single["reason"]
 
-    # 2. Fit with 2 observed bands (e.g. cool star rising at ~1.5 - 2.5 um)
-    # Degrees of freedom is 2 - 2 = 0, so reduced chi2 is None
+    # 2. Fit with 2 observed bands returns unavailable (two-parameter fit requires >= 3 bands for dof >= 1)
     fit_two = fit_blackbody_continuum([
         {"detector": "SPHEREx-D1", "wavelength_um": 0.935, "flux_mjy_sr": 5.0, "flux_err_mjy_sr": 0.2},
         {"detector": "SPHEREx-D3", "wavelength_um": 2.050, "flux_mjy_sr": 15.0, "flux_err_mjy_sr": 0.5},
     ])
-    assert fit_two["status"] == "converged"
-    assert fit_two["temperature_k"] is not None
+    assert fit_two["status"] == "unavailable"
+    assert fit_two["temperature_k"] is None
     assert fit_two["degrees_of_freedom"] == 0
     assert fit_two["reduced_chi2"] is None
-    assert len(fit_two["inputs"]) == 2
-    assert "Broadband continuum approximation" in fit_two["limitations"]
+    assert "minimum 3 distinct bands" in fit_two["reason"]
 
-    # Fit with 3 observed bands: dof = 3 - 2 = 1, reduced_chi2 is a float
+    # 3. Fit with 3 observed distinct bands: dof = 3 - 2 = 1, reduced_chi2 is a float
     fit_three = fit_blackbody_continuum([
         {"detector": "SPHEREx-D1", "wavelength_um": 0.935, "flux_mjy_sr": 5.0, "flux_err_mjy_sr": 0.2},
         {"detector": "SPHEREx-D3", "wavelength_um": 2.050, "flux_mjy_sr": 15.0, "flux_err_mjy_sr": 0.5},
         {"detector": "SPHEREx-D6", "wavelength_um": 4.710, "flux_mjy_sr": 12.0, "flux_err_mjy_sr": 0.4},
     ])
     assert fit_three["status"] == "converged"
+    assert fit_three["temperature_k"] is not None
     assert fit_three["degrees_of_freedom"] == 1
     assert fit_three["reduced_chi2"] is not None
+    assert "Single-temperature Planck blackbody continuum fit" in fit_three["model"]
 
-    # Handle None flux errors gracefully without TypeError
+    # 4. Missing/None flux error returns unavailable (missing-error no-fit; 10% substitution disallowed)
     fit_none_err = fit_blackbody_continuum([
         {"detector": "SPHEREx-D1", "wavelength_um": 0.935, "flux_mjy_sr": 5.0, "flux_err_mjy_sr": None},
-        {"detector": "SPHEREx-D3", "wavelength_um": 2.050, "flux_mjy_sr": 15.0, "flux_err_mjy_sr": None},
+        {"detector": "SPHEREx-D3", "wavelength_um": 2.050, "flux_mjy_sr": 15.0, "flux_err_mjy_sr": 0.5},
+        {"detector": "SPHEREx-D6", "wavelength_um": 4.710, "flux_mjy_sr": 12.0, "flux_err_mjy_sr": 0.4},
     ])
-    assert fit_none_err["status"] == "converged"
-    assert fit_none_err["temperature_k"] is not None
+    assert fit_none_err["status"] == "unavailable"
+    assert fit_none_err["temperature_k"] is None
+    assert "Missing valid propagated photometric uncertainty" in fit_none_err["limitations"]
 
-    # Repeated identical wavelengths (zero baseline) return unavailable
+    # 5. Repeated identical wavelengths (zero baseline) return unavailable
     fit_same_wave = fit_blackbody_continuum([
-        {"detector": "SPHEREx-D1", "wavelength_um": 0.935, "flux_mjy_sr": 5.0},
-        {"detector": "SPHEREx-D1", "wavelength_um": 0.935, "flux_mjy_sr": 5.2},
+        {"detector": "SPHEREx-D1", "wavelength_um": 0.935, "flux_mjy_sr": 5.0, "flux_err_mjy_sr": 0.2},
+        {"detector": "SPHEREx-D1", "wavelength_um": 0.935, "flux_mjy_sr": 5.2, "flux_err_mjy_sr": 0.2},
+        {"detector": "SPHEREx-D1", "wavelength_um": 0.935, "flux_mjy_sr": 5.1, "flux_err_mjy_sr": 0.2},
     ])
     assert fit_same_wave["status"] == "unavailable"
-    assert "Insufficient spectral baseline" in fit_same_wave["limitations"]
+    assert fit_same_wave["temperature_k"] is None
 
-    # 3. generate_spectrum_for_target at arbitrary coordinates
+    # 6. generate_spectrum_for_target with no observations
     spec = generate_spectrum_for_target(ra=150.0, dec=20.0, observations=[], cutout_fetcher=None)
-    # When no observations, temperature must be None (no unbacked claims!)
+    # When no observations, all summary metrics must be unavailable (no synthetic measured peaks!)
+    assert spec["summary"]["peak_wavelength_um"] is None
+    assert spec["summary"]["peak_detector"] is None
+    assert spec["summary"]["peak_flux_mjy_sr"] is None
+    assert spec["summary"]["peak_is_measured"] is False
     assert spec["summary"]["estimated_temperature_k"] is None
+    assert spec["summary"]["integrated_flux_mjy_sr_um"] is None
+    assert spec["summary"]["continuum_shape"] == "insufficient observed coverage (no observed archive bands)"
+    assert spec["summary"]["spectral_class"] == "insufficient observed coverage (no observed archive bands)"
     # Channels 102 must be labeled as illustrative estimated continuum
     for ch in spec["channels_102"]:
         assert ch["is_interpolated"] is True
         assert ch["is_observed"] is False
         assert "Estimated Continuum Model (Interpolated)" in ch["model_label"]
         assert "Never Observed Resolution" in ch["model_label"]
+
+
+def test_audit_spectrum_truthfulness_tightened_temperature_and_neutral_shapes():
+    """
+    Focused verification of the 4 truthfulness requirements:
+    1. Neutral measured-shape descriptions only (no Brown Dwarf, Cool Star, or Dust Disk candidate classifications).
+    2. Temperature fit unavailable with < 3 distinct bands (two-band no-fit) or missing propagated errors (missing-error no-fit).
+    3. Three-band documented fit succeeds with positive residual dof (dof >= 1).
+    4. Zero observations makes summary metrics unavailable without outputting synthetic peaks as measured.
+    """
+    from app.science.spectrum import fit_blackbody_continuum, generate_spectrum_for_target
+
+    # Req 1: Neutral profile output for candidate-like colors
+    # Rising slope (formerly "Cold Sub-stellar / Brown Dwarf")
+    class MockObs:
+        def __init__(self, obs_id, detector):
+            self.id = obs_id
+            self.detector = detector
+            self.access_url = "mock://obs"
+
+    class MockFetcher:
+        def __init__(self, fluxes):
+            self.fluxes = fluxes
+        def get(self, url):
+            return b"MOCK_FITS_BYTES"
+
+    # Test direct fit: Two-band no-fit
+    fit_2band = fit_blackbody_continuum([
+        {"detector": "SPHEREx-D1", "wavelength_um": 0.935, "flux_mjy_sr": 1.0, "flux_err_mjy_sr": 0.1},
+        {"detector": "SPHEREx-D6", "wavelength_um": 4.710, "flux_mjy_sr": 10.0, "flux_err_mjy_sr": 0.5},
+    ])
+    assert fit_2band["status"] == "unavailable"
+    assert fit_2band["temperature_k"] is None
+    assert fit_2band["degrees_of_freedom"] == 0
+
+    # Test direct fit: Missing-error no-fit
+    fit_no_err = fit_blackbody_continuum([
+        {"detector": "SPHEREx-D1", "wavelength_um": 0.935, "flux_mjy_sr": 1.0, "flux_err_mjy_sr": 0.1},
+        {"detector": "SPHEREx-D3", "wavelength_um": 2.050, "flux_mjy_sr": 3.0, "flux_err_mjy_sr": None},
+        {"detector": "SPHEREx-D6", "wavelength_um": 4.710, "flux_mjy_sr": 10.0, "flux_err_mjy_sr": 0.5},
+    ])
+    assert fit_no_err["status"] == "unavailable"
+    assert fit_no_err["temperature_k"] is None
+    assert "Missing valid propagated photometric uncertainty" in fit_no_err["limitations"]
+
+    # Test direct fit: Three-band documented fit behavior
+    fit_3band = fit_blackbody_continuum([
+        {"detector": "SPHEREx-D1", "wavelength_um": 0.935, "flux_mjy_sr": 10.0, "flux_err_mjy_sr": 0.3},
+        {"detector": "SPHEREx-D3", "wavelength_um": 2.050, "flux_mjy_sr": 12.0, "flux_err_mjy_sr": 0.4},
+        {"detector": "SPHEREx-D6", "wavelength_um": 4.710, "flux_mjy_sr": 4.0, "flux_err_mjy_sr": 0.2},
+    ])
+    assert fit_3band["status"] == "converged"
+    assert fit_3band["temperature_k"] is not None
+    assert fit_3band["uncertainty_k"] is not None
+    assert fit_3band["degrees_of_freedom"] == 1
+    assert fit_3band["reduced_chi2"] is not None
+    assert len(fit_3band["inputs"]) == 3
+    assert "not an object's known physical temperature" in fit_3band["limitations"]
+
+    # Req 4: Report generation SED section contains neutral shape and fit limitations
+    from app.science.report import generate_discovery_report
+    mock_spec_converged = {
+        "total_observed_bands": 3,
+        "observed_channels": [
+            {"detector": "SPHEREx-D1", "wavelength_um": 0.935, "flux_mjy_sr": 10.0, "flux_err_mjy_sr": 0.3, "calibration_source": "WCS-WAVE"},
+            {"detector": "SPHEREx-D3", "wavelength_um": 2.050, "flux_mjy_sr": 12.0, "flux_err_mjy_sr": 0.4, "calibration_source": "WCS-WAVE"},
+            {"detector": "SPHEREx-D6", "wavelength_um": 4.710, "flux_mjy_sr": 4.0, "flux_err_mjy_sr": 0.2, "calibration_source": "WCS-WAVE"},
+        ],
+        "temperature_fit": fit_3band,
+        "summary": {
+            "continuum_shape": "peak among measured detector bands (2.05 µm in SPHEREx-D3)",
+            "temperature_fit": fit_3band,
+        },
+    }
+    rep = generate_discovery_report(
+        target_name="Test Source",
+        ra_deg=269.452,
+        dec_deg=4.693,
+        spectrum_data=mock_spec_converged,
+    )
+    assert "Broadband Continuum Shape:" in rep["markdown_report"]
+    assert "Single-Temperature Blackbody Continuum Fit:" in rep["markdown_report"]
+    assert "not an object's known physical temperature" in rep["markdown_report"]
+    assert "Candidate Profile" not in rep["markdown_report"]
+    assert "Brown Dwarf" not in rep["markdown_report"]
 
 
 def test_audit_stacking_snr_improvement_uncensored():

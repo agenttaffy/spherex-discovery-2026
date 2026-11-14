@@ -82,14 +82,41 @@ def generate_discovery_report(
     if spectrum_data:
         obs_bands = spectrum_data.get("observed_channels") or spectrum_data.get("observed_detector_bands") or []
         total_obs = spectrum_data.get("total_observed_bands", len(obs_bands))
+        summary = spectrum_data.get("summary", {})
+        shape_desc = summary.get("continuum_shape") or summary.get("spectral_class") or "insufficient observed coverage"
+        bb_fit = spectrum_data.get("temperature_fit") or summary.get("temperature_fit") or {}
+
         md_lines.extend([
             "",
             "## 5. Spectral Energy Distribution (SED)",
             f"- **Observed Detector Bands:** {total_obs} of 6 bands (calibrated WCS-WAVE where available)",
             "- **Spectrophotometric Continuum:** Estimated Continuum Model (Interpolated across 6 detector bandpasses)",
-            "- **Spectral Line Caveat:** The 102 individual channel values represent an interpolated continuum curve across the 6 SPHEREx detector arrays, not 102 independently resolved spectral line measurements. Unsupported empirical temperature or classification claims are omitted.",
+            "- **Spectral Line Caveat:** The 102 individual channel values represent an interpolated continuum curve across the 6 SPHEREx detector arrays, not 102 independently resolved spectral line measurements.",
+            f"- **Broadband Continuum Shape:** {shape_desc} (Note: broadband continuum shape across measured detector bands, not an astrophysical classification)",
         ])
-        if obs_bands:
+
+        if bb_fit.get("status") == "converged" and bb_fit.get("temperature_k") is not None:
+            unc_str = f"± {bb_fit.get('uncertainty_k')} K" if bb_fit.get("uncertainty_k") is not None else "uncertainty unconstrained"
+            stats_parts = []
+            if bb_fit.get("reduced_chi2") is not None:
+                stats_parts.append(f"reduced χ² = {bb_fit['reduced_chi2']}")
+            if bb_fit.get("degrees_of_freedom") is not None:
+                stats_parts.append(f"dof = {bb_fit['degrees_of_freedom']}")
+            stats_str = f" ({', '.join(stats_parts)})" if stats_parts else ""
+            md_lines.append(
+                f"- **Single-Temperature Blackbody Continuum Fit:** T = {bb_fit['temperature_k']} {unc_str}{stats_str}. Note: Single-temperature broadband continuum fit; not an object's known physical temperature."
+            )
+        else:
+            limit_reason = bb_fit.get("reason") or bb_fit.get("limitations") or "Insufficient observed detector bands (minimum 3 distinct bands with propagated errors required for dof >= 1)"
+            md_lines.append(
+                f"- **Single-Temperature Blackbody Continuum Fit:** Unavailable ({limit_reason})"
+            )
+
+        if total_obs == 0:
+            md_lines.append(
+                "- **Archive Coverage Status:** No observed archive bands available. Summary metrics (peak wavelength, peak flux, temperature fit) are unavailable."
+            )
+        elif obs_bands:
             md_lines.append("")
             md_lines.append("### Observed Detector Photometry")
             md_lines.append("| Detector | λ_eff (μm) | Net Flux (MJy/sr) | ± Uncertainty | Calibration |")
