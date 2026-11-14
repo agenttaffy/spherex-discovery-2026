@@ -28,6 +28,9 @@ def parse_coordinates(
     ra_str = str(ra_input).strip()
     dec_str = str(dec_input).strip()
 
+    if not ra_str or not dec_str:
+        raise ValueError("Celestial coordinate inputs cannot be empty.")
+
     # Try simple float conversion first
     try:
         ra_val = float(ra_str)
@@ -42,11 +45,12 @@ def parse_coordinates(
 
     # Use Astropy SkyCoord for sexagesimal parsing
     try:
-        # Check if units are explicitly included
+        # Check if units are explicitly included or colon/space separated
         if "h" in ra_str or "m" in ra_str:
             coord = SkyCoord(ra_str, dec_str, unit=(u.hourangle, u.deg), frame="icrs")
-        elif ":" in ra_str:
-            coord = SkyCoord(f"{ra_str} {dec_str}", unit=(u.hourangle, u.deg), frame="icrs")
+        elif ":" in ra_str or " " in ra_str:
+            # Standard astronomical convention: sexagesimal RA is in hours, Dec in degrees
+            coord = SkyCoord(ra_str, dec_str, unit=(u.hourangle, u.deg), frame="icrs")
         else:
             coord = SkyCoord(ra_str, dec_str, unit=(u.deg, u.deg), frame="icrs")
 

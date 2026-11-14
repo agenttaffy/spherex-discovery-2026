@@ -50,6 +50,7 @@ export interface FrameResponse {
   image_base64: string;
   colormapped_base64?: string;
   provenance_url: string;
+  is_synthetic?: boolean;
 }
 
 export interface DemoPreset {

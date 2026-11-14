@@ -27,20 +27,27 @@ class CutoutService:
         fov_deg: float = 0.05
     ) -> bytes:
         """
-        Fetches FITS cutout from NASA IRSA IBE service using on-demand query parameters:
-        ?center=<ra>,<dec>&size=<size_deg>
-        Utilizes local disk cache to avoid redundant network loads.
+        Fetches FITS cutout from local cache or NASA IRSA IBE service.
+        Checks exact cutout URL hash, demo manifest cache mappings, and live IRSA endpoints.
         """
         cutout_url = f"{base_access_url}?center={ra:.6f},{dec:.6f}&size={fov_deg:.4f}"
 
-        # 1. Check cache
+        # 1. Check exact key in cache
         cached = cache_service.get(cutout_url)
         if cached:
             return cached
 
-        # 2. Fetch from NASA IRSA
+        # 2. Check demo service cache by base access URL
+        from app.services.demo_service import demo_service
+        demo_cached = demo_service.get_cached_cutout_for_url(base_access_url)
+        if demo_cached:
+            # Also populate exact URL cache for faster subsequent hits
+            cache_service.set(cutout_url, demo_cached)
+            return demo_cached
+
+        # 3. Fetch live from NASA IRSA IBE
         ssl_ctx = ssl.create_default_context(cafile=certifi.where())
-        async with httpx.AsyncClient(verify=ssl_ctx, timeout=35.0) as client:
+        async with httpx.AsyncClient(verify=ssl_ctx, timeout=30.0) as client:
             resp = await client.get(cutout_url, headers={"User-Agent": "SPHEREx-Discovery/1.0"})
             if resp.status_code != 200:
                 raise ValueError(f"IRSA IBE cutout returned status {resp.status_code}: {resp.text[:120]}")
@@ -92,7 +99,9 @@ class CutoutService:
         Retrieves observation by frame_id, downloads or loads cutout,
         processes extensions, and returns FrameResponse.
         """
-        # Look up metadata
+        is_synthetic = False
+
+        # Look up metadata in active registry
         meta = OBSERVATION_REGISTRY.get(frame_id)
         if not meta:
             # Check if it matches a fixture in fixtures dir
@@ -115,11 +124,19 @@ class CutoutService:
             ra = meta["ra"]
             dec = meta["dec"]
 
-            try:
-                fits_bytes = await self.fetch_cutout_fits(access_url, ra, dec, fov_deg=fov_deg)
-            except Exception as e:
-                print(f"[CutoutService] Failed to fetch real cutout: {e}. Checking cache or generating fallback.")
-                fits_bytes = self.generate_synthetic_fixture(obs_id, detector)
+            # Check if exact cached cutout URL is recorded in metadata
+            cached_url = meta.get("cached_cutout_url")
+            fits_bytes = None
+            if cached_url:
+                fits_bytes = cache_service.get(cached_url)
+
+            if not fits_bytes:
+                try:
+                    fits_bytes = await self.fetch_cutout_fits(access_url, ra, dec, fov_deg=fov_deg)
+                except Exception as e:
+                    print(f"[CutoutService] Failed to fetch real cutout: {e}. Falling back to labeled synthetic fixture.")
+                    fits_bytes = self.generate_synthetic_fixture(obs_id, detector)
+                    is_synthetic = True
 
         # Parse FITS
         hdul = load_fits_cutout(fits_bytes)
@@ -147,7 +164,8 @@ class CutoutService:
             wcs=WCSInfo(**wcs_dict),
             image_base64=gray_b64,
             colormapped_base64=inferno_b64,
-            provenance_url=access_url,
+            provenance_url=access_url if not is_synthetic else f"simulated://synthetic_fixture/{obs_id}",
+            is_synthetic=is_synthetic,
         )
 
 cutout_service = CutoutService()

@@ -2,6 +2,8 @@ import { ObservationRecord, FrameResponse, DemoPreset, DiffResult } from '../typ
 
 const API_BASE = '/api';
 
+const frameCache = new Map<string, FrameResponse>();
+
 export async function checkHealth(): Promise<{ status: string; irsa_connected: boolean; cached_frames: number }> {
   const resp = await fetch(`${API_BASE}/health`);
   if (!resp.ok) throw new Error('Health check failed');
@@ -40,12 +42,25 @@ export async function fetchFrame(
   stretch: string = 'asinh',
   fov: number = 0.05
 ): Promise<FrameResponse> {
+  const cacheKey = `${frameId}_${stretch}_${fov}`;
+  if (frameCache.has(cacheKey)) {
+    return frameCache.get(cacheKey)!;
+  }
   const resp = await fetch(`${API_BASE}/frames/${encodeURIComponent(frameId)}?stretch=${stretch}&fov=${fov}`);
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({ detail: 'Failed to fetch frame' }));
     throw new Error(err.detail || 'Failed to fetch frame');
   }
-  return resp.json();
+  const data: FrameResponse = await resp.json();
+  frameCache.set(cacheKey, data);
+  return data;
+}
+
+export function prefetchFrame(frameId: string, stretch: string = 'asinh', fov: number = 0.05): void {
+  const cacheKey = `${frameId}_${stretch}_${fov}`;
+  if (!frameCache.has(cacheKey)) {
+    fetchFrame(frameId, stretch, fov).catch(() => {});
+  }
 }
 
 export async function fetchDemoPresets(): Promise<DemoPreset[]> {

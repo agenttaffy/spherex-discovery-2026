@@ -56,6 +56,7 @@ class FrameResponse(BaseModel):
     image_base64: str
     colormapped_base64: Optional[str] = None
     provenance_url: str
+    is_synthetic: bool = False
 
 class HealthResponse(BaseModel):
     status: str

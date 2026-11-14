@@ -2,6 +2,18 @@
 
 All notable changes to the SPHEREx Discovery project will be documented in this file.
 
+## [1.1.0] - 2026-11-14
+### Fixed & Hardened
+- **Demo Manifest Cache Mapper & Offline Resilience:** Fixed cache miss issue where FOV mismatch (0.0350 vs 0.0400 deg) caused fallback to synthetic star fixtures. Implemented `demo_service.py` to pre-populate `OBSERVATION_REGISTRY` with all 22 verified demonstration entries and provide offline fallback when IRSA SIA is unreachable.
+- **Spherical RA 0°/360° Boundary Wrapping:** Fixed `check_comparison_eligibility` rejecting observations across the 0°/360° seam (e.g. 0.01° and 359.99°). Wrapped delta RA to `[-180, +180]`.
+- **NaN / Inf Robustness in Differencing Engine:** Fixed `compute_difference_frame` crashing or emitting `nan` stats when processing raw cutouts with non-finite pixels. Added finite pixel masks and mid-gray (128) default for masked data.
+- **Space-Separated & Unicode Coordinate Parsing:** Fixed `parse_coordinates` treating space-separated sexagesimal notation (`12 30 00`) as degrees instead of hours. Added support for unicode prime/double-prime characters directly from the NASA Space Apps challenge prompt.
+- **Synthetic Fixture Transparency:** Added `is_synthetic` boolean to `FrameResponse` and UI warning badge in `CanvasViewer.tsx` to strictly prevent simulated data from masquerading as real observations.
+- **Canvas Rendering Optimization:** Cached decoded `HTMLImageElement` in React state, eliminating async image decoding thrashing on mouse drag and wheel zoom events.
+- **Client Frame Caching & Prefetching:** Added in-memory frame cache (`Map<string, FrameResponse>`) and adjacent frame prefetching in `api.ts` and `App.tsx` for zero-latency time-lapse playback.
+- **Enhanced Side-by-Side Comparison View:** Updated `ComparisonView.tsx` with 3-panel side-by-side view (Epoch 1, Epoch 2, Difference frame) with time separation baseline $\Delta t$.
+- **Automated Test Suite Expansion:** Added `test_demo_resilience.py` and `test_image_registration.py`, expanding test coverage from 23 to 36 passing tests.
+
 ## [1.0.0] - 2026-11-14
 ### Added
 - **Repository Setup:** Initialized multi-agent architecture with `AGENTS.md`, `PROJECT_STATE.md`, `TODO.md`, `RESEARCH.md`, `TEST_RESULTS.md`, `DECISIONS.md`, and `HANDOFF.md`.

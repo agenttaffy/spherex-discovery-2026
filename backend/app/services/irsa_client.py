@@ -94,6 +94,20 @@ class IRSAClient:
         except Exception as e:
             print(f"[IRSAClient] Error querying IRSA SIA: {e}")
 
+        # If archive is offline or query returned no records, check verified demonstration dataset
+        if not records:
+            from app.services.demo_service import demo_service
+            fallback = demo_service.find_matching_observations(
+                ra=ra,
+                dec=dec,
+                radius_deg=max(radius_deg, 0.15),
+                collection=collection,
+                detector=detector,
+            )
+            if fallback:
+                print(f"[IRSAClient] Using {len(fallback)} verified demonstration observations for ({ra:.4f}, {dec:.4f})")
+                return fallback[:limit]
+
         # Sort chronologically by UTC / MJD
         records.sort(key=lambda x: x.mjd or 0.0)
         return records

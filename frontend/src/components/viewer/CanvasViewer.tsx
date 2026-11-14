@@ -32,18 +32,19 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [showCrosshair, setShowCrosshair] = useState(true);
   const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
+  const [cachedImg, setCachedImg] = useState<HTMLImageElement | null>(null);
 
   const resetView = useCallback(() => {
     setZoom(1.0);
     setOffset({ x: 0, y: 0 });
   }, []);
 
-  // Redraw image onto canvas
+  // 1. Decode image once when frame or colormap changes
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !frame) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!frame) {
+      setCachedImg(null);
+      return;
+    }
 
     const img = new Image();
     img.src = colormap === 'inferno' && frame.colormapped_base64
@@ -51,43 +52,53 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
       : frame.image_base64;
 
     img.onload = () => {
-      canvas.width = canvas.parentElement?.clientWidth || 600;
-      canvas.height = canvas.parentElement?.clientHeight || 450;
-
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.imageSmoothingEnabled = false; // Nearest neighbor preserves astronomical pixel blocks!
-
-      ctx.save();
-      ctx.translate(canvas.width / 2 + offset.x, canvas.height / 2 + offset.y);
-      ctx.scale(zoom, zoom);
-
-      // Draw image centered
-      const drawW = img.width * 14;
-      const drawH = img.height * 14;
-      ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
-
-      // Crosshair
-      if (showCrosshair) {
-        ctx.strokeStyle = 'rgba(56, 189, 248, 0.5)';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([4, 4]);
-
-        ctx.beginPath();
-        ctx.moveTo(-drawW / 2 - 20, 0);
-        ctx.lineTo(drawW / 2 + 20, 0);
-        ctx.moveTo(0, -drawH / 2 - 20);
-        ctx.lineTo(0, drawH / 2 + 20);
-        ctx.stroke();
-
-        ctx.setLineDash([]);
-        ctx.beginPath();
-        ctx.arc(0, 0, 16, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-
-      ctx.restore();
+      setCachedImg(img);
     };
-  }, [frame, zoom, offset, colormap, showCrosshair]);
+  }, [frame?.image_base64, frame?.colormapped_base64, colormap]);
+
+  // 2. High-performance canvas redraw (runs smoothly during dragging / zooming)
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !cachedImg) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    canvas.width = canvas.parentElement?.clientWidth || 600;
+    canvas.height = canvas.parentElement?.clientHeight || 450;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.imageSmoothingEnabled = false; // Nearest neighbor preserves astronomical pixel blocks!
+
+    ctx.save();
+    ctx.translate(canvas.width / 2 + offset.x, canvas.height / 2 + offset.y);
+    ctx.scale(zoom, zoom);
+
+    // Draw image centered
+    const drawW = cachedImg.width * 14;
+    const drawH = cachedImg.height * 14;
+    ctx.drawImage(cachedImg, -drawW / 2, -drawH / 2, drawW, drawH);
+
+    // Crosshair
+    if (showCrosshair) {
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.5)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
+
+      ctx.beginPath();
+      ctx.moveTo(-drawW / 2 - 20, 0);
+      ctx.lineTo(drawW / 2 + 20, 0);
+      ctx.moveTo(0, -drawH / 2 - 20);
+      ctx.lineTo(0, drawH / 2 + 20);
+      ctx.stroke();
+
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.arc(0, 0, 16, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }, [cachedImg, zoom, offset, showCrosshair]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     setIsDragging(true);
@@ -129,6 +140,11 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
             <p className="text-[10px] text-slate-400 font-mono">
               {subtitle || (frame ? `${frame.detector} • ${frame.utc_date?.split('T')[0] || ''}` : 'Select an observation')}
             </p>
+            {frame?.is_synthetic && (
+              <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                SIMULATED FIXTURE (ARCHIVE OFFLINE)
+              </span>
+            )}
           </div>
         </div>
 

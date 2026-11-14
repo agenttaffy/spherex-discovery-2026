@@ -50,9 +50,20 @@ async def diff_frames(req: DiffRequest = Body(...)):
         raise HTTPException(status_code=400, detail=f"Comparison ineligible: {reason}")
 
     try:
-        # Fetch cutouts
-        b1 = await cutout_service.fetch_cutout_fits(meta1["access_url"], meta1["ra"], meta1["dec"])
-        b2 = await cutout_service.fetch_cutout_fits(meta2["access_url"], meta2["ra"], meta2["dec"])
+        # Fetch cutouts using cache or cutout service
+        b1 = None
+        if "cached_cutout_url" in meta1:
+            from app.services.cache_service import cache_service
+            b1 = cache_service.get(meta1["cached_cutout_url"])
+        if not b1:
+            b1 = await cutout_service.fetch_cutout_fits(meta1["access_url"], meta1["ra"], meta1["dec"])
+
+        b2 = None
+        if "cached_cutout_url" in meta2:
+            from app.services.cache_service import cache_service
+            b2 = cache_service.get(meta2["cached_cutout_url"])
+        if not b2:
+            b2 = await cutout_service.fetch_cutout_fits(meta2["access_url"], meta2["ra"], meta2["dec"])
         
         i1, _ = extract_primary_image(load_fits_cutout(b1))
         i2, _ = extract_primary_image(load_fits_cutout(b2))

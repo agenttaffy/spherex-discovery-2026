@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ObservationRecord, DiffResult } from '../../types/astronomy';
-import { computeDiff } from '../../services/api';
+import { ObservationRecord, DiffResult, FrameResponse } from '../../types/astronomy';
+import { computeDiff, fetchFrame } from '../../services/api';
 import { ArrowRight, Sparkles, Loader2, AlertCircle } from 'lucide-react';
 
 interface ComparisonViewProps {
@@ -9,19 +9,43 @@ interface ComparisonViewProps {
 
 export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations }) => {
   const [index1, setIndex1] = useState(0);
-  const [index2, setIndex2] = useState(Math.min(1, observations.length - 1));
+  const [index2, setIndex2] = useState(1);
   const [diffResult, setDiffResult] = useState<DiffResult | null>(null);
+  const [frame1, setFrame1] = useState<FrameResponse | null>(null);
+  const [frame2, setFrame2] = useState<FrameResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const obs1 = observations[index1];
-  const obs2 = observations[index2];
+  // Safely clamp indices to current observations array
+  const safeIndex1 = Math.min(Math.max(0, index1), Math.max(0, observations.length - 1));
+  const safeIndex2 = Math.min(Math.max(0, index2), Math.max(0, observations.length - 1));
 
+  const obs1 = observations[safeIndex1];
+  const obs2 = observations[safeIndex2];
+
+  // Load preview thumbnails for both epochs
+  useEffect(() => {
+    if (obs1) {
+      fetchFrame(obs1.id, 'asinh', 0.04)
+        .then(setFrame1)
+        .catch(() => setFrame1(null));
+    }
+  }, [obs1?.id]);
+
+  useEffect(() => {
+    if (obs2) {
+      fetchFrame(obs2.id, 'asinh', 0.04)
+        .then(setFrame2)
+        .catch(() => setFrame2(null));
+    }
+  }, [obs2?.id]);
+
+  // Compute differential image
   useEffect(() => {
     if (observations.length < 2 || !obs1 || !obs2) return;
     if (obs1.id === obs2.id) {
       setDiffResult(null);
-      setError('Please select two different observations for temporal differencing.');
+      setError('Please select two different epochs for temporal differencing.');
       return;
     }
 
@@ -43,7 +67,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations }) 
     return () => {
       active = false;
     };
-  }, [obs1, obs2, observations.length]);
+  }, [obs1?.id, obs2?.id, observations.length]);
 
   if (observations.length < 2) {
     return (
@@ -57,20 +81,35 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations }) 
     );
   }
 
+  // Calculate baseline delta days if MJD available
+  let deltaDays: number | null = null;
+  if (obs1?.mjd && obs2?.mjd) {
+    deltaDays = Math.abs(obs2.mjd - obs1.mjd);
+  }
+
   return (
     <div className="flex-1 flex flex-col p-6 bg-slate-950 overflow-y-auto">
-      <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+      <div className="flex flex-col md:flex-row md:items-center justify-between pb-4 border-b border-slate-800 gap-4">
         <div>
-          <h2 className="text-base font-bold text-slate-100">Differential Image Analysis (I₂ − I₁)</h2>
-          <p className="text-xs text-slate-400">Sub-pixel scientific differencing to isolate astrometric and photometric transients.</p>
+          <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
+            <span>Differential Image Analysis (I₂ − I₁)</span>
+            {deltaDays !== null && (
+              <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800/60">
+                Δt = {deltaDays.toFixed(1)} days
+              </span>
+            )}
+          </h2>
+          <p className="text-xs text-slate-400">
+            Sub-pixel scientific differencing to isolate astrometric movement and photometric transients.
+          </p>
         </div>
 
         {/* Epoch Selectors */}
         <div className="flex items-center space-x-3 text-xs">
           <div className="flex items-center gap-2">
-            <span className="text-slate-500">Epoch 1:</span>
+            <span className="text-slate-500">Epoch 1 (I₁):</span>
             <select
-              value={index1}
+              value={safeIndex1}
               onChange={(e) => setIndex1(Number(e.target.value))}
               className="bg-slate-900 border border-slate-800 rounded px-2.5 py-1 text-slate-200 font-mono text-xs focus:outline-none focus:border-cyan-500"
             >
@@ -85,9 +124,9 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations }) 
           <ArrowRight className="w-4 h-4 text-slate-600" />
 
           <div className="flex items-center gap-2">
-            <span className="text-slate-500">Epoch 2:</span>
+            <span className="text-slate-500">Epoch 2 (I₂):</span>
             <select
-              value={index2}
+              value={safeIndex2}
               onChange={(e) => setIndex2(Number(e.target.value))}
               className="bg-slate-900 border border-slate-800 rounded px-2.5 py-1 text-slate-200 font-mono text-xs focus:outline-none focus:border-cyan-500"
             >
@@ -116,51 +155,94 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations }) 
       )}
 
       {!loading && diffResult && (
-        <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6 flex-1 items-start">
-          <div className="md:col-span-2 flex flex-col items-center justify-center bg-slate-900/40 border border-slate-800 rounded-xl p-4">
-            <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-3">
-              Calibrated Difference Frame (I₂ − I₁)
-            </h4>
-            <div className="relative border border-slate-700 rounded-lg overflow-hidden bg-black max-w-md w-full aspect-square flex items-center justify-center">
-              <img
-                src={diffResult.image_base64}
-                alt="Difference Frame"
-                className="w-full h-full object-contain [image-rendering:pixelated]"
-              />
+        <div className="mt-6 flex flex-col gap-6 flex-1">
+          {/* Side-by-Side Comparison: Epoch 1, Epoch 2, Difference */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Epoch 1 Thumbnail */}
+            <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-3 flex flex-col items-center">
+              <div className="w-full flex items-center justify-between text-[11px] font-mono text-slate-400 mb-2">
+                <span className="text-cyan-400 font-semibold">Epoch 1 (I₁)</span>
+                <span>{obs1?.utc_date?.split('T')[0]}</span>
+              </div>
+              <div className="w-full aspect-square bg-black rounded-lg border border-slate-800 overflow-hidden flex items-center justify-center">
+                {frame1 ? (
+                  <img
+                    src={frame1.image_base64}
+                    alt="Epoch 1"
+                    className="w-full h-full object-contain [image-rendering:pixelated]"
+                  />
+                ) : (
+                  <span className="text-xs text-slate-600 font-mono">Loading...</span>
+                )}
+              </div>
+              <span className="text-[10px] text-slate-500 font-mono mt-2">{obs1?.detector}</span>
             </div>
-            <p className="text-[11px] text-slate-500 mt-3 text-center max-w-sm">
-              Mid-gray represents zero residual flux. Bright white spots indicate positive flux emergence (brightening/arrival); dark regions indicate flux reduction (dimming/departure).
-            </p>
+
+            {/* Epoch 2 Thumbnail */}
+            <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-3 flex flex-col items-center">
+              <div className="w-full flex items-center justify-between text-[11px] font-mono text-slate-400 mb-2">
+                <span className="text-indigo-400 font-semibold">Epoch 2 (I₂)</span>
+                <span>{obs2?.utc_date?.split('T')[0]}</span>
+              </div>
+              <div className="w-full aspect-square bg-black rounded-lg border border-slate-800 overflow-hidden flex items-center justify-center">
+                {frame2 ? (
+                  <img
+                    src={frame2.image_base64}
+                    alt="Epoch 2"
+                    className="w-full h-full object-contain [image-rendering:pixelated]"
+                  />
+                ) : (
+                  <span className="text-xs text-slate-600 font-mono">Loading...</span>
+                )}
+              </div>
+              <span className="text-[10px] text-slate-500 font-mono mt-2">{obs2?.detector}</span>
+            </div>
+
+            {/* Calibrated Difference Frame */}
+            <div className="bg-slate-900/60 border border-cyan-800/40 rounded-xl p-3 flex flex-col items-center shadow-lg shadow-cyan-950/20">
+              <div className="w-full flex items-center justify-between text-[11px] font-mono mb-2">
+                <span className="text-amber-300 font-semibold">Difference (I₂ − I₁)</span>
+                <span className="text-slate-400">RMS: {diffResult.diff_stats.rms_diff_mjy_sr}</span>
+              </div>
+              <div className="w-full aspect-square bg-black rounded-lg border border-slate-700 overflow-hidden flex items-center justify-center">
+                <img
+                  src={diffResult.image_base64}
+                  alt="Difference Frame"
+                  className="w-full h-full object-contain [image-rendering:pixelated]"
+                />
+              </div>
+              <span className="text-[10px] text-slate-400 font-mono mt-2">Mid-gray = 0 residual</span>
+            </div>
           </div>
 
-          {/* Differential Metrics */}
+          {/* Differential Metrics Dock */}
           <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5 flex flex-col gap-4">
             <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
-              Differencing Metrics
+              Differential Photometric & Astrometric Metrics
             </h4>
-            <div className="space-y-3 font-mono text-xs">
-              <div className="flex justify-between items-center p-2.5 bg-slate-950 rounded-lg border border-slate-800">
-                <span className="text-slate-400">RMS Difference:</span>
-                <span className="text-cyan-400 font-bold">{diffResult.diff_stats.rms_diff_mjy_sr} MJy/sr</span>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 font-mono text-xs">
+              <div className="p-3 bg-slate-950 rounded-lg border border-slate-800">
+                <span className="text-slate-400 text-[11px] block">RMS Difference</span>
+                <span className="text-cyan-400 font-bold text-sm">{diffResult.diff_stats.rms_diff_mjy_sr} MJy/sr</span>
               </div>
-              <div className="flex justify-between items-center p-2.5 bg-slate-950 rounded-lg border border-slate-800">
-                <span className="text-slate-400">Peak Positive Residual:</span>
-                <span className="text-emerald-400 font-bold">+{diffResult.diff_stats.peak_positive_flux} MJy/sr</span>
+              <div className="p-3 bg-slate-950 rounded-lg border border-slate-800">
+                <span className="text-slate-400 text-[11px] block">Peak Positive Flux</span>
+                <span className="text-emerald-400 font-bold text-sm">+{diffResult.diff_stats.peak_positive_flux} MJy/sr</span>
               </div>
-              <div className="flex justify-between items-center p-2.5 bg-slate-950 rounded-lg border border-slate-800">
-                <span className="text-slate-400">Peak Negative Residual:</span>
-                <span className="text-rose-400 font-bold">{diffResult.diff_stats.peak_negative_flux} MJy/sr</span>
+              <div className="p-3 bg-slate-950 rounded-lg border border-slate-800">
+                <span className="text-slate-400 text-[11px] block">Peak Negative Flux</span>
+                <span className="text-rose-400 font-bold text-sm">{diffResult.diff_stats.peak_negative_flux} MJy/sr</span>
               </div>
-              <div className="flex justify-between items-center p-2.5 bg-slate-950 rounded-lg border border-slate-800">
-                <span className="text-slate-400">Noise Sigma (σ):</span>
-                <span className="text-slate-300">±{diffResult.diff_stats.sigma_mjy_sr} MJy/sr</span>
+              <div className="p-3 bg-slate-950 rounded-lg border border-slate-800">
+                <span className="text-slate-400 text-[11px] block">Noise Level (σ)</span>
+                <span className="text-slate-200 font-bold text-sm">±{diffResult.diff_stats.sigma_mjy_sr} MJy/sr</span>
               </div>
             </div>
 
-            <div className="mt-2 p-3 bg-cyan-950/20 border border-cyan-800/40 rounded-lg text-[11px] text-cyan-300 space-y-1">
-              <p className="font-semibold">Transient Detection Threshold:</p>
+            <div className="p-3 bg-cyan-950/20 border border-cyan-800/40 rounded-lg text-[11px] text-cyan-300 space-y-1">
+              <p className="font-semibold">Interpretation:</p>
               <p className="text-slate-400">
-                Signal-to-noise ratio ($S/N$) for candidate transients is evaluated against local variance per pixel.
+                Mid-gray (128) denotes zero net brightness change between epochs. Bright white spots represent newly brightened or incoming sources, while dark regions indicate dimmed or departed sources.
               </p>
             </div>
           </div>

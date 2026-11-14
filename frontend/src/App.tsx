@@ -8,7 +8,7 @@ import { MetadataPanel } from './components/metadata/MetadataPanel';
 import { ComparisonView } from './components/viewer/ComparisonView';
 import { AboutPage } from './pages/AboutPage';
 import { ObservationRecord, FrameResponse, DemoPreset } from './types/astronomy';
-import { checkHealth, fetchObservations, fetchFrame, fetchDemoPresets } from './services/api';
+import { checkHealth, fetchObservations, fetchFrame, prefetchFrame, fetchDemoPresets } from './services/api';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'explorer' | 'blink' | 'diff' | 'about'>('explorer');
@@ -118,6 +118,13 @@ export const App: React.FC = () => {
     const obs = observations[idx];
     if (obs) {
       loadFrame(obs.id, stretch, fov);
+      // Prefetch adjacent frames for smooth playback and blink comparison
+      if (idx + 1 < observations.length) {
+        prefetchFrame(observations[idx + 1].id, stretch, fov);
+      }
+      if (idx - 1 >= 0) {
+        prefetchFrame(observations[idx - 1].id, stretch, fov);
+      }
     }
   };
 

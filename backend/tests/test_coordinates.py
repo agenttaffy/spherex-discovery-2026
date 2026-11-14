@@ -22,6 +22,20 @@ def test_parse_sexagesimal_colon_format():
     assert pytest.approx(ra, 0.001) == 133.7951
     assert pytest.approx(dec, 0.001) == -7.2451
 
+def test_parse_sexagesimal_space_format():
+    ra, dec = parse_coordinates("12 30 00", "-07 14 42")
+    assert pytest.approx(ra, 0.001) == 187.5
+    assert pytest.approx(dec, 0.001) == -7.245
+
+def test_parse_challenge_prompt_unicode_coordinates():
+    ra, dec = parse_coordinates("08h55m10.831s", "-07°14′42.53″")
+    assert pytest.approx(ra, 0.001) == 133.7951
+    assert pytest.approx(dec, 0.001) == -7.2451
+
+def test_empty_coordinate_input():
+    with pytest.raises(ValueError, match="cannot be empty"):
+        parse_coordinates("", "")
+
 def test_ra_wrapping():
     ra, dec = parse_coordinates(370.0, 10.0)
     assert pytest.approx(ra, 0.0001) == 10.0
