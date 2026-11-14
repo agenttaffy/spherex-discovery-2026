@@ -10,6 +10,7 @@ from app.science.fits_processing import (
     calculate_pixel_stats,
     apply_asinh_stretch,
     apply_zscale_stretch,
+    render_image_to_base64,
     render_image_to_base64_png,
 )
 
@@ -99,3 +100,12 @@ def test_render_image_to_base64_png():
     # Inferno colormap
     inferno_b64 = render_image_to_base64_png(u8_arr, colormap="inferno")
     assert inferno_b64.startswith("data:image/png;base64,")
+
+def test_render_image_to_base64_webp():
+    u8_arr = np.linspace(0, 255, 256, dtype=np.uint8).reshape((16, 16))
+    webp_b64 = render_image_to_base64(u8_arr, format="webp")
+    assert webp_b64.startswith("data:image/webp;base64,")
+
+    webp_inferno = render_image_to_base64(u8_arr, colormap="inferno", format="webp")
+    assert webp_inferno.startswith("data:image/webp;base64,")
+

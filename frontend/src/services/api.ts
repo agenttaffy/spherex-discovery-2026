@@ -49,13 +49,16 @@ export async function fetchObservations(
 export async function fetchFrame(
   frameId: string,
   stretch: string = 'asinh',
-  fov: number = 0.05
+  fov: number = 0.05,
+  format: string = 'webp'
 ): Promise<FrameResponse> {
-  const cacheKey = `${frameId}_${stretch}_${fov}`;
+  const cacheKey = `${frameId}_${stretch}_${fov}_${format}`;
   if (frameCache.has(cacheKey)) {
     return frameCache.get(cacheKey)!;
   }
-  const resp = await fetch(`${API_BASE}/frames/${encodeURIComponent(frameId)}?stretch=${stretch}&fov=${fov}`);
+  const resp = await fetch(
+    `${API_BASE}/frames/${encodeURIComponent(frameId)}?stretch=${stretch}&fov=${fov}&format=${format}`
+  );
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({ detail: 'Failed to fetch frame' }));
     throw new Error(err.detail || 'Failed to fetch frame');
@@ -65,10 +68,15 @@ export async function fetchFrame(
   return data;
 }
 
-export function prefetchFrame(frameId: string, stretch: string = 'asinh', fov: number = 0.05): void {
-  const cacheKey = `${frameId}_${stretch}_${fov}`;
+export function prefetchFrame(
+  frameId: string,
+  stretch: string = 'asinh',
+  fov: number = 0.05,
+  format: string = 'webp'
+): void {
+  const cacheKey = `${frameId}_${stretch}_${fov}_${format}`;
   if (!frameCache.has(cacheKey)) {
-    fetchFrame(frameId, stretch, fov).catch(() => {});
+    fetchFrame(frameId, stretch, fov, format).catch(() => {});
   }
 }
 
@@ -78,11 +86,15 @@ export async function fetchDemoPresets(): Promise<DemoPreset[]> {
   return resp.json();
 }
 
-export async function computeDiff(frameId1: string, frameId2: string): Promise<DiffResult> {
+export async function computeDiff(
+  frameId1: string,
+  frameId2: string,
+  format: string = 'webp'
+): Promise<DiffResult> {
   const resp = await fetch(`${API_BASE}/frames/diff`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ frame_id_1: frameId1, frame_id_2: frameId2 }),
+    body: JSON.stringify({ frame_id_1: frameId1, frame_id_2: frameId2, format }),
   });
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({ detail: 'Failed to compute diff' }));

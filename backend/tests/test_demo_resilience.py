@@ -48,3 +48,27 @@ def test_diff_on_demo_epochs():
         assert diff_data["eligible"] is True
         assert "diff_stats" in diff_data
         assert not any(str(v) == "nan" for v in diff_data["diff_stats"].values())
+
+def test_webp_frame_and_diff_endpoints():
+    barnard_recs = demo_service.find_matching_observations(269.45208, 4.69339, radius_deg=0.1)
+    d3_recs = [r for r in barnard_recs if "D3" in r.detector]
+    assert len(d3_recs) >= 2
+
+    # Test WebP frame endpoint
+    frame_resp = client.get(f"/api/frames/{d3_recs[0].id}?format=webp")
+    assert frame_resp.status_code == 200
+    f_data = frame_resp.json()
+    assert f_data["image_base64"].startswith("data:image/webp;base64,")
+    assert f_data["colormapped_base64"].startswith("data:image/webp;base64,")
+
+    # Test WebP diff endpoint
+    diff_resp = client.post("/api/frames/diff", json={
+        "frame_id_1": d3_recs[0].id,
+        "frame_id_2": d3_recs[1].id,
+        "format": "webp"
+    })
+    assert diff_resp.status_code == 200
+    d_data = diff_resp.json()
+    assert d_data["image_base64"].startswith("data:image/webp;base64,")
+    assert "alignment_method" in d_data["diff_stats"]
+

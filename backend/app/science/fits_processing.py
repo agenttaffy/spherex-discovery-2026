@@ -1,6 +1,6 @@
 import io
 import base64
-from typing import Dict, Any, Tuple, Optional, Union
+from typing import Dict, Any, Tuple, Optional, Union, Literal
 import numpy as np
 from astropy.io import fits
 from astropy.wcs import WCS
@@ -168,12 +168,23 @@ def apply_inferno_colormap(grayscale_u8: np.ndarray) -> np.ndarray:
     palette = np.stack([r * 255, g * 255, b * 255], axis=-1).astype(np.uint8)
     return palette[grayscale_u8]
 
-def render_image_to_base64_png(
+def extract_astropy_wcs(header: fits.Header) -> Optional[WCS]:
+    """
+    Constructs an Astropy WCS instance from FITS header if celestial keywords are present.
+    """
+    try:
+        return WCS(header)
+    except Exception:
+        return None
+
+def render_image_to_base64(
     uint8_image: np.ndarray,
-    colormap: Optional[str] = None
+    colormap: Optional[str] = None,
+    format: Literal["png", "webp"] = "png",
 ) -> str:
     """
-    Encodes uint8 2D array to Base64 data URI PNG string.
+    Encodes uint8 2D array to Base64 data URI string (PNG or WebP).
+    WebP provides smaller payload sizes for rapid multi-epoch timeline playback.
     """
     # Flip vertically to match astronomical convention (North up, standard image coords)
     flipped = np.flipud(uint8_image)
@@ -185,6 +196,22 @@ def render_image_to_base64_png(
         pil_img = Image.fromarray(flipped, mode="L")
 
     buffer = io.BytesIO()
-    pil_img.save(buffer, format="PNG")
+    fmt_str = (format or "png").lower()
+    if fmt_str == "webp":
+        pil_img.save(buffer, format="WEBP", quality=90)
+        mime = "image/webp"
+    else:
+        pil_img.save(buffer, format="PNG")
+        mime = "image/png"
+
     b64_str = base64.b64encode(buffer.getvalue()).decode("utf-8")
-    return f"data:image/png;base64,{b64_str}"
+    return f"data:{mime};base64,{b64_str}"
+
+def render_image_to_base64_png(
+    uint8_image: np.ndarray,
+    colormap: Optional[str] = None
+) -> str:
+    """
+    Backwards-compatible wrapper for PNG rendering.
+    """
+    return render_image_to_base64(uint8_image, colormap=colormap, format="png")

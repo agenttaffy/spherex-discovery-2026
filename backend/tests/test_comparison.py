@@ -1,4 +1,5 @@
 import numpy as np
+from astropy.wcs import WCS
 from app.science.comparison import check_comparison_eligibility, compute_difference_frame
 
 def test_comparison_eligibility():
@@ -48,3 +49,35 @@ def test_compute_difference_frame_nan_handling():
     assert not np.isnan(stats["rms_diff_mjy_sr"])
     assert stats["peak_positive_flux"] == 10.0
     assert diff_u8[5, 5] == 128  # masked to mid-gray
+
+def test_compute_difference_frame_wcs_reproject():
+    w1 = WCS(naxis=2)
+    w1.wcs.crpix = [10.0, 10.0]
+    w1.wcs.cdelt = [-0.01, 0.01]
+    w1.wcs.crval = [100.0, 20.0]
+    w1.wcs.ctype = ['RA---TAN', 'DEC--TAN']
+
+    w2 = WCS(naxis=2)
+    w2.wcs.crpix = [11.0, 10.0]
+    w2.wcs.cdelt = [-0.01, 0.01]
+    w2.wcs.crval = [100.0, 20.0]
+    w2.wcs.ctype = ['RA---TAN', 'DEC--TAN']
+
+    i1 = np.ones((20, 20), dtype=np.float32) * 5.0
+    i2 = np.ones((20, 20), dtype=np.float32) * 5.0
+    i2[10, 10] = 25.0
+
+    diff_u8, stats = compute_difference_frame(i1, i2, wcs1=w1, wcs2=w2)
+    assert diff_u8.shape == (20, 20)
+    assert stats["alignment_method"] == "wcs_reproject"
+
+def test_compute_difference_frame_fft_shift_fallback():
+    # Two images with a distinct Gaussian feature shifted by 2 pixels, without WCS
+    y, x = np.mgrid[0:30, 0:30]
+    i1 = 5.0 + 20.0 * np.exp(-((x - 15)**2 + (y - 15)**2) / 8.0).astype(np.float32)
+    i2 = 5.0 + 20.0 * np.exp(-((x - 17)**2 + (y - 15)**2) / 8.0).astype(np.float32)
+
+    diff_u8, stats = compute_difference_frame(i1, i2, wcs1=None, wcs2=None)
+    assert diff_u8.shape == (30, 30)
+    assert stats["alignment_method"] == "fft_shift"
+

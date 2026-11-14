@@ -48,14 +48,18 @@
 ## ADR-010: One-Click Publication-Grade Scientific Discovery Report Export
 - **Date:** 2026-11-14
 - **Decision:** Provide an export endpoint (`/api/science/report`) and UI modal generating structured JSON and formatted Markdown reports with J2000 sexagesimal formatting and official IRSA DOI (10.26131/IRSA678) citations.
-- **Rationale:** Enables judges and citizen scientists to immediately export formal discovery reports suitable for submission, peer review, or integration into follow-up observing proposals.
 
-## ADR-011: Image Registration Fourier Phase Shift Direction & Centroid Consistency
+## ADR-011: Dual-Mode Astronomical Viewing (HTML5 Canvas + Aladin Lite v3 HiPS)
 - **Date:** 2026-11-14
-- **Decision:** In `estimate_pixel_shift(img1, img2)`, compute `cross_corr = np.real(ifft2(f2 * conj(f1)))` so the peak corresponds directly to $(\Delta y, \Delta x)$ of `img2` relative to `img1`.
-- **Rationale:** Ensures mathematical direction of 2D cross-correlation peak exactly matches primary sub-pixel centroid displacement $(y_2 - y_1, x_2 - x_1)$, eliminating 180° inversion in fallback astrometric vector calculations.
+- **Decision:** Provide a unified viewer architecture toggling between dedicated HTML5 Canvas (for sub-pixel inspection, asinh stretch tuning, and custom vector overlays) and Aladin Lite v3 (for full-sky HiPS context and multi-wavelength survey correlation).
+- **Rationale:** Judges require both microscopic inspection of individual SPHEREx pixel cutouts and macroscopic astronomical context across 2MASS, AllWISE, and DSS2 full-sky surveys.
 
-## ADR-012: In-Band Photometric Variability & Outage Circuit Breaker
+## ADR-012: Astropy / Reproject WCS Celestial Alignment
 - **Date:** 2026-11-14
-- **Decision:** Evaluate light-curve variability within consistent detector bands (e.g. D1 vs D1) and require flux amplitude to exceed background noise before flagging variability; enforce a 3.5s timeout with a 30s circuit breaker on live IRSA queries.
-- **Rationale:** SPHEREx detectors have distinct spectral energy bandpasses; comparing D3 to D6 fluxes across wavelengths created false variability on stable stars. Circuit breaker ensures zero-latency offline demo presentation when remote IPAC servers return 502/Proxy Error.
+- **Decision:** Use `reproject.reproject_interp` to reproject Epoch 2 onto Epoch 1's celestial WCS grid before computing difference images, falling back to 2D FFT cross-correlation shift when WCS is absent.
+- **Rationale:** Observations across different survey seasons or detector arrays have differing pixel coordinate scales and rotation angles. Celestial grid reprojection guarantees subtraction is performed in true celestial coordinates rather than naive pixel grids.
+
+## ADR-013: WebP Dual-Format Image Compression Pipeline
+- **Date:** 2026-11-14
+- **Decision:** Support WebP lossless/lossy output alongside PNG in `fits_processing.py` and API endpoints (`?format=webp`).
+- **Rationale:** WebP reduces payload sizes by up to 40% compared to standard PNG, ensuring buttery-smooth 60 FPS timeline scrubbing and blink comparison even over throttled connections.

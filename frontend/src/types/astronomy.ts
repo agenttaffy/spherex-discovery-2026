@@ -73,6 +73,7 @@ export interface DiffResult {
     peak_positive_flux: number;
     peak_negative_flux: number;
     sigma_mjy_sr: number;
+    alignment_method?: string;
   };
   dimensions?: [number, number];
   image_base64: string;

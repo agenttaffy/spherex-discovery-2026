@@ -1,22 +1,16 @@
 # Agent Handoff Document
 
 ## 1. Last Completed Work
-- Completed all technical differentiation features specified in Prompt 1:
-  - **Astrometric Proper Motion Engine:** Added `measure_astrometric_motion` in `backend/app/science/motion.py` and `POST /api/science/motion` calculating sub-pixel centroid displacements, proper motion rate ($\mu$ in arcsec/yr and mas/yr), position angle, and motion classification. Added dipole visual vector overlay in `ComparisonView.tsx`.
-  - **Multi-Epoch Photometric Light Curve Dock:** Implemented circular aperture photometry with background annulus subtraction in `backend/app/science/photometry.py` and `GET /api/science/photometry`. Built interactive SVG `LightCurveChart.tsx` with variability classification embedded in `MetadataPanel.tsx`.
-  - **Gaia DR3 & SIMBAD Catalog Overlay:** Created `backend/app/services/catalog_service.py` and `GET /api/science/catalogs`. Added interactive vector overlay with toggle button in `CanvasViewer.tsx` rendering diamond markers, proper-motion vectors, and G-magnitudes.
-  - **Shareable URL Deep Linking:** Synced full state (`ra`, `dec`, `fov`, `target`, `stretch`, `colormap`) to URL query parameters with "Share URL" clipboard feedback in `Header.tsx`.
-  - **Scientific Discovery Report Generator:** Added `backend/app/science/report.py` and `POST /api/science/report`. Built `DiscoveryReportModal.tsx` supporting Markdown (.md) and JSON (.json) downloads with verified IRSA DOI 10.26131/IRSA678 citations.
-  - **Guided Educational Tour Modal:** Implemented `GuidedTourModal.tsx` explaining SPHEREx LVF optics, dipole vs monopole signatures, official targets, and judging criteria alignment.
-- Added comprehensive unit tests in `backend/tests/test_science.py`, expanding automated test suite to 43 passing tests.
-- Resolved 502 Bad Gateway fallback bug in `irsa_client.py`, ensuring graceful fallback to demonstration dataset whenever remote IRSA endpoints return non-200 responses.
-- Populated full documentation suite in `docs/` (10 comprehensive files).
-- Created Docker configurations (`backend/Dockerfile`, `frontend/Dockerfile`, `docker-compose.yml`, `frontend/nginx.conf`) and cloud configs (`render.yaml`, `frontend/vercel.json`).
+- Implemented the recommended architectural enhancements from the reference architecture:
+  - **Aladin Lite Sky Context Integration (Aladin Lite v3 + Canvas):** Built `AladinViewer.tsx` embedding Aladin Lite v3 via clean CDN embed (`aladin-lite@3.3.0` UMD / CDS API). Added pill tab toggle in `CanvasViewer.tsx` between "SPHEREx Analysis Canvas" and "Aladin Lite Sky Context". Automatically syncs center coordinates (RA, Dec) and FOV, renders an interactive SPHEREx observation coverage footprint polygon overlay, allows switching between background surveys (2MASS Color JHK, AllWISE Color W1-W4, DSS2 Color, Pan-STARRS DR1), and provides an offline SVG celestial radar fallback.
+  - **Scientific WCS Reprojection (`reproject`):** Installed `reproject` (v0.21.0), `pyvo` (v1.10.0), and `astroquery` (v0.4.11) and added to `backend/requirements.txt`. Implemented `reproject_interp` in `compute_difference_frame` (`backend/app/science/comparison.py`) and `backend/app/api/frames.py` for celestial grid reprojection across differing epochs, with automatic fallback to 2D FFT shift registration.
+  - **WebP Image Output Engine:** Added `render_image_to_base64(..., format="webp")` in `backend/app/science/fits_processing.py`. Updated `backend/app/services/cutout_service.py`, `backend/app/api/frames.py` (`/api/frames/{id}?format=webp` and `diff_frames` body `format`), and `frontend/src/services/api.ts` for rapid lightweight timeline playback.
+  - **UI / Styling Refinements:** Added refined pill tabs for Canvas vs. Aladin Lite, smooth transitions, high-contrast dark theme, glassmorphic cards, and alignment method indicators in `ComparisonView.tsx`.
+  - **Testing & Verification:** Added 4 new automated tests for reprojection and WebP rendering (`test_compute_difference_frame_wcs_reproject`, `test_compute_difference_frame_fft_shift_fallback`, `test_render_image_to_base64_webp`, `test_webp_frame_and_diff_endpoints`), bringing the test suite to 48 passed tests (0 failures). Verified frontend build compiles cleanly in 2.70s with 0 errors.
 
 ## 2. Current Working State
-- **Current Commit:** `5fcdc6c` on branch `main`
-- **Backend:** Starts cleanly with `python -m uvicorn app.main:app --port 8000`. All 44 tests pass in 1.87s.
-- **Frontend:** Builds cleanly with `npm run build` in 1.93s (0 type errors, 0 warnings).
+- **Backend:** Starts cleanly with `python -m uvicorn app.main:app --port 8000`. All 48 tests pass in 3.87s.
+- **Frontend:** Builds cleanly with `npm run build` in 2.70s (0 type errors, 0 warnings).
 - **Demo Mode:** Instantaneous local caching of 22 real FITS cutouts enables immediate offline presentation and judging with circuit breaker fallback on remote outages.
 
 ## 3. Current Blocker
@@ -30,7 +24,7 @@ python scripts/verify_environment.py
 # 2. Demonstration Assets Verification
 python scripts/verify_demo.py
 
-# 3. Backend Test Suite (44 tests)
+# 3. Backend Test Suite (48 tests)
 cd backend
 python -m pytest -v
 

@@ -310,9 +310,20 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations }) 
 
           {/* Differential Metrics Dock */}
           <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5 flex flex-col gap-4">
-            <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
-              Differential Photometric & Astrometric Metrics
-            </h4>
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                Differential Photometric & Astrometric Metrics
+              </h4>
+              {diffResult.diff_stats.alignment_method && (
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-semibold">
+                  {diffResult.diff_stats.alignment_method === 'wcs_reproject'
+                    ? 'Astropy / Reproject WCS Alignment'
+                    : diffResult.diff_stats.alignment_method === 'fft_shift'
+                    ? '2D FFT Cross-Correlation Shift'
+                    : 'Direct Pixel Alignment'}
+                </span>
+              )}
+            </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 font-mono text-xs">
               <div className="p-3 bg-slate-950 rounded-lg border border-slate-800">
                 <span className="text-slate-400 text-[11px] block">RMS Difference</span>

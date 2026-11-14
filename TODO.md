@@ -13,7 +13,7 @@
 - [x] `P1-002` | COMPLETED | Display contrast scaling engines (`asinh`, `zscale`, `linear`)
 - [x] `P1-003` | COMPLETED | Data quality flag bitmask evaluation (`flags_processing.py`, `MetadataPanel.tsx`)
 - [x] `P1-004` | COMPLETED | Local caching of 22 verified real FITS cutouts for judging demo reliability (`data/cache`)
-- [x] `P1-005` | COMPLETED | Full automated test suite (43 pytest tests passing)
+- [x] `P1-005` | COMPLETED | Full automated test suite (48 pytest tests passing)
 - [x] `P1-006` | COMPLETED | Offline / archive downtime resilience with automatic demo manifest fallback (`demo_service.py`, `irsa_client.py`)
 - [x] `P1-007` | COMPLETED | Spherical RA 0°/360° boundary wrapping and NaN-safe differencing (`comparison.py`)
 - [x] `P1-008` | COMPLETED | Sub-pixel 2D FFT image translation estimator (`image_registration.py`)
@@ -29,3 +29,12 @@
 - [x] `P2-006` | COMPLETED | Guided educational exploration tour modal (`GuidedTourModal.tsx`)
 - [x] `P2-007` | COMPLETED | Comprehensive documentation suite in `docs/` (10 technical documents)
 - [x] `P2-008` | COMPLETED | Multi-container Dockerization and CI/CD workflows (`Dockerfile`, `docker-compose.yml`, `render.yaml`, `vercel.json`, `ci.yml`)
+
+## P3: Architecture & Astronomy Viewer Enhancements (ALL COMPLETED)
+- [x] `P3-001` | COMPLETED | Aladin Lite v3 Sky Context integration with survey switching (2MASS, AllWISE, DSS2, Pan-STARRS) (`AladinViewer.tsx`)
+- [x] `P3-002` | COMPLETED | Interactive SPHEREx celestial footprint overlay box synced to RA/Dec/FOV (`AladinViewer.tsx`, `CanvasViewer.tsx`)
+- [x] `P3-003` | COMPLETED | Dual-mode viewer switcher pill tabs (SPHEREx Canvas vs Aladin Lite Sky Context) (`CanvasViewer.tsx`)
+- [x] `P3-004` | COMPLETED | Scientific WCS reprojection using `reproject_interp` with FFT shift fallback (`comparison.py`, `frames.py`)
+- [x] `P3-005` | COMPLETED | WebP image encoding in `fits_processing.py` and API endpoints (`?format=webp`)
+- [x] `P3-006` | COMPLETED | Added `reproject`, `pyvo`, and `astroquery` to `backend/requirements.txt`
+- [x] `P3-007` | COMPLETED | Polished shadcn/ui-inspired glassmorphic cards, telemetry pills, and alignment method indicators

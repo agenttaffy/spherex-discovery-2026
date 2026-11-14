@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Literal
 from fastapi import APIRouter, Query, HTTPException, Body
 from pydantic import BaseModel
 from app.models.schemas import FrameResponse
@@ -8,6 +8,7 @@ from app.science.comparison import check_comparison_eligibility, compute_differe
 from app.science.fits_processing import (
     load_fits_cutout,
     extract_primary_image,
+    render_image_to_base64,
     render_image_to_base64_png,
 )
 
@@ -16,18 +17,26 @@ router = APIRouter()
 class DiffRequest(BaseModel):
     frame_id_1: str
     frame_id_2: str
+    format: Optional[str] = "png"
 
 @router.get("/frames/{frame_id}", response_model=FrameResponse)
 async def get_frame(
     frame_id: str,
     stretch: str = Query("asinh", description="Contrast stretch (asinh, zscale, linear)"),
     fov: float = Query(0.05, description="Cutout size in degrees"),
+    format: str = Query("png", description="Image output format: png or webp"),
 ):
     """
     Fetches and renders a SPHEREx observation cutout frame with scientific metadata.
+    Supports PNG and WebP output formats.
     """
     try:
-        frame = await cutout_service.get_frame(frame_id=frame_id, stretch=stretch, fov_deg=fov)
+        frame = await cutout_service.get_frame(
+            frame_id=frame_id,
+            stretch=stretch,
+            fov_deg=fov,
+            format=format,
+        )
         return frame
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -38,6 +47,7 @@ async def get_frame(
 async def diff_frames(req: DiffRequest = Body(...)):
     """
     Computes scientific difference image between two observations (frame 2 minus frame 1).
+    Utilizes astropy / reproject WCS celestial alignment across epochs.
     """
     meta1 = OBSERVATION_REGISTRY.get(req.frame_id_1)
     meta2 = OBSERVATION_REGISTRY.get(req.frame_id_2)
@@ -65,11 +75,13 @@ async def diff_frames(req: DiffRequest = Body(...)):
         if not b2:
             b2 = await cutout_service.fetch_cutout_fits(meta2["access_url"], meta2["ra"], meta2["dec"])
         
-        i1, _ = extract_primary_image(load_fits_cutout(b1))
-        i2, _ = extract_primary_image(load_fits_cutout(b2))
+        hd1 = load_fits_cutout(b1)
+        hd2 = load_fits_cutout(b2)
+        i1, h1 = extract_primary_image(hd1)
+        i2, h2 = extract_primary_image(hd2)
 
-        diff_u8, stats = compute_difference_frame(i1, i2)
-        diff_b64 = render_image_to_base64_png(diff_u8)
+        diff_u8, stats = compute_difference_frame(i1, i2, wcs1=h1, wcs2=h2)
+        diff_b64 = render_image_to_base64(diff_u8, format=req.format or "png")
 
         return {
             "eligible": True,

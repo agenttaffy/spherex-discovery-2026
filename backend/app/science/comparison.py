@@ -1,5 +1,7 @@
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, Optional
 import numpy as np
+from astropy.wcs import WCS
+from app.science.image_registration import estimate_pixel_shift
 
 def check_comparison_eligibility(
     meta1: Dict[str, Any],
@@ -44,24 +46,64 @@ def check_comparison_eligibility(
 
 def compute_difference_frame(
     img1: np.ndarray,
-    img2: np.ndarray
-) -> Tuple[np.ndarray, Dict[str, float]]:
+    img2: np.ndarray,
+    wcs1: Optional[Any] = None,
+    wcs2: Optional[Any] = None,
+) -> Tuple[np.ndarray, Dict[str, Any]]:
     """
-    Computes calibrated difference (img2 - img1).
-    Resizes img2 to img1 shape if dimensions differ slightly due to cutout edge rounding.
+    Computes calibrated scientific difference (img2 - img1).
+    When celestial WCS coordinates are provided, reprojects img2 onto img1's celestial grid
+    using astropy / reproject_interp to account for differing WCS geometries, pixel scales,
+    or rotations.
+    Gracefully falls back to FFT shift registration if WCS is absent, and crops to overlapping
+    bounding boxes when dimensions differ.
     Robust against NaN, Inf, and non-finite pixel values.
     Returns:
         Tuple[difference_array_uint8, stats_dict]
     """
-    if img1.shape != img2.shape:
-        # Crop to common overlapping bounding box
-        min_h = min(img1.shape[0], img2.shape[0])
-        min_w = min(img1.shape[1], img2.shape[1])
-        i1 = img1[:min_h, :min_w]
-        i2 = img2[:min_h, :min_w]
-    else:
-        i1 = img1
-        i2 = img2
+    alignment_method = "direct"
+    i1 = img1.copy()
+    i2 = img2.copy()
+
+    # 1. Scientific WCS Reprojection via reproject_interp
+    if wcs1 is not None and wcs2 is not None:
+        try:
+            from reproject import reproject_interp
+            w_obj1 = WCS(wcs1) if not isinstance(wcs1, WCS) else wcs1
+            w_obj2 = WCS(wcs2) if not isinstance(wcs2, WCS) else wcs2
+
+            reproj_arr, footprint = reproject_interp(
+                (i2, w_obj2),
+                w_obj1,
+                shape_out=i1.shape,
+                order="bilinear",
+            )
+            if np.any(footprint > 0) and np.any(np.isfinite(reproj_arr)):
+                i2 = reproj_arr.astype(np.float32)
+                i2[footprint == 0] = np.nan
+                alignment_method = "wcs_reproject"
+        except Exception:
+            # Reprojection encountered an edge case; proceed to FFT shift fallback
+            pass
+
+    # 2. Crop to common overlapping bounding box if dimensions differ
+    if i1.shape != i2.shape:
+        min_h = min(i1.shape[0], i2.shape[0])
+        min_w = min(i1.shape[1], i2.shape[1])
+        i1 = i1[:min_h, :min_w]
+        i2 = i2[:min_h, :min_w]
+
+    # 3. FFT Shift Registration Fallback (if WCS reprojection was not applied)
+    if alignment_method != "wcs_reproject":
+        try:
+            dy, dx = estimate_pixel_shift(i1, i2)
+            if abs(dy) >= 0.5 or abs(dx) >= 0.5:
+                from scipy.ndimage import shift
+                # Shift img2 to register with img1
+                i2 = shift(i2, (-dy, -dx), order=1, mode="constant", cval=np.nan)
+                alignment_method = "fft_shift"
+        except Exception:
+            pass
 
     diff = i2.astype(np.float32) - i1.astype(np.float32)
     finite_mask = np.isfinite(diff)
@@ -73,6 +115,7 @@ def compute_difference_frame(
             "peak_positive_flux": 0.0,
             "peak_negative_flux": 0.0,
             "sigma_mjy_sr": 0.0,
+            "alignment_method": alignment_method,
         }
 
     finite_diff = diff[finite_mask]
@@ -93,7 +136,8 @@ def compute_difference_frame(
         "rms_diff_mjy_sr": round(rms, 4),
         "peak_positive_flux": round(max_pos, 4),
         "peak_negative_flux": round(max_neg, 4),
-        "sigma_mjy_sr": round(sigma, 4)
+        "sigma_mjy_sr": round(sigma, 4),
+        "alignment_method": alignment_method,
     }
 
     return u8_diff, stats

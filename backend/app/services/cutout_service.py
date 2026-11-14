@@ -14,6 +14,7 @@ from app.science.fits_processing import (
     evaluate_quality_flags,
     calculate_pixel_stats,
     apply_stretch,
+    render_image_to_base64,
     render_image_to_base64_png,
 )
 from app.models.schemas import FrameResponse, PixelStats, FlagSummary, WCSInfo
@@ -93,7 +94,8 @@ class CutoutService:
         self,
         frame_id: str,
         stretch: str = "asinh",
-        fov_deg: float = 0.05
+        fov_deg: float = 0.05,
+        format: str = "png",
     ) -> FrameResponse:
         """
         Retrieves observation by frame_id, downloads or loads cutout,
@@ -149,8 +151,8 @@ class CutoutService:
         stretched_u8 = apply_stretch(img_array, method=stretch)
         
         # Render image previews
-        gray_b64 = render_image_to_base64_png(stretched_u8)
-        inferno_b64 = render_image_to_base64_png(stretched_u8, colormap="inferno")
+        gray_b64 = render_image_to_base64(stretched_u8, format=format)
+        inferno_b64 = render_image_to_base64(stretched_u8, colormap="inferno", format=format)
 
         return FrameResponse(
             frame_id=frame_id,

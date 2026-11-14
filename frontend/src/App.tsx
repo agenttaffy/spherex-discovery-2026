@@ -349,6 +349,9 @@ export const App: React.FC = () => {
                     ? `${observations[currentIndex].collection.toUpperCase()} • ${observations[currentIndex].detector} • ${observations[currentIndex].utc_date || ''}`
                     : undefined
                 }
+                targetRa={Number(ra)}
+                targetDec={Number(dec)}
+                targetFov={fov}
               />
 
               {/* Bottom Multi-Epoch Timeline & Blink Player */}
