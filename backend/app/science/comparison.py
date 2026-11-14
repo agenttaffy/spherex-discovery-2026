@@ -72,16 +72,23 @@ def compute_difference_frame(
             w_obj1 = WCS(wcs1) if not isinstance(wcs1, WCS) else wcs1
             w_obj2 = WCS(wcs2) if not isinstance(wcs2, WCS) else wcs2
 
-            reproj_arr, footprint = reproject_interp(
-                (i2, w_obj2),
-                w_obj1,
-                shape_out=i1.shape,
-                order="bilinear",
-            )
-            if np.any(footprint > 0) and np.any(np.isfinite(reproj_arr)):
-                i2 = reproj_arr.astype(np.float32)
-                i2[footprint == 0] = np.nan
-                alignment_method = "wcs_reproject"
+            # Extract 2D celestial sub-WCS if headers contain extra axes (e.g., spectral NAXIS=3)
+            if hasattr(w_obj1, "has_celestial") and w_obj1.has_celestial and w_obj1.naxis > 2:
+                w_obj1 = w_obj1.celestial
+            if hasattr(w_obj2, "has_celestial") and w_obj2.has_celestial and w_obj2.naxis > 2:
+                w_obj2 = w_obj2.celestial
+
+            if w_obj1.naxis == 2 and w_obj2.naxis == 2:
+                reproj_arr, footprint = reproject_interp(
+                    (i2, w_obj2),
+                    w_obj1,
+                    shape_out=i1.shape,
+                    order="bilinear",
+                )
+                if np.any(footprint > 0) and np.any(np.isfinite(reproj_arr)):
+                    i2 = reproj_arr.astype(np.float32)
+                    i2[footprint == 0] = np.nan
+                    alignment_method = "wcs_reproject"
         except Exception:
             # Reprojection encountered an edge case; proceed to FFT shift fallback
             pass

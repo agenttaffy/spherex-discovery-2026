@@ -63,3 +63,8 @@
 - **Date:** 2026-11-14
 - **Decision:** Support WebP lossless/lossy output alongside PNG in `fits_processing.py` and API endpoints (`?format=webp`).
 - **Rationale:** WebP reduces payload sizes by up to 40% compared to standard PNG, ensuring buttery-smooth 60 FPS timeline scrubbing and blink comparison even over throttled connections.
+
+## ADR-014: Aladin Lite Layer Reuse, Meridian Seam Splitting & 3D Celestial Sub-WCS
+- **Date:** 2026-11-14
+- **Decision:** Reuse graphic overlay instances via `overlay.removeAll()` in `AladinViewer.tsx`, split coverage footprint polygons across the 0°/360° RA meridian seam, and extract `.celestial` sub-WCS for 3D/spectral FITS cutouts before calling `reproject_interp`.
+- **Rationale:** Prevents catastrophic memory and rendering leaks in Aladin Lite WebGL scene graph from unbounded `addOverlay` calls on coordinate change. Splitting across the meridian avoids full-sky polygon tearing artifacts. Celestial sub-WCS extraction allows spectral cubes and 3D FITS cutouts to reproject seamlessly without throwing dimension errors.

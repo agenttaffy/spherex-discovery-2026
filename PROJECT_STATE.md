@@ -56,7 +56,7 @@
   - `.github/workflows/ci.yml` running pytest and frontend build.
   - Docker configurations (`backend/Dockerfile`, `frontend/Dockerfile`, `docker-compose.yml`, `frontend/nginx.conf`).
   - Cloud configurations (`render.yaml`, `frontend/vercel.json`).
-- **Comprehensive Automated Test Suite:** 48 passing pytest tests covering unit, science, reprojection, WebP, offline resilience, and integration flows.
+- **Comprehensive Automated Test Suite:** 52 passing pytest tests covering unit, science, 3D WCS reprojection, rotated WCS alignment, WebP, offline resilience, and integration flows.
 
 ---
 
@@ -70,5 +70,5 @@
 ---
 
 ## 3. Latest Build & Test Status
-- **Backend pytest:** 48 passed in 3.87s (0 failures).
-- **Frontend build:** `npm run build` succeeded in 2.70s (0 type errors, 0 warnings).
+- **Backend pytest:** 52 passed in 2.48s (0 failures).
+- **Frontend build:** `npm run build` succeeded in 2.08s (0 type errors, 0 warnings).

@@ -12,6 +12,7 @@ from app.science.fits_processing import (
     apply_zscale_stretch,
     render_image_to_base64,
     render_image_to_base64_png,
+    extract_astropy_wcs,
 )
 
 @pytest.fixture
@@ -108,4 +109,23 @@ def test_render_image_to_base64_webp():
 
     webp_inferno = render_image_to_base64(u8_arr, colormap="inferno", format="webp")
     assert webp_inferno.startswith("data:image/webp;base64,")
+
+def test_extract_astropy_wcs_celestial():
+    header = fits.Header()
+    header["NAXIS"] = 3
+    header["CTYPE1"] = "RA---TAN"
+    header["CTYPE2"] = "DEC--TAN"
+    header["CTYPE3"] = "WAVE"
+    header["CRVAL1"] = 127.6944
+    header["CRVAL2"] = -39.1776
+    header["CRVAL3"] = 1.5
+    w = extract_astropy_wcs(header)
+    assert w is not None
+    assert w.naxis == 2  # Extracted 2D celestial sub-WCS
+
+def test_render_image_to_base64_float_sanitization():
+    # Test float32 input with NaN to ensure no Pillow deprecation warning or exception
+    float_arr = np.array([[10.5, np.nan], [200.2, 500.0]], dtype=np.float32)
+    b64 = render_image_to_base64(float_arr, format="webp")
+    assert b64.startswith("data:image/webp;base64,")
 

@@ -166,7 +166,7 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
     }
 
     ctx.restore();
-  }, [cachedImg, zoom, offset, showCrosshair, showCatalog, catalogSources, frame]);
+  }, [cachedImg, zoom, offset, showCrosshair, showCatalog, catalogSources, frame, viewerMode]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     setIsDragging(true);

@@ -56,22 +56,23 @@ export const AladinViewer: React.FC<AladinViewerProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const aladinInstanceRef = useRef<any>(null);
+  const overlayRef = useRef<any>(null);
   const [activeSurvey, setActiveSurvey] = useState<string>('P/2MASS/color');
   const [scriptLoaded, setScriptLoaded] = useState<boolean>(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [currentZoomFov, setCurrentZoomFov] = useState<number>(fov * 2.5);
 
-  // Compute bounding box footprint coordinates
+  // Robust bounding box footprint coordinates with celestial boundary normalization
   const halfFovDeg = fov / 2;
-  const cosDec = Math.max(Math.cos((dec * Math.PI) / 180), 0.01);
+  const clampedDec = Math.max(-89.9, Math.min(89.9, dec));
+  const cosDec = Math.max(Math.cos((clampedDec * Math.PI) / 180), 0.001);
   const halfRaDeg = halfFovDeg / cosDec;
 
-  const footprintCorners = [
-    { ra: ra - halfRaDeg, dec: dec - halfFovDeg },
-    { ra: ra + halfRaDeg, dec: dec - halfFovDeg },
-    { ra: ra + halfRaDeg, dec: dec + halfFovDeg },
-    { ra: ra - halfRaDeg, dec: dec + halfFovDeg },
-  ];
+  const decMin = Math.max(-90, dec - halfFovDeg);
+  const decMax = Math.min(90, dec + halfFovDeg);
+  const normRa = (r: number) => ((r % 360) + 360) % 360;
+  const raMin = normRa(ra - halfRaDeg);
+  const raMax = normRa(ra + halfRaDeg);
 
   // Helper to load Aladin Lite script dynamically
   useEffect(() => {
@@ -94,9 +95,9 @@ export const AladinViewer: React.FC<AladinViewerProps> = ({
       setScriptLoaded(true);
     };
     script.onerror = () => {
-      // Secondary fallback to CDS official URL
+      // Secondary fallback to unpkg mirror
       const fallbackScript = document.createElement('script');
-      fallbackScript.src = 'https://aladin.cds.unistra.fr/AladinLite/api/v3/latest/aladin.js';
+      fallbackScript.src = 'https://unpkg.com/aladin-lite@3.3.0/dist/aladin.umd.cjs';
       fallbackScript.async = true;
       fallbackScript.onload = () => setScriptLoaded(true);
       fallbackScript.onerror = () => {
@@ -113,35 +114,55 @@ export const AladinViewer: React.FC<AladinViewerProps> = ({
       const A = (window as any).A;
       if (!A || !aladin) return;
 
-      // Clean existing overlays
-      if (aladin.view && aladin.view.overlays) {
-        aladin.view.overlays.forEach((o: any) => {
-          if (o.name === 'SPHEREx Footprint') {
-            o.removeAll && o.removeAll();
-          }
+      // Reuse existing overlay to avoid memory/rendering leaks
+      if (!overlayRef.current) {
+        overlayRef.current = A.graphicOverlay({
+          name: 'SPHEREx Footprint',
+          color: '#06b6d4', // Cyan-500
+          lineWidth: 2,
         });
+        aladin.addOverlay(overlayRef.current);
+      } else {
+        overlayRef.current.removeAll();
       }
 
-      const overlay = A.graphicOverlay({
-        name: 'SPHEREx Footprint',
-        color: '#06b6d4', // Cyan-500
-        lineWidth: 2,
-      });
-      aladin.addOverlay(overlay);
-
-      const polygonCoords = [
-        [footprintCorners[0].ra, footprintCorners[0].dec],
-        [footprintCorners[1].ra, footprintCorners[1].dec],
-        [footprintCorners[2].ra, footprintCorners[2].dec],
-        [footprintCorners[3].ra, footprintCorners[3].dec],
-      ];
-
-      const polygon = A.polygon(polygonCoords);
-      overlay.add(polygon);
+      // Handle meridian wrap-around (RA = 0° / 360° crossing)
+      if (raMin > raMax) {
+        const polyWest = A.polygon([
+          [raMin, decMin],
+          [360, decMin],
+          [360, decMax],
+          [raMin, decMax],
+        ]);
+        const polyEast = A.polygon([
+          [0, decMin],
+          [raMax, decMin],
+          [raMax, decMax],
+          [0, decMax],
+        ]);
+        overlayRef.current.add(polyWest);
+        overlayRef.current.add(polyEast);
+      } else {
+        const polygon = A.polygon([
+          [raMin, decMin],
+          [raMax, decMin],
+          [raMax, decMax],
+          [raMin, decMax],
+        ]);
+        overlayRef.current.add(polygon);
+      }
     } catch (err) {
       console.warn('[AladinViewer] Could not draw footprint overlay:', err);
     }
-  }, [footprintCorners]);
+  }, [raMin, raMax, decMin, decMax]);
+
+  // Clean up references on unmount
+  useEffect(() => {
+    return () => {
+      aladinInstanceRef.current = null;
+      overlayRef.current = null;
+    };
+  }, []);
 
   // Initialize or re-target Aladin Lite instance
   useEffect(() => {
@@ -159,9 +180,12 @@ export const AladinViewer: React.FC<AladinViewerProps> = ({
         aladinDiv.style.height = '100%';
         containerRef.current.appendChild(aladinDiv);
 
-        const initPromise = A.init ? A.init : Promise.resolve();
+        const initPromise = typeof A.init === 'function'
+          ? A.init()
+          : (A.init && typeof A.init.then === 'function' ? A.init : Promise.resolve());
+
         initPromise.then(() => {
-          const inst = A.aladin('#aladin-lite-mount-point', {
+          const inst = A.aladin(aladinDiv, {
             survey: activeSurvey,
             fov: currentZoomFov,
             target: `${ra} ${dec}`,

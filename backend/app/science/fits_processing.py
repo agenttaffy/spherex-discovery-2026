@@ -171,9 +171,13 @@ def apply_inferno_colormap(grayscale_u8: np.ndarray) -> np.ndarray:
 def extract_astropy_wcs(header: fits.Header) -> Optional[WCS]:
     """
     Constructs an Astropy WCS instance from FITS header if celestial keywords are present.
+    Extracts 2D celestial sub-WCS if the header contains extra axes (e.g. NAXIS=3).
     """
     try:
-        return WCS(header)
+        w = WCS(header)
+        if hasattr(w, "has_celestial") and w.has_celestial and w.naxis > 2:
+            return w.celestial
+        return w
     except Exception:
         return None
 
@@ -186,7 +190,9 @@ def render_image_to_base64(
     Encodes uint8 2D array to Base64 data URI string (PNG or WebP).
     WebP provides smaller payload sizes for rapid multi-epoch timeline playback.
     """
-    # Flip vertically to match astronomical convention (North up, standard image coords)
+    # Ensure uint8 array and flip vertically to match astronomical convention (North up, standard image coords)
+    if uint8_image.dtype != np.uint8:
+        uint8_image = np.clip(np.nan_to_num(uint8_image, nan=0.0), 0, 255).astype(np.uint8)
     flipped = np.flipud(uint8_image)
     
     if colormap == "inferno":

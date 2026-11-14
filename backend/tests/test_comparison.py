@@ -81,3 +81,54 @@ def test_compute_difference_frame_fft_shift_fallback():
     assert diff_u8.shape == (30, 30)
     assert stats["alignment_method"] == "fft_shift"
 
+def test_compute_difference_frame_spectral_3d_wcs():
+    # 3D WCS with RA, Dec, and Spectral Wave channel
+    w1 = WCS(naxis=3)
+    w1.wcs.ctype = ['RA---TAN', 'DEC--TAN', 'WAVE']
+    w1.wcs.crval = [100.0, 20.0, 1.5]
+    w1.wcs.cdelt = [-0.01, 0.01, 0.1]
+    w1.wcs.crpix = [10.0, 10.0, 1.0]
+
+    w2 = WCS(naxis=3)
+    w2.wcs.ctype = ['RA---TAN', 'DEC--TAN', 'WAVE']
+    w2.wcs.crval = [100.0, 20.0, 1.5]
+    w2.wcs.cdelt = [-0.01, 0.01, 0.1]
+    w2.wcs.crpix = [11.0, 10.0, 1.0]
+
+    i1 = np.ones((20, 20), dtype=np.float32) * 5.0
+    i2 = np.ones((20, 20), dtype=np.float32) * 5.0
+    i2[10, 10] = 30.0
+
+    diff_u8, stats = compute_difference_frame(i1, i2, wcs1=w1, wcs2=w2)
+    assert diff_u8.shape == (20, 20)
+    assert stats["alignment_method"] == "wcs_reproject"
+
+def test_compute_difference_frame_rotated_wcs():
+    # Target image
+    w1 = WCS(naxis=2)
+    w1.wcs.crpix = [10.0, 10.0]
+    w1.wcs.cdelt = [-0.001, 0.001]
+    w1.wcs.crval = [150.0, 2.0]
+    w1.wcs.ctype = ['RA---TAN', 'DEC--TAN']
+
+    # 90 degree rotated image
+    w2 = WCS(naxis=2)
+    w2.wcs.crpix = [10.0, 10.0]
+    w2.wcs.pc = [[0, -1], [1, 0]]
+    w2.wcs.cdelt = [-0.001, 0.001]
+    w2.wcs.crval = [150.0, 2.0]
+    w2.wcs.ctype = ['RA---TAN', 'DEC--TAN']
+
+    img1 = np.zeros((20, 20), dtype=np.float32)
+    img1[10, 12] = 50.0
+
+    sky_coord = w1.pixel_to_world(12, 10)
+    px2, py2 = w2.world_to_pixel(sky_coord)
+    img2 = np.zeros((20, 20), dtype=np.float32)
+    img2[int(round(float(py2))), int(round(float(px2)))] = 50.0
+
+    diff_u8, stats = compute_difference_frame(img1, img2, wcs1=w1, wcs2=w2)
+    assert diff_u8.shape == (20, 20)
+    assert stats["alignment_method"] == "wcs_reproject"
+    assert stats["rms_diff_mjy_sr"] < 0.1
+

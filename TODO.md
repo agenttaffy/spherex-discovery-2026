@@ -38,3 +38,4 @@
 - [x] `P3-005` | COMPLETED | WebP image encoding in `fits_processing.py` and API endpoints (`?format=webp`)
 - [x] `P3-006` | COMPLETED | Added `reproject`, `pyvo`, and `astroquery` to `backend/requirements.txt`
 - [x] `P3-007` | COMPLETED | Polished shadcn/ui-inspired glassmorphic cards, telemetry pills, and alignment method indicators
+- [x] `P3-008` | COMPLETED | Fixed CanvasViewer unmount/remount blank redraw bug (`viewerMode` dependency), Aladin Lite overlay layer reuse/memory leak prevention, 0°/360° RA seam crossing handling, and 3D spectral WCS celestial extraction in reprojection
