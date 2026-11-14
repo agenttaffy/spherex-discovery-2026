@@ -422,7 +422,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations }) 
                   </span>
                   <span className="text-emerald-400 font-bold bg-emerald-950/80 px-1.5 py-0.5 rounded border border-emerald-800/60 text-[10px]">
                     {stackResult.snr_improvement_factor != null
-                      ? `+${((stackResult.snr_improvement_factor - 1) * 100).toFixed(0)}% SNR (~${stackResult.snr_improvement_factor}×)`
+                      ? `${stackResult.snr_improvement_factor >= 1.0 ? '+' : ''}${((stackResult.snr_improvement_factor - 1) * 100).toFixed(0)}% SNR (~${stackResult.snr_improvement_factor}×)`
                       : `Theory: ~${stackResult.theoretical_snr_gain}×`}
                   </span>
                 </div>

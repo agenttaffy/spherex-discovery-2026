@@ -70,6 +70,25 @@ def compute_aperture_photometry(
                 "aperture_area_pixels": 0,
                 "valid_pixel_count": 0,
             }
+
+        # Check if projected coordinates lie completely outside image bounds
+        if center_x < -aperture_radius or center_x >= (w + aperture_radius) or center_y < -aperture_radius or center_y >= (h + aperture_radius):
+            return {
+                "status": "unavailable",
+                "valid": False,
+                "reason": f"Target coordinates project outside image boundaries (pixel x={center_x:.1f}, y={center_y:.1f} for image {w}x{h})",
+                "aperture_flux_sum": None,
+                "aperture_mean": None,
+                "background_median": None,
+                "background_std": None,
+                "net_flux": None,
+                "flux_err": None,
+                "peak_flux": None,
+                "snr": None,
+                "coverage_fraction": 0.0,
+                "aperture_area_pixels": 0,
+                "valid_pixel_count": 0,
+            }
     elif center_y is None or center_x is None:
         # Blind peak-seeking only when NO target coordinates were specified
         from app.science.motion import _find_brightest_centroid
@@ -143,10 +162,10 @@ def compute_aperture_photometry(
             "status": "unavailable",
             "valid": False,
             "reason": "Target aperture contains zero valid, unmasked pixels within the frame",
-            "aperture_flux_sum": 0.0,
-            "aperture_mean": 0.0,
-            "background_median": round(bg_med, 4),
-            "background_std": round(bg_std, 4),
+            "aperture_flux_sum": None,
+            "aperture_mean": None,
+            "background_median": round(bg_med, 4) if np.isfinite(bg_med) else None,
+            "background_std": round(bg_std, 4) if np.isfinite(bg_std) else None,
             "net_flux": None,
             "flux_err": None,
             "peak_flux": None,
@@ -301,6 +320,7 @@ def build_lightcurve_series(
 
     return {
         "total_points": len(points),
+        "valid_points_count": len(net_fluxes),
         "is_variable": is_variable,
         "variability_index": round(max_var_index, 3),
         "mean_flux_mjy_sr": round(mean_flux, 4),

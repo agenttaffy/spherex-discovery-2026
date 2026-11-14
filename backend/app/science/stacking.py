@@ -208,15 +208,18 @@ def compute_coadd_stack(
     n_frames = len(aligned_frames)
 
     # Perform stacking
-    with np.errstate(all="ignore"):
-        if method == "median":
-            stacked = np.nanmedian(cube, axis=0)
-        elif method == "sum":
-            stacked = np.nansum(cube, axis=0)
-            all_nan_mask = np.all(~np.isfinite(cube), axis=0)
-            stacked[all_nan_mask] = np.nan
-        else:  # default "mean"
-            stacked = np.nanmean(cube, axis=0)
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=RuntimeWarning)
+        with np.errstate(all="ignore"):
+            if method == "median":
+                stacked = np.nanmedian(cube, axis=0)
+            elif method == "sum":
+                stacked = np.nansum(cube, axis=0)
+                all_nan_mask = np.all(~np.isfinite(cube), axis=0)
+                stacked[all_nan_mask] = np.nan
+            else:  # default "mean"
+                stacked = np.nanmean(cube, axis=0)
 
     # Propagate Variance: Var_stack = (1/N^2) * sum(Var_i) for mean coaddition
     valid_data_mask = np.isfinite(cube)

@@ -51,11 +51,15 @@ def sample_fits_bytes():
 def test_load_and_extract_image(sample_fits_bytes):
     hdul = load_fits_cutout(sample_fits_bytes)
     assert len(hdul) == 3
+    # Default scientific extraction preserves NaN as mask
     data, header = extract_primary_image(hdul)
     assert data.shape == (3, 3)
-    # NaN should be sanitized
-    assert not np.isnan(data).any()
+    assert np.isnan(data).any()
     assert header["BUNIT"] == "MJy/sr"
+
+    # Explicit preserve_nan=False sanitizes for legacy display compatibility
+    data_sanitized, _ = extract_primary_image(hdul, preserve_nan=False)
+    assert not np.isnan(data_sanitized).any()
 
 def test_extract_wcs(sample_fits_bytes):
     hdul = load_fits_cutout(sample_fits_bytes)
@@ -66,7 +70,14 @@ def test_extract_wcs(sample_fits_bytes):
 
 def test_evaluate_quality_flags(sample_fits_bytes):
     hdul = load_fits_cutout(sample_fits_bytes)
-    flag_summary = evaluate_quality_flags(hdul)
+    # Default call without mask metadata preserves explicit unknown/missing state
+    default_summary = evaluate_quality_flags(hdul)
+    assert default_summary["quality_state"] == "unknown_metadata_missing"
+    assert default_summary["flagged_pixels"] == 0
+
+    # Explicit fixture/test call allows legacy synthetic bits
+    flag_summary = evaluate_quality_flags(hdul, allow_legacy_synthetic=True)
+    assert flag_summary["quality_state"] == "legacy_synthetic"
     assert flag_summary["total_pixels"] == 9
     assert flag_summary["flagged_pixels"] == 2
     assert flag_summary["flag_breakdown"]["cosmic_ray"] == 1

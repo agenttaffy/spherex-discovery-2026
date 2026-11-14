@@ -47,7 +47,7 @@
 - [x] `P5-004` | COMPLETED | Removed all preset coordinates/names and hardcoded temperatures from spectrum SED; added documented Planck blackbody fit with inputs, uncertainty, and limitations (`spectrum.py`)
 - [x] `P5-005` | COMPLETED | Uncensored empirical SNR improvement estimator in image stacking, removing arbitrary `[0.5, 2.5 * sqrt(N)]` clamping (`stacking.py`)
 - [x] `P5-006` | COMPLETED | Preserved invalid pixels (NaN/Inf) as masks without fabricated fill values across image loading, photometry, stacking, and motion (`fits_processing.py`, `photometry.py`, `stacking.py`, `motion.py`)
-- [x] `P5-007` | COMPLETED | Comprehensive regression tests for all 5 audit issues (total 91 pytest tests passing) (`test_scientific_audit_regression.py`)
+- [x] `P5-007` | COMPLETED | Comprehensive regression tests for all 5 audit issues (total 92 pytest tests passing) (`test_scientific_audit_regression.py`)
 
 ## P4: Potential Considerations & Advanced Science Discoveries (ALL COMPLETED)
 - [x] `P4-001` | COMPLETED | On-the-fly spectra generation endpoint (`GET /api/science/spectrum`) gathering aperture fluxes across the 6 SPHEREx detector arrays (D1: 0.75–1.12 µm, D2: 1.12–1.68 µm, D3: 1.68–2.42 µm, D4: 2.42–3.82 µm, D5: 3.82–4.42 µm, D6: 4.42–5.00 µm) (`spectrum.py`)

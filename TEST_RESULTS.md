@@ -1,8 +1,8 @@
 # SPHEREx Discovery — Test Execution Record
 
-**Execution Timestamp:** 2026-11-14T22:56:00Z  
+**Execution Timestamp:** 2026-11-14T23:12:00Z  
 **Platform:** Windows 11 / Python 3.11.4 / Node.js v22.19.0  
-**Test Suite Status:** 91 backend pytest tests passed in 7.98s | 41 automated UI accessibility checks passed | Frontend Build: 0 errors in 2.77s | Demo Assets: 22/22 verified | NASA/IPAC IRSA SIA: 200 OK
+**Test Suite Status:** 92 backend pytest tests passed in 7.82s | 41 automated UI accessibility checks passed | Frontend Build: 0 errors in 2.62s | Demo Assets: 22/22 verified | NASA/IPAC IRSA SIA: 200 OK
 
 ---
 
@@ -108,64 +108,7 @@ backend/tests/test_stacking_and_spectrum.py::test_stack_frames_endpoint_distant_
 backend/tests/test_stacking_and_spectrum.py::test_spectrum_endpoint_fov_validation PASSED [ 98%]
 backend/tests/test_stacking_and_spectrum.py::test_robust_noise_sigma_point_source_insensitivity PASSED [100%]
 
-======================== 91 passed, 1 warning in 7.98s ========================
-```
-tests/test_fits_processing.py::test_spherex_documented_flags_distinguish_source_mask PASSED [ 38%]
-tests/test_fits_processing.py::test_apply_diverging_colormap PASSED      [ 39%]
-tests/test_health.py::test_root PASSED                                   [ 40%]
-tests/test_health.py::test_health PASSED                                 [ 41%]
-tests/test_health.py::test_demo_presets PASSED                           [ 43%]
-tests/test_image_registration.py::test_identical_images PASSED           [ 44%]
-tests/test_image_registration.py::test_known_shift_recovery PASSED       [ 45%]
-tests/test_image_registration.py::test_different_dimensions PASSED       [ 46%]
-tests/test_image_registration.py::test_nan_and_inf_robustness PASSED     [ 47%]
-tests/test_image_registration.py::test_constant_image PASSED             [ 48%]
-tests/test_integration.py::test_full_explorer_flow PASSED                [ 50%]
-tests/test_integration.py::test_invalid_coordinates_flow PASSED          [ 51%]
-tests/test_irsa_client.py::test_irsa_client_parse PASSED                 [ 52%]
-tests/test_irsa_client.py::test_observation_registry_insertion PASSED    [ 53%]
-tests/test_science.py::test_aperture_photometry_gaussian_source PASSED   [ 54%]
-tests/test_science.py::test_lightcurve_variability_classification PASSED [ 55%]
-tests/test_science.py::test_astrometric_motion_measurement PASSED        [ 56%]
-tests/test_science.py::test_catalog_endpoint_barnard PASSED              [ 58%]
-tests/test_science.py::test_photometry_endpoint_demo PASSED              [ 59%]
-tests/test_science.py::test_motion_endpoint_on_demo_epochs PASSED        [ 60%]
-tests/test_science.py::test_discovery_report_endpoint PASSED             [ 61%]
-tests/test_science.py::test_photometry_preset_differentiation PASSED     [ 62%]
-tests/test_scientific_audit_regression.py::test_priority_1_flags_metadata_and_source_mask_distinction PASSED [ 63%]
-tests/test_scientific_audit_regression.py::test_priority_2_photometry_wcs_target_measurement_and_variance PASSED [ 65%]
-tests/test_scientific_audit_regression.py::test_priority_2_spectrum_interpolation_labeled_correctly PASSED [ 66%]
-tests/test_scientific_audit_regression.py::test_priority_3_astrometric_motion_wcs_target_tracking PASSED [ 67%]
-tests/test_scientific_audit_regression.py::test_priority_4_differencing_lvf_compatibility_and_reprojection_error PASSED [ 68%]
-tests/test_scientific_audit_regression.py::test_priority_5_stacking_detector_compatibility_and_variance PASSED [ 69%]
-tests/test_scientific_audit_regression.py::test_priority_6_gaia_provenance_explicit_labeling PASSED [ 70%]
-tests/test_scientific_audit_regression.py::test_priority_1_extract_source_mask PASSED [ 72%]
-tests/test_scientific_audit_regression.py::test_priority_2_aperture_photometry_boundary_and_wcs_wave PASSED [ 73%]
-tests/test_scientific_audit_regression.py::test_priority_3_astrometric_vector_components_and_no_wandering PASSED [ 74%]
-tests/test_scientific_audit_regression.py::test_priority_5_stacking_variance_with_masked_pixels PASSED [ 75%]
-tests/test_scientific_audit_regression.py::test_priority_1_source_mask_background_exclusion_without_aperture_rejection PASSED [ 76%]
-tests/test_scientific_audit_regression.py::test_priority_2_discovery_report_sed_truthfulness PASSED [ 77%]
-tests/test_scientific_audit_regression.py::test_priority_3_pointing_shift_not_presented_as_target_motion PASSED [ 79%]
-tests/test_scientific_audit_regression.py::test_priority_1_lightcurve_source_mask_background_exclusion PASSED [ 80%]
-tests/test_stacking_and_spectrum.py::test_compute_coadd_stack_mean_median_sum PASSED [ 81%]
-tests/test_stacking_and_spectrum.py::test_compute_coadd_stack_nan_handling PASSED [ 82%]
-tests/test_stacking_and_spectrum.py::test_compute_coadd_stack_wcs_reproject PASSED [ 83%]
-tests/test_stacking_and_spectrum.py::test_spectrum_generation_102_channels PASSED [ 84%]
-tests/test_stacking_and_spectrum.py::test_spectrum_endpoint_barnard PASSED [ 86%]
-tests/test_stacking_and_spectrum.py::test_spectrum_endpoint_wise0855_brown_dwarf PASSED [ 87%]
-tests/test_stacking_and_spectrum.py::test_spectrum_endpoint_sexagesimal PASSED [ 88%]
-tests/test_stacking_and_spectrum.py::test_spectrum_endpoint_invalid_coords PASSED [ 89%]
-tests/test_stacking_and_spectrum.py::test_stack_frames_endpoint_on_demo_epochs PASSED [ 90%]
-tests/test_stacking_and_spectrum.py::test_stack_frames_endpoint_validation PASSED [ 91%]
-tests/test_stacking_and_spectrum.py::test_stack_frames_endpoint_webp_and_median PASSED [ 93%]
-tests/test_stacking_and_spectrum.py::test_compute_coadd_stack_edge_cases PASSED [ 94%]
-tests/test_stacking_and_spectrum.py::test_stack_frames_endpoint_duplicate_frames_rejected PASSED [ 95%]
-tests/test_stacking_and_spectrum.py::test_compute_coadd_stack_non_overlapping_wcs_raises PASSED [ 96%]
-tests/test_stacking_and_spectrum.py::test_stack_frames_endpoint_distant_pointings_rejected PASSED [ 97%]
-tests/test_stacking_and_spectrum.py::test_spectrum_endpoint_fov_validation PASSED [ 98%]
-tests/test_stacking_and_spectrum.py::test_robust_noise_sigma_point_source_insensitivity PASSED [100%]
-
-============================= 86 passed in 6.70s ==============================
+======================= 92 passed, 2 warnings in 7.82s ========================
 ```
 
 ---

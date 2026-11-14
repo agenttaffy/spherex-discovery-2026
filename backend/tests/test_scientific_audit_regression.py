@@ -637,6 +637,25 @@ def test_audit_photometry_target_wcs_failure_returns_unavailable():
     assert phot_bad_wcs["valid"] is False
     assert phot_bad_wcs["net_flux"] is None
 
+    # Case B2: target_coord projects completely outside image bounds
+    good_hdr = fits.Header()
+    good_hdr["CTYPE1"] = "RA---TAN"
+    good_hdr["CTYPE2"] = "DEC--TAN"
+    good_hdr["CRVAL1"] = 100.0
+    good_hdr["CRVAL2"] = 20.0
+    good_hdr["CRPIX1"] = 10.0
+    good_hdr["CRPIX2"] = 10.0
+    good_hdr["CDELT1"] = -0.01
+    good_hdr["CDELT2"] = 0.01
+    phot_outside = compute_aperture_photometry(
+        image=img,
+        target_coord=(105.0, 25.0),  # Far outside 21x21 frame
+        wcs=good_hdr,
+    )
+    assert phot_outside["status"] == "unavailable"
+    assert phot_outside["valid"] is False
+    assert "outside image boundaries" in phot_outside["reason"]
+
     # Case C: build_lightcurve_series surfaces unavailable state
     frame_fail = {
         "obs_id": "OBS_FAIL",
@@ -689,6 +708,33 @@ def test_audit_fits_processing_wavelength_and_mask_semantics():
     assert wave_center is not None
     assert wave_center["wavelength_um"] == pytest.approx(3.12, rel=1e-3)
 
+    # Target coord with valid celestial 3D WCS (NAXIS=3)
+    img_hdr3d = fits.Header()
+    img_hdr3d["NAXIS1"] = 20
+    img_hdr3d["NAXIS2"] = 20
+    img_hdr3d["NAXIS3"] = 1
+    img_hdr3d["CTYPE1"] = "RA---TAN"
+    img_hdr3d["CTYPE2"] = "DEC--TAN"
+    img_hdr3d["CTYPE3"] = "WAVE"
+    img_hdr3d["CRVAL1"] = 100.0
+    img_hdr3d["CRVAL2"] = 20.0
+    img_hdr3d["CRVAL3"] = 3.0
+    img_hdr3d["CRPIX1"] = 10.0
+    img_hdr3d["CRPIX2"] = 10.0
+    img_hdr3d["CRPIX3"] = 1.0
+    img_hdr3d["CDELT1"] = -0.01
+    img_hdr3d["CDELT2"] = 0.01
+    img_hdr3d["CDELT3"] = 0.1
+    img_hdu3d = fits.ImageHDU(data=np.ones((20, 20), dtype=np.float32), header=img_hdr3d, name="IMAGE")
+    hdul_3d = fits.HDUList([fits.PrimaryHDU(), img_hdu3d, wave_hdu])
+    wave_3d = extract_calibrated_wavelength(hdul_3d, target_coord=(100.0, 20.0))
+    assert wave_3d is not None
+    assert wave_3d["wavelength_um"] == pytest.approx(3.12, rel=1e-3)
+
+    # Target coord projecting outside cutout bounds returns None
+    wave_out_bounds = extract_calibrated_wavelength(hdul_3d, target_coord=(120.0, 40.0))
+    assert wave_out_bounds is None
+
     # 2. FLAGS extension with missing mask metadata
     flags_data = np.array([[1, 2], [4, 8]], dtype=np.int32)
     flags_hdr = fits.Header()  # No MSKN cards!
@@ -699,10 +745,19 @@ def test_audit_fits_processing_wavelength_and_mask_semantics():
     mask_default = extract_fatal_quality_mask(hdul_flags)
     assert mask_default is None
 
+    # evaluate_quality_flags must also preserve explicit unknown/missing quality state
+    eval_default = evaluate_quality_flags(hdul_flags)
+    assert eval_default["quality_state"] == "unknown_metadata_missing"
+    assert eval_default["flagged_pixels"] == 0
+
     # Fixture-only explicit call allows legacy synthetic bits
     mask_synthetic = extract_fatal_quality_mask(hdul_flags, allow_legacy_synthetic=True)
     assert mask_synthetic is not None
     assert np.all(mask_synthetic)
+
+    eval_synthetic = evaluate_quality_flags(hdul_flags, allow_legacy_synthetic=True)
+    assert eval_synthetic["quality_state"] == "legacy_synthetic"
+    assert eval_synthetic["flagged_pixels"] == 4
 
 
 def test_audit_spectrum_truthfulness_and_documented_bb_fit():
@@ -723,15 +778,43 @@ def test_audit_spectrum_truthfulness_and_documented_bb_fit():
     assert "minimum of 2 observed detector bands" in fit_single["limitations"]
 
     # 2. Fit with 2 observed bands (e.g. cool star rising at ~1.5 - 2.5 um)
+    # Degrees of freedom is 2 - 2 = 0, so reduced chi2 is None
     fit_two = fit_blackbody_continuum([
         {"detector": "SPHEREx-D1", "wavelength_um": 0.935, "flux_mjy_sr": 5.0, "flux_err_mjy_sr": 0.2},
         {"detector": "SPHEREx-D3", "wavelength_um": 2.050, "flux_mjy_sr": 15.0, "flux_err_mjy_sr": 0.5},
     ])
     assert fit_two["status"] == "converged"
     assert fit_two["temperature_k"] is not None
-    assert fit_two["reduced_chi2"] is not None
+    assert fit_two["degrees_of_freedom"] == 0
+    assert fit_two["reduced_chi2"] is None
     assert len(fit_two["inputs"]) == 2
     assert "Broadband continuum approximation" in fit_two["limitations"]
+
+    # Fit with 3 observed bands: dof = 3 - 2 = 1, reduced_chi2 is a float
+    fit_three = fit_blackbody_continuum([
+        {"detector": "SPHEREx-D1", "wavelength_um": 0.935, "flux_mjy_sr": 5.0, "flux_err_mjy_sr": 0.2},
+        {"detector": "SPHEREx-D3", "wavelength_um": 2.050, "flux_mjy_sr": 15.0, "flux_err_mjy_sr": 0.5},
+        {"detector": "SPHEREx-D6", "wavelength_um": 4.710, "flux_mjy_sr": 12.0, "flux_err_mjy_sr": 0.4},
+    ])
+    assert fit_three["status"] == "converged"
+    assert fit_three["degrees_of_freedom"] == 1
+    assert fit_three["reduced_chi2"] is not None
+
+    # Handle None flux errors gracefully without TypeError
+    fit_none_err = fit_blackbody_continuum([
+        {"detector": "SPHEREx-D1", "wavelength_um": 0.935, "flux_mjy_sr": 5.0, "flux_err_mjy_sr": None},
+        {"detector": "SPHEREx-D3", "wavelength_um": 2.050, "flux_mjy_sr": 15.0, "flux_err_mjy_sr": None},
+    ])
+    assert fit_none_err["status"] == "converged"
+    assert fit_none_err["temperature_k"] is not None
+
+    # Repeated identical wavelengths (zero baseline) return unavailable
+    fit_same_wave = fit_blackbody_continuum([
+        {"detector": "SPHEREx-D1", "wavelength_um": 0.935, "flux_mjy_sr": 5.0},
+        {"detector": "SPHEREx-D1", "wavelength_um": 0.935, "flux_mjy_sr": 5.2},
+    ])
+    assert fit_same_wave["status"] == "unavailable"
+    assert "Insufficient spectral baseline" in fit_same_wave["limitations"]
 
     # 3. generate_spectrum_for_target at arbitrary coordinates
     spec = generate_spectrum_for_target(ra=150.0, dec=20.0, observations=[], cutout_fetcher=None)
@@ -818,5 +901,39 @@ def test_audit_nan_inf_preserved_as_masks_not_fabricated():
     assert phot["valid"] is True
     # Verify original array unchanged
     assert np.isnan(f1[2, 2])
+
+
+def test_audit_motion_requested_target_never_substitutes_brightest_peak():
+    """
+    When target_coord is requested in measure_astrometric_motion, but WCS projection
+    fails or centroids cannot be tracked, motion analysis must NEVER substitute the blind
+    brightest peak in the field as the target.
+    """
+    img1 = np.ones((30, 30), dtype=np.float32) * 1.0
+    img2 = np.ones((30, 30), dtype=np.float32) * 1.0
+    # Add an unrelated bright field star at (5, 5)
+    img1[5, 5] = 100.0
+    img2[5, 5] = 100.0
+
+    meta1 = {"mjd": 60000.0}
+    meta2 = {"mjd": 60365.0}
+
+    # Request motion for a target without WCS
+    res = measure_astrometric_motion(
+        img1=img1,
+        img2=img2,
+        meta1=meta1,
+        meta2=meta2,
+        wcs1=None,
+        wcs2=None,
+        target_coord=(120.0, 45.0),
+    )
+    # Must NOT track the unrelated bright star at (5, 5)
+    assert res["centroid_detected"] is False
+    assert res["centroid_1"] is None
+    assert res["centroid_2"] is None
+    assert res["displacement_pixels"] == 0.0
+    assert res["proper_motion_arcsec_yr"] == 0.0
+
 
 

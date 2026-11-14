@@ -112,7 +112,40 @@ def fit_blackbody_continuum(obs_measurements: List[Dict[str, Any]]) -> Dict[str,
 
     waves = np.array([m["wavelength_um"] for m in valid_obs], dtype=np.float64)
     fluxes = np.array([m["flux_mjy_sr"] for m in valid_obs], dtype=np.float64)
-    errors = np.array([max(1e-4, float(m.get("flux_err_mjy_sr", 0.1 * m["flux_mjy_sr"]))) for m in valid_obs], dtype=np.float64)
+    
+    errors_list = []
+    for m in valid_obs:
+        err = m.get("flux_err_mjy_sr")
+        try:
+            err_f = float(err) if err is not None else None
+            if err_f is None or not np.isfinite(err_f) or err_f <= 0:
+                err_f = 0.1 * float(m["flux_mjy_sr"])
+        except Exception:
+            err_f = 0.1 * float(m["flux_mjy_sr"])
+        errors_list.append(max(1e-4, err_f))
+    errors = np.array(errors_list, dtype=np.float64)
+
+    # Require at least 2 distinct wavelengths/bands for a physical blackbody SED fit
+    distinct_waves = np.unique(np.round(waves, 3))
+    if len(distinct_waves) < 2:
+        return {
+            "status": "unavailable",
+            "temperature_k": None,
+            "uncertainty_k": None,
+            "reduced_chi2": None,
+            "degrees_of_freedom": 0,
+            "inputs": [
+                {
+                    "detector": m.get("detector"),
+                    "wavelength_um": round(float(m.get("wavelength_um", 0.0)), 4),
+                    "flux_mjy_sr": round(float(m.get("flux_mjy_sr", 0.0)), 4),
+                    "flux_err_mjy_sr": round(float(errors[i]), 4),
+                }
+                for i, m in enumerate(valid_obs)
+            ],
+            "model": "Single-temperature Planck blackbody B_nu(T)",
+            "limitations": "Insufficient spectral baseline; observations must span at least 2 distinct wavelengths/detector bands.",
+        }
 
     def compute_chi2(t_val: float) -> Tuple[float, float]:
         b_vals = np.array([planck_b_nu(w, t_val) for w in waves], dtype=np.float64)
@@ -152,8 +185,8 @@ def fit_blackbody_continuum(obs_measurements: List[Dict[str, Any]]) -> Dict[str,
     except Exception:
         pass
 
-    dof = max(1, len(valid_obs) - 2)
-    red_chi2 = best_chi2 / dof
+    dof = len(valid_obs) - 2
+    red_chi2 = round(best_chi2 / dof, 3) if dof > 0 else None
 
     dt = max(10.0, best_temp * 0.02)
     c_plus, _ = compute_chi2(best_temp + dt)
@@ -165,7 +198,7 @@ def fit_blackbody_continuum(obs_measurements: List[Dict[str, Any]]) -> Dict[str,
         "status": "converged",
         "temperature_k": round(best_temp, 1),
         "uncertainty_k": round(temp_unc, 1) if temp_unc and np.isfinite(temp_unc) else None,
-        "reduced_chi2": round(red_chi2, 3),
+        "reduced_chi2": red_chi2,
         "degrees_of_freedom": dof,
         "amplitude": best_amp,
         "inputs": [
@@ -173,9 +206,9 @@ def fit_blackbody_continuum(obs_measurements: List[Dict[str, Any]]) -> Dict[str,
                 "detector": m.get("detector"),
                 "wavelength_um": round(float(m.get("wavelength_um", 0.0)), 4),
                 "flux_mjy_sr": round(float(m.get("flux_mjy_sr", 0.0)), 4),
-                "flux_err_mjy_sr": round(float(m.get("flux_err_mjy_sr", 0.0)), 4),
+                "flux_err_mjy_sr": round(float(errors[i]), 4),
             }
-            for m in valid_obs
+            for i, m in enumerate(valid_obs)
         ],
         "model": "Single-temperature Planck blackbody B_nu(T)",
         "limitations": "Broadband continuum approximation. Ignores narrow molecular absorption bands (H2O, CH4, CO), non-LTE effects, and multi-component dust.",
@@ -456,6 +489,21 @@ def generate_spectrum_for_target(
 
     estimated_temp = int(round(bb_fit["temperature_k"])) if bb_fit.get("temperature_k") is not None else None
 
+    continuum_classification = {
+        "profile_name": spec_class,
+        "method": "Empirical broad-band continuum spectral index across observed SPHEREx bands",
+        "observed_bands_count": len(observed_channels),
+        "inputs": [
+            {
+                "detector": b.get("detector"),
+                "wavelength_um": b.get("wavelength_um"),
+                "flux_mjy_sr": b.get("flux_mjy_sr"),
+            }
+            for b in observed_channels
+        ],
+        "limitations": "Empirical broad-band continuum shape only; definitive astrophysical classification requires spectroscopic line/band identification.",
+    }
+
     return {
         "target": {"ra": round(ra, 6), "dec": round(dec, 6)},
         "total_observed_bands": len(measured_by_detector),
@@ -468,6 +516,7 @@ def generate_spectrum_for_target(
         "continuum_curve": continuum_curve,
         "continuum_model_label": "Estimated Continuum Model (Interpolated) - Illustrative Continuum, Never Observed Resolution",
         "temperature_fit": bb_fit,
+        "continuum_classification": continuum_classification,
         "summary": {
             "peak_wavelength_um": peak_band["wavelength_um"],
             "peak_detector": peak_band["detector"],
@@ -476,6 +525,7 @@ def generate_spectrum_for_target(
             "spectral_class": spec_class,
             "spectral_class_limitations": "Empirical broad-band continuum shape; definitive classification requires spectroscopic feature identification.",
             "temperature_fit": bb_fit,
+            "continuum_classification": continuum_classification,
             "integrated_flux_mjy_sr_um": round(total_flux_integral, 3),
             "total_channels": len(channels_102),
             "estimated_channels_count": len(channels_102),

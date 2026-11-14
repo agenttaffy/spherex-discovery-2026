@@ -201,7 +201,9 @@ async def stack_frames(req: StackRequest = Body(...)):
             "frame_ids": resolved_ids,
             "dimensions": [int(stacked_float.shape[0]), int(stacked_float.shape[1])],
             "snr_improvement_factor": stats["snr_improvement_factor"],
+            "snr_gain_status": stats.get("snr_gain_status"),
             "theoretical_snr_gain": stats["theoretical_snr_gain"],
+            "theoretical_gain_model": stats.get("theoretical_gain_model"),
             "noise_stats": {
                 "reference_noise_sigma": stats["reference_noise_sigma"],
                 "stacked_noise_sigma": stats["stacked_noise_sigma"],

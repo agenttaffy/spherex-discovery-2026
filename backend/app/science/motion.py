@@ -111,12 +111,6 @@ def _find_local_centroid(
 
     return float(cen_y), float(cen_x), snr
 
-    yy, xx = np.indices(sub.shape)
-    cen_y = box_y_min + np.sum(yy * sub) / total_flux
-    cen_x = box_x_min + np.sum(xx * sub) / total_flux
-
-    return float(cen_y), float(cen_x), snr
-
 def measure_astrometric_motion(
     img1: np.ndarray,
     img2: np.ndarray,
@@ -151,10 +145,10 @@ def measure_astrometric_motion(
     if w_obj2 is None and "header" in meta2:
         w_obj2 = extract_astropy_wcs(meta2["header"])
 
-    # Establish target coordinates
+    # Establish target coordinates if explicitly requested
     if target_coord is None:
-        tgt_ra = meta1.get("target_ra") or meta1.get("ra")
-        tgt_dec = meta1.get("target_dec") or meta1.get("dec")
+        tgt_ra = meta1.get("target_ra")
+        tgt_dec = meta1.get("target_dec")
         if tgt_ra is not None and tgt_dec is not None:
             target_coord = (float(tgt_ra), float(tgt_dec))
 
@@ -182,11 +176,13 @@ def measure_astrometric_motion(
         except Exception:
             used_wcs = False
 
-    # Centroid tracking fallback when WCS tracking was not used or centroids not yet found
-    if c1 is None:
-        c1 = _find_brightest_centroid(img1)
-    if c2 is None:
-        c2 = _find_brightest_centroid(img2)
+    # Centroid tracking fallback when WCS tracking was not used or centroids not yet found.
+    # Blind peak-seeking is strictly confined to cases where NO target coordinate was specified.
+    if target_coord is None:
+        if c1 is None:
+            c1 = _find_brightest_centroid(img1)
+        if c2 is None:
+            c2 = _find_brightest_centroid(img2)
 
     celestial_shift_arcsec = None
     celestial_pa_deg = None

@@ -52,13 +52,13 @@ SPHEREX_ARTIFACT_FLAG_NAMES = {
 
 def extract_primary_image(
     hdul: fits.HDUList,
-    preserve_nan: bool = False,
+    preserve_nan: bool = True,
 ) -> Tuple[np.ndarray, fits.Header]:
     """
     Extracts the calibrated IMAGE extension (surface brightness in MJy/sr).
-    When preserve_nan=True (scientific analysis mode), preserves invalid non-finite (NaN, Inf)
-    pixels as NaN rather than substituting fabricated fill values.
-    When preserve_nan=False (legacy mode), sanitizes non-finite values for backward compatibility.
+    When preserve_nan=True (default scientific mode), preserves invalid non-finite (NaN, Inf)
+    pixels as NaN masks rather than substituting fabricated fill values.
+    When preserve_nan=False (legacy display mode), sanitizes non-finite values for backward compatibility.
     """
     if "IMAGE" in hdul:
         hdu = hdul["IMAGE"]
@@ -201,20 +201,26 @@ def extract_calibrated_wavelength(
         w = extract_astropy_wcs(img_hdr)
 
         px, py = None, None
+        naxis1 = img_hdr.get("NAXIS1", 12)
+        naxis2 = img_hdr.get("NAXIS2", 12)
+
         if target_coord is not None:
-            if w is not None and getattr(w, "is_celestial", False):
-                try:
-                    px, py = w.world_to_pixel_values(target_coord[0], target_coord[1])
-                except Exception:
-                    pass
+            if w is not None:
+                w_cel = w.celestial if (hasattr(w, "has_celestial") and w.has_celestial) else w
+                if getattr(w_cel, "is_celestial", False):
+                    try:
+                        px, py = w_cel.world_to_pixel_values(target_coord[0], target_coord[1])
+                    except Exception:
+                        pass
             if px is None or not np.isfinite(px) or py is None or not np.isfinite(py):
                 # Target coordinates were requested but could not be projected via celestial WCS.
                 # Never fall back to center or substitute an arbitrary position.
                 return None
+            # Target coordinates must also lie within the frame cutout boundaries
+            if px < 0 or px >= naxis1 or py < 0 or py >= naxis2:
+                return None
         else:
             # Caller explicitly requested center measurement (no target_coord provided)
-            naxis1 = img_hdr.get("NAXIS1", 12)
-            naxis2 = img_hdr.get("NAXIS2", 12)
             px = (naxis1 - 1.0) / 2.0
             py = (naxis2 - 1.0) / 2.0
 
@@ -253,13 +259,19 @@ def extract_variance_data(hdul: fits.HDUList) -> Optional[np.ndarray]:
         return var
     return None
 
-def evaluate_quality_flags(hdul: fits.HDUList) -> Dict[str, Any]:
+def evaluate_quality_flags(
+    hdul: fits.HDUList,
+    allow_legacy_synthetic: bool = False,
+) -> Dict[str, Any]:
     """
     Evaluates per-pixel data quality flags from the FLAGS extension.
     Distinguishes nominal astronomical source detections (SOURCE mask) from fatal defect flags.
+    When mask metadata (MSKN cards) are absent, preserves an explicit unknown/missing state
+    rather than guessing real SPHEREx flag semantics from undocumented raw bits.
+    Legacy synthetic bit checking (1|2|4|8|16) is confined strictly to tests/fixtures via allow_legacy_synthetic=True.
     """
     if "FLAGS" not in hdul or hdul["FLAGS"].data is None:
-        return {"flagged_pixels": 0, "total_pixels": 0, "flag_breakdown": {}}
+        return {"quality_state": "missing_flags_extension", "flagged_pixels": 0, "total_pixels": 0, "flag_breakdown": {}}
 
     flags = hdul["FLAGS"].data.astype(np.int32)
     total_pixels = int(flags.size)
@@ -276,19 +288,32 @@ def evaluate_quality_flags(hdul: fits.HDUList) -> Dict[str, Any]:
         fatal_mask = (flags & fatal_bitmask) != 0
         flagged_count = int(np.count_nonzero(fatal_mask))
 
+        def _count_plane(*names: str) -> int:
+            mask_val = 0
+            for n in names:
+                if n in planes:
+                    mask_val |= planes[n]
+            return int(np.count_nonzero(flags & mask_val)) if mask_val != 0 else 0
+
         breakdown = {
-            "dead_unusable": int(np.count_nonzero(flags & planes.get("NONFUNC", 64))),
-            "saturated": int(np.count_nonzero(flags & planes.get("OVERFLOW", 2))),
-            "cosmic_ray": int(np.count_nonzero(flags & (planes.get("SNOWBALL", 134217728) | planes.get("TRANSIENT", 1)))),
-            "non_linear": int(np.count_nonzero(flags & planes.get("NONLINEAR", 32768))),
-            "sur_error": int(np.count_nonzero(flags & planes.get("SUR_ERROR", 4))),
-            "hot_pixel": int(np.count_nonzero(flags & planes.get("HOT", 1024))),
-            "cold_pixel": int(np.count_nonzero(flags & planes.get("COLD", 2048))),
-            "source_detection": int(np.count_nonzero(flags & planes.get("SOURCE", 2097152))),
-            "stray_light_glint": int(np.count_nonzero(flags & (planes.get("GHOST", 4194304) | planes.get("BLOOM", 67108864) | planes.get("HALO", 268435456)))),
+            "dead_unusable": _count_plane("NONFUNC"),
+            "saturated": _count_plane("OVERFLOW"),
+            "cosmic_ray": _count_plane("SNOWBALL", "TRANSIENT"),
+            "non_linear": _count_plane("NONLINEAR"),
+            "sur_error": _count_plane("SUR_ERROR"),
+            "hot_pixel": _count_plane("HOT"),
+            "cold_pixel": _count_plane("COLD"),
+            "source_detection": _count_plane("SOURCE"),
+            "stray_light_glint": _count_plane("GHOST", "BLOOM", "HALO"),
         }
-    else:
-        # Synthetic / mock FITS without header MSKN cards
+        return {
+            "quality_state": "documented_metadata",
+            "flagged_pixels": flagged_count,
+            "total_pixels": total_pixels,
+            "flag_breakdown": breakdown,
+        }
+    elif allow_legacy_synthetic:
+        # Confined strictly to explicit synthetic fixture/test path
         flagged_mask = (flags & (1 | 2 | 4 | 8 | 16)) != 0
         flagged_count = int(np.count_nonzero(flagged_mask))
         breakdown = {
@@ -298,12 +323,20 @@ def evaluate_quality_flags(hdul: fits.HDUList) -> Dict[str, Any]:
             "non_linear": int(np.count_nonzero(flags & 8)),
             "stray_light_glint": int(np.count_nonzero(flags & 16)),
         }
-
-    return {
-        "flagged_pixels": flagged_count,
-        "total_pixels": total_pixels,
-        "flag_breakdown": breakdown,
-    }
+        return {
+            "quality_state": "legacy_synthetic",
+            "flagged_pixels": flagged_count,
+            "total_pixels": total_pixels,
+            "flag_breakdown": breakdown,
+        }
+    else:
+        # Preserve explicit unknown/missing quality state without inferring flag semantics
+        return {
+            "quality_state": "unknown_metadata_missing",
+            "flagged_pixels": 0,
+            "total_pixels": total_pixels,
+            "flag_breakdown": {},
+        }
 
 def calculate_pixel_stats(data: np.ndarray) -> Dict[str, float]:
     """
