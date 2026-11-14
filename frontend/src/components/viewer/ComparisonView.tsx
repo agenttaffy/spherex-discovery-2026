@@ -130,12 +130,12 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations }) 
   }
 
   return (
-    <div className="flex-1 flex flex-col p-6 bg-slate-950 overflow-y-auto">
+    <div className="flex-1 flex flex-col p-3 sm:p-6 bg-slate-950 overflow-y-auto max-w-full">
       {/* Top Header & Mode Switcher */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between pb-4 border-b border-slate-800 gap-4">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between pb-4 border-b border-slate-800 gap-4">
         <div>
-          <div className="flex items-center gap-3">
-            <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-3">
+            <h2 className="text-base font-bold text-slate-100 flex flex-wrap items-center gap-2">
               {opMode === 'diff' ? (
                 <span>Differential Image Analysis (I₂ − I₁)</span>
               ) : (
@@ -149,24 +149,30 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations }) 
             </h2>
 
             {/* Mode Switcher Tabs */}
-            <div className="flex bg-slate-900 border border-slate-800 rounded-lg p-0.5 text-xs font-mono">
+            <div role="tablist" aria-label="Comparison operation mode" className="flex bg-slate-900 border border-slate-800 rounded-lg p-0.5 text-xs font-mono">
               <button
+                role="tab"
+                aria-selected={opMode === 'diff'}
+                aria-label="Differential Image Mode"
                 onClick={() => setOpMode('diff')}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-md transition ${
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-md transition focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${
                   opMode === 'diff'
-                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 font-semibold'
-                    : 'text-slate-400 hover:text-slate-200'
+                    ? 'bg-amber-500/20 text-amber-200 border border-amber-500/40 font-semibold'
+                    : 'text-slate-300 hover:text-white'
                 }`}
               >
                 <Minus className="w-3.5 h-3.5 text-amber-400" />
                 <span>Difference (I₂ − I₁)</span>
               </button>
               <button
+                role="tab"
+                aria-selected={opMode === 'stack'}
+                aria-label="Co-Addition Stacking Mode"
                 onClick={() => setOpMode('stack')}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-md transition ${
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-md transition focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${
                   opMode === 'stack'
                     ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-semibold'
-                    : 'text-slate-400 hover:text-slate-200'
+                    : 'text-slate-300 hover:text-white'
                 }`}
               >
                 <Plus className="w-3.5 h-3.5 text-cyan-400" />
@@ -175,7 +181,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations }) 
             </div>
           </div>
 
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-slate-300 mt-1">
             {opMode === 'diff'
               ? 'Sub-pixel scientific differencing to isolate astrometric movement, high proper motion dipoles, and transients.'
               : 'WCS-aligned co-addition to suppress uncorrelated read noise and sky background, unveiling faint static sources.'}
@@ -183,15 +189,16 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations }) 
         </div>
 
         {/* Epoch & Stacking Selectors */}
-        <div className="flex items-center flex-wrap gap-3 text-xs">
+        <div className="flex items-center flex-wrap gap-3 text-xs" role="toolbar" aria-label="Epoch comparison and co-addition settings">
           {opMode === 'stack' && (
             <>
               <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-800 rounded px-2 py-1">
-                <span className="text-slate-400 text-[11px]">Scope:</span>
+                <span className="text-slate-300 text-[11px] font-medium">Scope:</span>
                 <select
                   value={stackScope}
+                  aria-label="Co-addition stacking scope"
                   onChange={(e) => setStackScope(e.target.value as 'pair' | 'all')}
-                  className="bg-transparent text-cyan-300 font-mono text-xs focus:outline-none"
+                  className="bg-transparent text-cyan-300 font-mono text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
                 >
                   <option value="pair" className="bg-slate-900 text-slate-200">Selected Pair (2)</option>
                   <option value="all" className="bg-slate-900 text-slate-200">All Epochs ({observations.length})</option>
@@ -199,11 +206,12 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations }) 
               </div>
 
               <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-800 rounded px-2 py-1">
-                <span className="text-slate-400 text-[11px]">Method:</span>
+                <span className="text-slate-300 text-[11px] font-medium">Method:</span>
                 <select
                   value={stackMethod}
+                  aria-label="Co-addition stacking statistical algorithm"
                   onChange={(e) => setStackMethod(e.target.value as any)}
-                  className="bg-transparent text-cyan-300 font-mono text-xs focus:outline-none"
+                  className="bg-transparent text-cyan-300 font-mono text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
                 >
                   <option value="mean" className="bg-slate-900 text-slate-200">Mean (Max SNR)</option>
                   <option value="median" className="bg-slate-900 text-slate-200">Median (Reject Outliers)</option>
@@ -214,11 +222,13 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations }) 
           )}
 
           <div className="flex items-center gap-2">
-            <span className="text-slate-500">Epoch 1:</span>
+            <label htmlFor="epoch1-select" className="text-slate-300 font-medium">Epoch 1:</label>
             <select
+              id="epoch1-select"
               value={safeIndex1}
+              aria-label="Select first epoch for comparison"
               onChange={(e) => setIndex1(Number(e.target.value))}
-              className="bg-slate-900 border border-slate-800 rounded px-2.5 py-1 text-slate-200 font-mono text-xs focus:outline-none focus:border-cyan-500"
+              className="bg-slate-900 border border-slate-800 rounded px-2.5 py-1 text-slate-200 font-mono text-xs focus:outline-none focus:border-cyan-500 focus-visible:ring-2 focus-visible:ring-cyan-400"
             >
               {observations.map((o, idx) => (
                 <option key={o.id} value={idx}>
@@ -228,14 +238,16 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations }) 
             </select>
           </div>
 
-          <ArrowRight className="w-4 h-4 text-slate-600" />
+          <ArrowRight className="w-4 h-4 text-slate-500 hidden sm:block" />
 
           <div className="flex items-center gap-2">
-            <span className="text-slate-500">Epoch 2:</span>
+            <label htmlFor="epoch2-select" className="text-slate-300 font-medium">Epoch 2:</label>
             <select
+              id="epoch2-select"
               value={safeIndex2}
+              aria-label="Select second epoch for comparison"
               onChange={(e) => setIndex2(Number(e.target.value))}
-              className="bg-slate-900 border border-slate-800 rounded px-2.5 py-1 text-slate-200 font-mono text-xs focus:outline-none focus:border-cyan-500"
+              className="bg-slate-900 border border-slate-800 rounded px-2.5 py-1 text-slate-200 font-mono text-xs focus:outline-none focus:border-cyan-500 focus-visible:ring-2 focus-visible:ring-cyan-400"
             >
               {observations.map((o, idx) => (
                 <option key={o.id} value={idx}>

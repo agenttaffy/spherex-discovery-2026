@@ -4,14 +4,47 @@
 
 :root {
   color-scheme: dark;
+  --astro-bg: #050811;
+  --astro-surface: #0f172a;
+  --astro-card: #131d36;
+  --astro-border: #1e293b;
+  --astro-accent: #38bdf8;
+  --astro-focus: #22d3ee;
 }
 
-body {
+html, body {
   margin: 0;
-  background-color: #050811;
+  padding: 0;
+  background-color: var(--astro-bg);
   color: #f1f5f9;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   overflow-x: hidden;
+  max-width: 100vw;
+  min-width: 320px;
+}
+
+#root {
+  min-width: 320px;
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+/* WCAG 2.2 AA Focus Indicators */
+:focus-visible {
+  outline: 2px solid var(--astro-focus);
+  outline-offset: 2px;
+}
+
+/* Respect user's motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Custom scrollbars for astronomical telemetry */

@@ -2,6 +2,16 @@
 
 All notable changes to the SPHEREx Discovery project will be documented in this file.
 
+## [1.4.0] - 2026-11-14
+### Added & Enhanced — UI/UX Refinement, NASA/USWDS Accessibility & WCAG 2.2 AA Compliance
+- **Accessible Tabular Data Tables:** Implemented `<details><summary>View Accessible Data Table</summary>...` alongside SVG charts in `SpectrumChart.tsx` and `LightCurveChart.tsx` with semantic `role="table"`, `<caption className="sr-only">`, and `<th scope="col">` column headers for screen-reader and keyboard users.
+- **Canvas Keyboard Controls:** Added arrow key panning (ArrowUp, ArrowDown, ArrowLeft, ArrowRight), zoom controls (`+`/`-`), and view reset (`0`) with `tabIndex={0}`, high-visibility focus indicators, and screen-reader announcements via `aria-live="polite"`. Added visual keyboard shortcut indicator pill in `CanvasViewer.tsx`.
+- **WCAG 2.2 AA Color Contrast:** Elevated typography, telemetry labels, and chart axis text to meet or exceed 4.5:1 contrast ratio against deep space-navy backgrounds.
+- **High-Visibility Keyboard Focus Indicators:** Standardized global `:focus-visible` styling (`outline: 2px solid #22d3ee; outline-offset: 2px;`) in `index.css` and explicit `focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none` on all interactive buttons, selects, inputs, and modal controls.
+- **ARIA Navigation & Modal Roles:** Structured main navigation, telemetry switcher, comparison mode switcher, viewer switcher, and mobile tabs with `role="tablist"` and `role="tab"` (`aria-selected`, `aria-controls`); assigned `role="dialog"` with `aria-modal="true"` to `GuidedTourModal.tsx` and `DiscoveryReportModal.tsx`.
+- **320px Responsive Viewport Reflow:** Added deliberate mobile workspace panel switcher tabs (`[Canvas] [Target] [SED & Telemetry]`), responsive flex wrapping on headers and timeline player, and `min-width: 320px` safety preventing horizontal page overflow down to 320 CSS pixels.
+- **Automated Verification:** Added `scripts/verify_accessibility_and_responsive.mjs` verifying all 34 accessibility and responsive constraints; 81 backend pytest tests passing; clean frontend build (`tsc && vite build`).
+
 ## [1.2.1] - 2026-11-14
 ### Fixed & Hardened (Review & Verification Round)
 - **Fourier Phase Shift Vector Inversion:** Fixed mathematical sign error in `estimate_pixel_shift` (`f2 * np.conj(f1)` vs `f1 * np.conj(f2)`), aligning 2D cross-correlation displacement with primary centroid tracking. Fixed test fitting in `test_known_shift_recovery`.

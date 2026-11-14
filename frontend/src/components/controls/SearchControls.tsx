@@ -38,70 +38,78 @@ export const SearchControls: React.FC<SearchControlsProps> = ({
   selectedPresetId,
 }) => {
   return (
-    <div className="w-80 bg-slate-900/60 border-r border-slate-800 p-4 flex flex-col gap-4 overflow-y-auto">
+    <aside
+      aria-label="Target search and coordinate parameters"
+      className="w-full lg:w-80 lg:shrink-0 bg-slate-900/60 border-b lg:border-b-0 lg:border-r border-slate-800 p-4 flex flex-col gap-4 overflow-y-auto"
+    >
       {/* Official Challenge Presets */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+          <label className="text-xs font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
             <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
             Official Targets
           </label>
         </div>
-        <div className="grid grid-cols-1 gap-1.5">
+        <div className="grid grid-cols-1 gap-1.5" role="group" aria-label="Official Challenge Presets">
           {presets.map((p) => (
             <button
               key={p.id}
               onClick={() => onSelectPreset(p)}
-              className={`w-full text-left p-2 rounded-lg text-xs transition border ${
+              aria-pressed={selectedPresetId === p.id}
+              className={`w-full text-left p-2 rounded-lg text-xs transition border focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${
                 selectedPresetId === p.id
-                  ? 'bg-cyan-950/60 border-cyan-500/50 text-cyan-200'
-                  : 'bg-slate-900 border-slate-800/80 hover:border-slate-700 text-slate-300'
+                  ? 'bg-cyan-950/70 border-cyan-500/60 text-cyan-100 ring-1 ring-cyan-500/40'
+                  : 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-200'
               }`}
             >
-              <div className="font-semibold text-slate-200 flex items-center justify-between">
+              <div className="font-semibold text-slate-100 flex items-center justify-between">
                 <span>{p.name}</span>
-                <span className="text-[10px] text-cyan-400/80 font-mono">
+                <span className="text-[10px] text-cyan-300 font-mono">
                   {p.ra.toFixed(2)}°, {p.dec.toFixed(2)}°
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 line-clamp-1 mt-0.5">{p.notable_feature}</p>
+              <p className="text-[11px] text-slate-300 line-clamp-1 mt-0.5">{p.notable_feature}</p>
             </button>
           ))}
         </div>
       </div>
 
       <div className="border-t border-slate-800/80 pt-3">
-        <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 mb-2.5">
+        <label className="text-xs font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-1.5 mb-2.5">
           <Compass className="w-3.5 h-3.5 text-cyan-400" />
           Coordinates (J2000)
         </label>
 
         <div className="space-y-2">
           <div>
-            <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
-              <span>Right Ascension (RA)</span>
-              <span className="text-[10px] text-slate-500">deg or HMS</span>
+            <div className="flex items-center justify-between text-[11px] text-slate-300 mb-1">
+              <label htmlFor="ra-input">Right Ascension (RA)</label>
+              <span className="text-[10px] text-slate-400">deg or HMS</span>
             </div>
             <input
+              id="ra-input"
               type="text"
               value={ra}
               onChange={(e) => setRa(e.target.value)}
               placeholder="e.g. 269.45208 or 17h57m48s"
-              className="w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 font-mono"
+              aria-label="Right Ascension (RA) in decimal degrees or sexagesimal HMS"
+              className="w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-cyan-500 focus-visible:ring-2 focus-visible:ring-cyan-400 font-mono"
             />
           </div>
 
           <div>
-            <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
-              <span>Declination (Dec)</span>
-              <span className="text-[10px] text-slate-500">deg or DMS</span>
+            <div className="flex items-center justify-between text-[11px] text-slate-300 mb-1">
+              <label htmlFor="dec-input">Declination (Dec)</label>
+              <span className="text-[10px] text-slate-400">deg or DMS</span>
             </div>
             <input
+              id="dec-input"
               type="text"
               value={dec}
               onChange={(e) => setDec(e.target.value)}
               placeholder="e.g. 4.69339 or +04d41m36s"
-              className="w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 font-mono"
+              aria-label="Declination (Dec) in decimal degrees or sexagesimal DMS"
+              className="w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-cyan-500 focus-visible:ring-2 focus-visible:ring-cyan-400 font-mono"
             />
           </div>
         </div>
@@ -110,20 +118,22 @@ export const SearchControls: React.FC<SearchControlsProps> = ({
       {/* Query Parameters */}
       <div className="border-t border-slate-800/80 pt-3 space-y-3">
         <div>
-          <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 mb-1.5">
+          <label className="text-xs font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-1.5 mb-1.5">
             <Layers className="w-3.5 h-3.5 text-cyan-400" />
             Field of View (Cutout Size)
           </label>
-          <div className="grid grid-cols-3 gap-1.5">
+          <div className="grid grid-cols-3 gap-1.5" role="group" aria-label="Field of view options">
             {[0.02, 0.04, 0.08].map((size) => (
               <button
                 key={size}
                 type="button"
                 onClick={() => setFov(size)}
-                className={`py-1 text-xs rounded-md border font-mono transition ${
+                aria-pressed={fov === size}
+                aria-label={`Field of view ${(size * 60).toFixed(1)} arcminutes`}
+                className={`py-1 text-xs rounded-md border font-mono transition focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${
                   fov === size
-                    ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300'
-                    : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                    ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300 font-semibold'
+                    : 'bg-slate-950 border-slate-800 text-slate-300 hover:text-white'
                 }`}
               >
                 {(size * 60).toFixed(1)}′
@@ -133,17 +143,19 @@ export const SearchControls: React.FC<SearchControlsProps> = ({
         </div>
 
         <div>
-          <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5 block">
+          <label className="text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5 block">
             Survey Release
           </label>
-          <div className="grid grid-cols-2 gap-1.5">
+          <div className="grid grid-cols-2 gap-1.5" role="group" aria-label="Survey release data version">
             <button
               type="button"
               onClick={() => setCollection('spherex_dr1')}
-              className={`py-1.5 px-2 text-xs rounded-md border transition text-center ${
+              aria-pressed={collection === 'spherex_dr1'}
+              aria-label="Data Release 1 (Surveys 1 & 2)"
+              className={`py-1.5 px-2 text-xs rounded-md border transition text-center focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${
                 collection === 'spherex_dr1'
                   ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300 font-semibold'
-                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                  : 'bg-slate-950 border-slate-800 text-slate-300 hover:text-white'
               }`}
             >
               DR1 (Surveys 1 & 2)
@@ -151,10 +163,12 @@ export const SearchControls: React.FC<SearchControlsProps> = ({
             <button
               type="button"
               onClick={() => setCollection('spherex_qr3')}
-              className={`py-1.5 px-2 text-xs rounded-md border transition text-center ${
+              aria-pressed={collection === 'spherex_qr3'}
+              aria-label="Quick Release 3 (Surveys 3 & 4)"
+              className={`py-1.5 px-2 text-xs rounded-md border transition text-center focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${
                 collection === 'spherex_qr3'
                   ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300 font-semibold'
-                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                  : 'bg-slate-950 border-slate-800 text-slate-300 hover:text-white'
               }`}
             >
               QR3 (Surveys 3 & 4)
@@ -163,14 +177,16 @@ export const SearchControls: React.FC<SearchControlsProps> = ({
         </div>
 
         <div>
-          <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 mb-1.5">
+          <label htmlFor="detector-select" className="text-xs font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-1.5 mb-1.5">
             <Filter className="w-3.5 h-3.5 text-cyan-400" />
             Detector Band Filter
           </label>
           <select
+            id="detector-select"
             value={detector}
             onChange={(e) => setDetector(e.target.value)}
-            className="w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-cyan-500"
+            aria-label="Filter observations by detector band"
+            className="w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 focus-visible:ring-2 focus-visible:ring-cyan-400"
           >
             <option value="ALL">All Detectors (D1 – D6)</option>
             <option value="SPHEREx-D1">D1 (0.75 – 1.12 µm)</option>
@@ -187,11 +203,12 @@ export const SearchControls: React.FC<SearchControlsProps> = ({
         <button
           onClick={onSearch}
           disabled={loading}
-          className="w-full py-2.5 px-4 bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white rounded-lg font-semibold text-xs transition flex items-center justify-center gap-2 shadow-lg shadow-cyan-950/50 disabled:opacity-50"
+          aria-label="Discover Observations from NASA IRSA"
+          className="w-full py-2.5 px-4 bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white rounded-lg font-semibold text-xs transition flex items-center justify-center gap-2 shadow-lg shadow-cyan-950/50 disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none"
         >
           {loading ? (
             <>
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className="w-4 h-4 animate-spin text-white" />
               <span>Querying NASA IRSA...</span>
             </>
           ) : (
@@ -202,6 +219,6 @@ export const SearchControls: React.FC<SearchControlsProps> = ({
           )}
         </button>
       </div>
-    </div>
+    </aside>
   );
 };

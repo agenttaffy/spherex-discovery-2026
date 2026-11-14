@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { SpectrumResponse, SpectrumBandPoint, SpectralChannel } from '../../types/astronomy';
-import { Sparkles, Layers, Eye } from 'lucide-react';
+import { Sparkles, Layers, Eye, Table } from 'lucide-react';
 
 interface SpectrumChartProps {
   spectrum: SpectrumResponse | null;
@@ -18,7 +18,7 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
 
   if (loading) {
     return (
-      <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-4 flex flex-col items-center justify-center h-52 text-slate-400">
+      <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-4 flex flex-col items-center justify-center h-52 text-slate-300">
         <Sparkles className="w-6 h-6 animate-pulse text-indigo-400 mb-2" />
         <span className="text-xs font-mono">Extracting on-the-fly SED across 6 detectors...</span>
       </div>
@@ -27,7 +27,7 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
 
   if (!spectrum || !spectrum.bands || spectrum.bands.length === 0) {
     return (
-      <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-4 flex flex-col items-center justify-center h-48 text-slate-500 text-xs text-center">
+      <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-4 flex flex-col items-center justify-center h-48 text-slate-400 text-xs text-center">
         <Layers className="w-6 h-6 opacity-40 mb-2 text-indigo-400" />
         <p>No multi-band spectral coverage available for this coordinate pointing.</p>
       </div>
@@ -90,20 +90,22 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
         <div className="flex items-center gap-1.5">
           <Layers className="w-3.5 h-3.5 text-indigo-400" />
           <div>
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-300 block">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-200 block">
               Infrared SED (Flux vs. λ)
             </span>
-            <span className="text-[9px] font-mono text-slate-500">
+            <span className="text-[9px] font-mono text-slate-400">
               Observed Bands ({total_observed_bands}) · Continuum (Interpolated)
             </span>
           </div>
         </div>
         <button
           onClick={() => setShowChannels102(!showChannels102)}
-          className={`flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded border transition ${
+          aria-pressed={showChannels102}
+          aria-label="Toggle display of Estimated Continuum Model (102 Interpolated Channels)"
+          className={`flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded border transition focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${
             showChannels102
               ? 'bg-indigo-950 text-indigo-300 border-indigo-700 font-semibold'
-              : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+              : 'bg-slate-900 text-slate-300 border-slate-800 hover:text-white'
           }`}
           title="Toggle display of Estimated Continuum Model (102 Interpolated Channels)"
         >
@@ -113,7 +115,7 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
       </div>
 
       {/* Detector Array Quick Filter Pills */}
-      <div className="flex items-center justify-between gap-1 text-[9px] font-mono">
+      <div className="flex items-center justify-between gap-1 text-[9px] font-mono" role="group" aria-label="Filter spectrum by detector">
         {detectorBands.map((db) => {
           const fullName = `SPHEREx-${db.name}`;
           const isSel = selectedDetector === fullName;
@@ -121,10 +123,12 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
             <button
               key={db.name}
               onClick={() => setSelectedDetector(isSel ? null : fullName)}
-              className={`flex-1 py-0.5 rounded text-center transition border ${
+              aria-pressed={isSel}
+              aria-label={`Filter detector ${fullName} (${db.min} to ${db.max} micrometers)`}
+              className={`flex-1 py-0.5 rounded text-center transition border focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${
                 isSel
-                  ? 'font-bold border-white/60 shadow-sm'
-                  : 'opacity-70 hover:opacity-100 border-slate-800 bg-slate-950/60'
+                  ? 'font-bold border-white shadow-sm'
+                  : 'opacity-80 hover:opacity-100 border-slate-800 bg-slate-950/60'
               }`}
               style={{
                 color: db.color,
@@ -143,6 +147,8 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
       <div className="relative">
         <svg
           viewBox={`0 0 ${width} ${height}`}
+          role="img"
+          aria-label={`SPHEREx Spectral Energy Distribution Chart. Observed across ${total_observed_bands} detector bands with wavelength range 0.75 to 5.0 micrometers. Peak wavelength ${summary.peak_wavelength_um.toFixed(2)} micrometers in band ${summary.peak_detector}.`}
           className="w-full h-32 bg-slate-900/60 rounded border border-slate-800 select-none overflow-hidden"
         >
           {/* Detector Range Color Bands Background */}
@@ -166,7 +172,7 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
                   fontSize="7"
                   textAnchor="middle"
                   fontFamily="monospace"
-                  opacity="0.8"
+                  opacity="0.9"
                   fontWeight="bold"
                 >
                   {db.name}
@@ -176,17 +182,17 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
           })}
 
           {/* Gridlines */}
-          <line x1={padLeft} y1={padTop} x2={width - padRight} y2={padTop} stroke="#334155" strokeDasharray="2,2" strokeWidth="0.7" />
-          <line x1={padLeft} y1={padTop + plotH} x2={width - padRight} y2={padTop + plotH} stroke="#334155" strokeWidth="1" />
-          <line x1={padLeft} y1={padTop} x2={padLeft} y2={padTop + plotH} stroke="#334155" strokeWidth="1" />
+          <line x1={padLeft} y1={padTop} x2={width - padRight} y2={padTop} stroke="#475569" strokeDasharray="2,2" strokeWidth="0.7" />
+          <line x1={padLeft} y1={padTop + plotH} x2={width - padRight} y2={padTop + plotH} stroke="#475569" strokeWidth="1" />
+          <line x1={padLeft} y1={padTop} x2={padLeft} y2={padTop + plotH} stroke="#475569" strokeWidth="1" />
 
           {/* Wavelength Grid Ticks & Labels */}
           {[1.0, 2.0, 3.0, 4.0, 5.0].map((w) => {
             const x = getX(w);
             return (
               <g key={w}>
-                <line x1={x} y1={padTop + plotH} x2={x} y2={padTop + plotH + 3} stroke="#64748b" strokeWidth="1" />
-                <text x={x} y={padTop + plotH + 11} fill="#64748b" fontSize="7.5" textAnchor="middle" fontFamily="monospace">
+                <line x1={x} y1={padTop + plotH} x2={x} y2={padTop + plotH + 3} stroke="#94a3b8" strokeWidth="1" />
+                <text x={x} y={padTop + plotH + 11} fill="#94a3b8" fontSize="7.5" textAnchor="middle" fontFamily="monospace">
                   {w}µm
                 </text>
               </g>
@@ -194,10 +200,10 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
           })}
 
           {/* Y Axis Labels (MJy/sr) */}
-          <text x={padLeft - 4} y={padTop + 4} fill="#64748b" fontSize="7.5" textAnchor="end" fontFamily="monospace">
+          <text x={padLeft - 4} y={padTop + 4} fill="#94a3b8" fontSize="7.5" textAnchor="end" fontFamily="monospace">
             {maxFlux.toFixed(1)}
           </text>
-          <text x={padLeft - 4} y={padTop + plotH} fill="#64748b" fontSize="7.5" textAnchor="end" fontFamily="monospace">
+          <text x={padLeft - 4} y={padTop + plotH} fill="#94a3b8" fontSize="7.5" textAnchor="end" fontFamily="monospace">
             0.0
           </text>
 
@@ -224,11 +230,19 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
                 <g
                   key={ch.channel_index}
                   className="cursor-pointer"
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`Channel ${ch.channel_index}, detector ${ch.detector}, wavelength ${ch.wavelength_um.toFixed(3)} micrometers, flux ${ch.flux_mjy_sr.toFixed(2)} MegaJanskys per steradian`}
                   onMouseEnter={() => {
                     setHoveredChannel(ch);
                     setHoveredBand(null);
                   }}
                   onMouseLeave={() => setHoveredChannel(null)}
+                  onFocus={() => {
+                    setHoveredChannel(ch);
+                    setHoveredBand(null);
+                  }}
+                  onBlur={() => setHoveredChannel(null)}
                 >
                   <circle cx={cx} cy={cy} r={6} fill="transparent" />
                   <circle
@@ -256,13 +270,26 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
               <g
                 key={b.detector}
                 className="cursor-pointer"
+                tabIndex={0}
+                role="button"
+                aria-label={`Detector ${b.detector}, effective wavelength ${b.wavelength_um.toFixed(3)} micrometers, flux ${b.flux_mjy_sr.toFixed(2)} plus minus ${b.flux_err_mjy_sr.toFixed(2)} MegaJanskys per steradian, SNR ${b.snr} sigma. ${b.is_observed ? 'Observed archive frame' : 'Interpolated model'}`}
                 opacity={isDimmed ? 0.3 : 1.0}
                 onMouseEnter={() => {
                   setHoveredBand(b);
                   setHoveredChannel(null);
                 }}
                 onMouseLeave={() => setHoveredBand(null)}
+                onFocus={() => {
+                  setHoveredBand(b);
+                  setHoveredChannel(null);
+                }}
+                onBlur={() => setHoveredBand(null)}
                 onClick={() => setSelectedDetector(selectedDetector === b.detector ? null : b.detector)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    setSelectedDetector(selectedDetector === b.detector ? null : b.detector);
+                  }
+                }}
               >
                 {/* Photometric Error Bar */}
                 <line
@@ -272,7 +299,7 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
                   y2={cyErrBot}
                   stroke={b.color}
                   strokeWidth="1.2"
-                  opacity="0.8"
+                  opacity="0.9"
                 />
                 <line
                   x1={cx - 2.5}
@@ -281,7 +308,7 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
                   y2={cyErrTop}
                   stroke={b.color}
                   strokeWidth="1.2"
-                  opacity="0.8"
+                  opacity="0.9"
                 />
                 <line
                   x1={cx - 2.5}
@@ -290,7 +317,7 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
                   y2={cyErrBot}
                   stroke={b.color}
                   strokeWidth="1.2"
-                  opacity="0.8"
+                  opacity="0.9"
                 />
 
                 {/* Outer ring for observed archive FITS */}
@@ -325,7 +352,7 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
           <div className="absolute top-1 right-2 bg-slate-900 border border-slate-700 rounded p-2 text-[10px] text-slate-200 pointer-events-none shadow-xl z-20 font-mono space-y-0.5">
             <div className="flex items-center gap-1.5 font-bold" style={{ color: hoveredBand.color }}>
               <span>{hoveredBand.detector}</span>
-              <span className="text-[9px] text-slate-400">({hoveredBand.wavelength_min_um}–{hoveredBand.wavelength_max_um} µm)</span>
+              <span className="text-[9px] text-slate-300">({hoveredBand.wavelength_min_um}–{hoveredBand.wavelength_max_um} µm)</span>
             </div>
             <div>
               <span className="text-slate-400">λ_eff:</span> {hoveredBand.wavelength_um.toFixed(3)} µm
@@ -359,7 +386,7 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
             </div>
             <div className="flex items-center gap-1.5 font-bold" style={{ color: hoveredChannel.color }}>
               <span>Estimated Channel #{hoveredChannel.channel_index} / 102</span>
-              <span className="text-[9px] text-slate-400">({hoveredChannel.detector})</span>
+              <span className="text-[9px] text-slate-300">({hoveredChannel.detector})</span>
             </div>
             <div>
               <span className="text-slate-400">Wavelength λ:</span> {hoveredChannel.wavelength_um.toFixed(4)} µm
@@ -371,6 +398,55 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
         )}
       </div>
 
+      {/* Accessible Tabular Data View (USWDS & WCAG 2.2 compliant) */}
+      <details className="text-[10px] font-mono group border border-slate-800 rounded bg-slate-950/70 p-2">
+        <summary className="cursor-pointer text-slate-300 hover:text-cyan-300 font-sans font-medium flex items-center justify-between select-none focus-visible:ring-2 focus-visible:ring-cyan-400 rounded px-1 py-0.5 outline-none">
+          <span className="flex items-center gap-1.5">
+            <Table className="w-3.5 h-3.5 text-cyan-400" />
+            <span>View Accessible Data Table</span>
+          </span>
+          <span className="text-[9px] text-slate-400 font-mono">({bands.length} bands{showChannels102 ? ' + 102 channels' : ''})</span>
+        </summary>
+        <div className="mt-2 overflow-x-auto max-h-48 overflow-y-auto">
+          <table className="w-full text-left border-collapse" role="table" aria-label="SPHEREx Spectral Energy Distribution Observed Detector Bands">
+            <caption className="sr-only">SPHEREx Infrared SED photometrically observed detector bands and flux values</caption>
+            <thead>
+              <tr className="border-b border-slate-800 text-slate-400 text-[9px] uppercase tracking-wider">
+                <th scope="col" className="py-1 px-1.5 font-semibold">Detector</th>
+                <th scope="col" className="py-1 px-1.5 font-semibold text-right">λ (µm)</th>
+                <th scope="col" className="py-1 px-1.5 font-semibold text-right">Flux (MJy/sr)</th>
+                <th scope="col" className="py-1 px-1.5 font-semibold text-right">± Err</th>
+                <th scope="col" className="py-1 px-1.5 font-semibold text-right">SNR</th>
+                <th scope="col" className="py-1 px-1.5 font-semibold text-center">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/60 text-slate-300">
+              {bands.map((b) => (
+                <tr key={b.detector} className="hover:bg-slate-900/60 transition">
+                  <td className="py-1 px-1.5 font-semibold" style={{ color: b.color }}>{b.detector}</td>
+                  <td className="py-1 px-1.5 text-right font-mono">{b.wavelength_um.toFixed(3)}</td>
+                  <td className="py-1 px-1.5 text-right font-mono font-medium text-slate-100">{b.flux_mjy_sr.toFixed(2)}</td>
+                  <td className="py-1 px-1.5 text-right font-mono text-slate-400">±{b.flux_err_mjy_sr.toFixed(2)}</td>
+                  <td className="py-1 px-1.5 text-right font-mono text-cyan-300 font-semibold">{b.snr}σ</td>
+                  <td className="py-1 px-1.5 text-center">
+                    {b.is_observed ? (
+                      <span className="text-emerald-400 font-semibold">Observed</span>
+                    ) : (
+                      <span className="text-slate-400">Modeled</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {showChannels102 && (
+            <div className="mt-2 pt-2 border-t border-slate-800 text-[9px] text-slate-400">
+              <span className="font-semibold text-indigo-300">Note on 102 channels:</span> Showing 6 measured detector bands above. The 102 channels represent the continuous PCHIP spline interpolated spectrophotometric SED model across SPHEREx linear variable filter dispersion.
+            </div>
+          )}
+        </div>
+      </details>
+
       {/* Spectral Classification & Summary Bar */}
       <div className="bg-slate-900/80 border border-slate-800 rounded p-2 space-y-1.5 font-mono">
         <div className="flex items-center justify-between text-[10px]">
@@ -381,16 +457,16 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
         </div>
         <div className="grid grid-cols-3 gap-1 pt-1 text-center">
           <div className="bg-slate-950/60 p-1 rounded border border-slate-800/80">
-            <span className="text-[9px] text-slate-500 block">Peak λ</span>
-            <span className="text-[11px] text-amber-400 font-bold">{summary.peak_wavelength_um.toFixed(2)} µm</span>
+            <span className="text-[9px] text-slate-400 block">Peak λ</span>
+            <span className="text-[11px] text-amber-300 font-bold">{summary.peak_wavelength_um.toFixed(2)} µm</span>
           </div>
           <div className="bg-slate-950/60 p-1 rounded border border-slate-800/80">
-            <span className="text-[9px] text-slate-500 block">Peak Band</span>
+            <span className="text-[9px] text-slate-400 block">Peak Band</span>
             <span className="text-[11px] text-cyan-300 font-bold">{summary.peak_detector.replace('SPHEREx-', '')}</span>
           </div>
           <div className="bg-slate-950/60 p-1 rounded border border-slate-800/80">
-            <span className="text-[9px] text-slate-500 block">Observed</span>
-            <span className="text-[11px] text-emerald-400 font-bold">{total_observed_bands} / 6</span>
+            <span className="text-[9px] text-slate-400 block">Observed</span>
+            <span className="text-[11px] text-emerald-300 font-bold">{total_observed_bands} / 6</span>
           </div>
         </div>
       </div>

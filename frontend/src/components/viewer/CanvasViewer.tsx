@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { FrameResponse, CatalogSource } from '../../types/astronomy';
-import { ZoomIn, ZoomOut, RotateCcw, Crosshair, Palette, Sliders, Star, Globe } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, Crosshair, Palette, Sliders, Star, Globe, Keyboard } from 'lucide-react';
 import { AladinViewer } from './AladinViewer';
 
 interface CanvasViewerProps {
@@ -47,11 +47,52 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
   const [showCrosshair, setShowCrosshair] = useState(true);
   const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
   const [cachedImg, setCachedImg] = useState<HTMLImageElement | null>(null);
+  const [announcement, setAnnouncement] = useState<string>('');
 
   const resetView = useCallback(() => {
     setZoom(1.0);
     setOffset({ x: 0, y: 0 });
   }, []);
+
+  // Keyboard controls for canvas accessibility
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    const panStep = 40;
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setOffset((prev) => ({ ...prev, y: prev.y + panStep }));
+      setAnnouncement('Panned up');
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setOffset((prev) => ({ ...prev, y: prev.y - panStep }));
+      setAnnouncement('Panned down');
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      setOffset((prev) => ({ ...prev, x: prev.x + panStep }));
+      setAnnouncement('Panned left');
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      setOffset((prev) => ({ ...prev, x: prev.x - panStep }));
+      setAnnouncement('Panned right');
+    } else if (e.key === '+' || e.key === '=') {
+      e.preventDefault();
+      setZoom((prev) => {
+        const next = Math.min(prev * 1.25, 8.0);
+        setAnnouncement(`Zoomed in to ${Math.round(next * 100)}%`);
+        return next;
+      });
+    } else if (e.key === '-' || e.key === '_') {
+      e.preventDefault();
+      setZoom((prev) => {
+        const next = Math.max(prev * 0.8, 0.4);
+        setAnnouncement(`Zoomed out to ${Math.round(next * 100)}%`);
+        return next;
+      });
+    } else if (e.key === '0') {
+      e.preventDefault();
+      resetView();
+      setAnnouncement('View reset to default 100% zoom and center position');
+    }
+  };
 
   // 1. Decode image once when frame or colormap changes
   useEffect(() => {
@@ -201,16 +242,24 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
 
   return (
     <div className="flex-1 flex flex-col bg-slate-950 relative overflow-hidden select-none" ref={containerRef}>
+      {/* Screen reader live announcements */}
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {announcement}
+      </div>
+      <div id="canvas-keyboard-help" className="sr-only">
+        Interactive astronomical canvas viewer. Use Arrow keys to pan image, Plus or Equal to zoom in, Minus to zoom out, and 0 to reset view.
+      </div>
+
       {/* Top Overlay Controls */}
       <div className="absolute top-3 left-4 right-4 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
-        <div className="bg-slate-900/80 backdrop-blur-md border border-slate-800 px-3 py-1.5 rounded-lg pointer-events-auto flex items-center gap-3">
+        <div className="bg-slate-900/90 backdrop-blur-md border border-slate-800 px-3 py-1.5 rounded-lg pointer-events-auto flex items-center gap-3">
           <div>
-            <h3 className="text-xs font-semibold text-slate-200">{title || (frame ? frame.obs_id : 'Astronomical Viewer')}</h3>
-            <p className="text-[10px] text-slate-400 font-mono">
+            <h3 className="text-xs font-semibold text-slate-100">{title || (frame ? frame.obs_id : 'Astronomical Viewer')}</h3>
+            <p className="text-[10px] text-slate-300 font-mono">
               {subtitle || (frame ? `${frame.detector} • ${frame.utc_date?.split('T')[0] || ''}` : 'Select an observation')}
             </p>
             {frame?.is_synthetic && (
-              <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+              <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold bg-amber-500/20 text-amber-200 border border-amber-500/40">
                 SIMULATED FIXTURE (ARCHIVE OFFLINE)
               </span>
             )}
@@ -218,46 +267,71 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
         </div>
 
         {/* Viewer Mode Switcher: SPHEREx Canvas vs Aladin Lite Sky Context */}
-        <div className="bg-slate-900/90 backdrop-blur-md border border-slate-800 p-1 rounded-xl pointer-events-auto flex items-center gap-1 shadow-lg">
+        <div
+          role="tablist"
+          aria-label="Astronomical viewer display mode"
+          className="bg-slate-900/90 backdrop-blur-md border border-slate-800 p-1 rounded-xl pointer-events-auto flex items-center gap-1 shadow-lg"
+        >
           <button
-            onClick={() => setViewerMode('canvas')}
-            className={`px-3 py-1 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+            role="tab"
+            aria-selected={viewerMode === 'canvas'}
+            aria-label="Switch to SPHEREx quantitative canvas view"
+            onClick={() => {
+              setViewerMode('canvas');
+              setAnnouncement('Switched to SPHEREx quantitative canvas');
+            }}
+            className={`px-3 py-1 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${
               viewerMode === 'canvas'
                 ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm font-semibold'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
             }`}
           >
-            <Sliders className="w-3.5 h-3.5" />
+            <Sliders className="w-3.5 h-3.5 text-cyan-400" />
             <span>SPHEREx Canvas</span>
           </button>
           <button
-            onClick={() => setViewerMode('aladin')}
-            className={`px-3 py-1 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+            role="tab"
+            aria-selected={viewerMode === 'aladin'}
+            aria-label="Switch to Aladin Lite multi-wavelength sky context view"
+            onClick={() => {
+              setViewerMode('aladin');
+              setAnnouncement('Switched to Aladin Lite multi-wavelength sky context');
+            }}
+            className={`px-3 py-1 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${
               viewerMode === 'aladin'
                 ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm font-semibold'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
             }`}
           >
-            <Globe className="w-3.5 h-3.5" />
+            <Globe className="w-3.5 h-3.5 text-cyan-400" />
             <span>Aladin Lite Sky Context</span>
           </button>
         </div>
 
         {/* Stretch & Visual Filters (shown in Canvas mode) */}
         {viewerMode === 'canvas' ? (
-          <div className="bg-slate-900/80 backdrop-blur-md border border-slate-800 p-1 rounded-lg pointer-events-auto flex items-center gap-1.5 text-xs">
-            <div className="flex items-center gap-1 px-2 py-0.5 border-r border-slate-800 text-slate-400">
+          <div
+            role="group"
+            aria-label="Image stretch and palette controls"
+            className="bg-slate-900/90 backdrop-blur-md border border-slate-800 p-1 rounded-lg pointer-events-auto flex items-center gap-1.5 text-xs"
+          >
+            <div className="flex items-center gap-1 px-2 py-0.5 border-r border-slate-800 text-slate-300 font-medium">
               <Sliders className="w-3.5 h-3.5 text-cyan-400" />
               <span>Stretch:</span>
             </div>
             {(['asinh', 'zscale', 'linear'] as const).map((s) => (
               <button
                 key={s}
-                onClick={() => setStretch(s)}
-                className={`px-2 py-1 rounded text-[11px] font-mono capitalize transition ${
+                aria-pressed={stretch === s}
+                aria-label={`Apply ${s} display stretch preview`}
+                onClick={() => {
+                  setStretch(s);
+                  setAnnouncement(`Display stretch set to ${s}`);
+                }}
+                className={`px-2 py-1 rounded text-[11px] font-mono capitalize transition focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${
                   stretch === s
-                    ? 'bg-cyan-500/20 text-cyan-300 font-semibold'
-                    : 'text-slate-400 hover:text-slate-200'
+                    ? 'bg-cyan-500/20 text-cyan-300 font-semibold border border-cyan-500/30'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
                 }`}
               >
                 {s}
@@ -268,14 +342,19 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
 
             {/* Colormap toggle */}
             <button
-              onClick={() => setColormap(colormap === 'inferno' ? 'grayscale' : 'inferno')}
-              className={`px-2 py-1 rounded text-[11px] flex items-center gap-1 transition ${
+              onClick={() => {
+                const nextColormap = colormap === 'inferno' ? 'grayscale' : 'inferno';
+                setColormap(nextColormap);
+                setAnnouncement(`Color palette set to ${nextColormap}`);
+              }}
+              aria-label={`Toggle colormap. Current: ${colormap}`}
+              className={`px-2 py-1 rounded text-[11px] flex items-center gap-1 transition focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${
                 colormap === 'inferno'
-                  ? 'bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/30'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-amber-500/20 text-amber-200 font-semibold border border-amber-500/40'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
               }`}
             >
-              <Palette className="w-3 h-3" />
+              <Palette className="w-3 h-3 text-cyan-400" />
               <span>{colormap === 'inferno' ? 'Inferno' : 'Grayscale'}</span>
             </button>
           </div>
@@ -300,9 +379,14 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
         />
       ) : (
         <>
-          {/* Canvas Area */}
+          {/* Canvas Area with Keyboard Focus & Navigation */}
           <div
-            className="flex-1 w-full h-full cursor-grab active:cursor-grabbing relative flex items-center justify-center"
+            tabIndex={0}
+            role="region"
+            aria-label="SPHEREx Astronomical Canvas Viewer. Use arrow keys to pan, plus or minus to zoom, and zero to reset view."
+            aria-describedby="canvas-keyboard-help"
+            onKeyDown={handleKeyDown}
+            className="flex-1 w-full h-full cursor-grab active:cursor-grabbing relative flex items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-inset"
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
@@ -319,16 +403,16 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
             )}
 
             {!frame && !loading && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500 gap-2">
-                <Crosshair className="w-10 h-10 opacity-30 text-cyan-400" />
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 gap-2">
+                <Crosshair className="w-10 h-10 opacity-40 text-cyan-400" />
                 <p className="text-xs">No observation loaded. Select a target preset or enter sky coordinates.</p>
               </div>
             )}
           </div>
 
           {/* Bottom Floating Telemetry & Zoom Dock */}
-          <div className="absolute bottom-3 left-4 right-4 z-20 flex items-center justify-between pointer-events-none">
-            <div className="bg-slate-900/80 backdrop-blur-md border border-slate-800 px-3 py-1 rounded-md pointer-events-auto text-[11px] font-mono text-slate-400 flex items-center gap-3">
+          <div className="absolute bottom-3 left-4 right-4 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+            <div className="bg-slate-900/90 backdrop-blur-md border border-slate-800 px-3 py-1 rounded-md pointer-events-auto text-[11px] font-mono text-slate-300 flex items-center gap-3">
               <span>Scale: {(zoom * 100).toFixed(0)}%</span>
               {frame && (
                 <>
@@ -344,18 +428,34 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
                   )}
                 </>
               )}
+              {/* Keyboard shortcuts helper badge */}
+              <span className="hidden xl:inline-flex items-center gap-1.5 text-slate-400 border-l border-slate-700/80 pl-3">
+                <Keyboard className="w-3 h-3 text-cyan-400" />
+                <span>Pan: <kbd className="px-1 py-0.5 bg-slate-800 rounded border border-slate-700 text-slate-200">Arrows</kbd></span>
+                <span>Zoom: <kbd className="px-1 py-0.5 bg-slate-800 rounded border border-slate-700 text-slate-200">+/-</kbd></span>
+                <span>Reset: <kbd className="px-1 py-0.5 bg-slate-800 rounded border border-slate-700 text-slate-200">0</kbd></span>
+              </span>
             </div>
 
             {/* Zoom controls */}
-            <div className="bg-slate-900/80 backdrop-blur-md border border-slate-800 p-1 rounded-lg pointer-events-auto flex items-center gap-1">
+            <div
+              role="toolbar"
+              aria-label="Canvas zoom and view controls"
+              className="bg-slate-900/90 backdrop-blur-md border border-slate-800 p-1 rounded-lg pointer-events-auto flex items-center gap-1"
+            >
               {setShowCatalog && (
                 <button
-                  onClick={() => setShowCatalog(!showCatalog)}
+                  onClick={() => {
+                    setShowCatalog(!showCatalog);
+                    setAnnouncement(!showCatalog ? 'Reference stars enabled' : 'Reference stars disabled');
+                  }}
+                  aria-pressed={showCatalog}
+                  aria-label={`Toggle Reference Stars: ${catalogSources[0]?.provenance || 'Gaia DR3 / Curated Demo'}`}
                   title={`Toggle Reference Stars: ${catalogSources[0]?.provenance || 'Gaia DR3 / Curated Demo'}`}
-                  className={`px-2 py-1 rounded text-[11px] font-mono flex items-center gap-1 transition ${
+                  className={`px-2 py-1 rounded text-[11px] font-mono flex items-center gap-1 transition focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${
                     showCatalog
                       ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-semibold'
-                      : 'text-slate-400 hover:text-slate-200'
+                      : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
                   }`}
                 >
                   <Star className="w-3.5 h-3.5 text-cyan-400" />
@@ -369,32 +469,55 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
               <div className="h-4 w-px bg-slate-800 mx-0.5" />
 
               <button
-                onClick={() => setShowCrosshair(!showCrosshair)}
+                onClick={() => {
+                  setShowCrosshair(!showCrosshair);
+                  setAnnouncement(!showCrosshair ? 'Celestial crosshair enabled' : 'Celestial crosshair disabled');
+                }}
+                aria-pressed={showCrosshair}
+                aria-label="Toggle Celestial Crosshair"
                 title="Toggle Celestial Crosshair"
-                className={`p-1.5 rounded transition ${
-                  showCrosshair ? 'bg-cyan-500/20 text-cyan-300' : 'text-slate-400 hover:text-slate-200'
+                className={`p-1.5 rounded transition focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${
+                  showCrosshair ? 'bg-cyan-500/20 text-cyan-300' : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
                 }`}
               >
                 <Crosshair className="w-4 h-4" />
               </button>
               <button
-                onClick={() => setZoom((prev) => Math.min(prev * 1.25, 8.0))}
-                title="Zoom In"
-                className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded transition"
+                onClick={() => {
+                  setZoom((prev) => {
+                    const next = Math.min(prev * 1.25, 8.0);
+                    setAnnouncement(`Zoomed in to ${Math.round(next * 100)}%`);
+                    return next;
+                  });
+                }}
+                aria-label="Zoom In"
+                title="Zoom In (+)"
+                className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded transition focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none"
               >
                 <ZoomIn className="w-4 h-4" />
               </button>
               <button
-                onClick={() => setZoom((prev) => Math.max(prev * 0.8, 0.4))}
-                title="Zoom Out"
-                className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded transition"
+                onClick={() => {
+                  setZoom((prev) => {
+                    const next = Math.max(prev * 0.8, 0.4);
+                    setAnnouncement(`Zoomed out to ${Math.round(next * 100)}%`);
+                    return next;
+                  });
+                }}
+                aria-label="Zoom Out"
+                title="Zoom Out (-)"
+                className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded transition focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none"
               >
                 <ZoomOut className="w-4 h-4" />
               </button>
               <button
-                onClick={resetView}
-                title="Reset View"
-                className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded transition"
+                onClick={() => {
+                  resetView();
+                  setAnnouncement('View reset to default 100% zoom and center position');
+                }}
+                aria-label="Reset View"
+                title="Reset View (0)"
+                className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded transition focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none"
               >
                 <RotateCcw className="w-4 h-4" />
               </button>

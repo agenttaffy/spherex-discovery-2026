@@ -51,26 +51,32 @@ export const TimelinePlayer: React.FC<TimelinePlayerProps> = ({
   const currentObs = observations[currentIndex];
 
   return (
-    <div className="h-20 bg-slate-950/90 border-t border-slate-800 px-6 flex items-center justify-between gap-6 z-20">
-      {/* Playback Controls */}
-      <div className="flex items-center space-x-2">
+    <div
+      role="region"
+      aria-label="Observation timeline player"
+      className="bg-slate-950/90 border-t border-slate-800 px-3 sm:px-6 py-2.5 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 z-20"
+    >
+      {/* Playback Controls & Blink */}
+      <div className="flex items-center justify-between sm:justify-start gap-1.5 shrink-0" role="toolbar" aria-label="Timeline playback controls">
         <button
           onClick={() => onSelectIndex(Math.max(0, currentIndex - 1))}
           disabled={currentIndex <= 0}
+          aria-label="Previous observation epoch"
           title="Previous Epoch"
-          className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg disabled:opacity-40 transition"
+          className="p-1.5 sm:p-2 text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg disabled:opacity-40 transition focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none"
         >
           <SkipBack className="w-4 h-4" />
         </button>
 
         <button
           onClick={() => setIsPlaying(!isPlaying)}
-          className={`p-2.5 rounded-lg font-semibold transition flex items-center justify-center ${
+          aria-label={isPlaying ? 'Pause time-lapse' : 'Play time-lapse'}
+          title={isPlaying ? 'Pause Time-Lapse' : 'Play Time-Lapse'}
+          className={`p-2 sm:p-2.5 rounded-lg font-semibold transition flex items-center justify-center focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${
             isPlaying
-              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+              ? 'bg-amber-500/20 text-amber-200 border border-amber-500/40'
               : 'bg-cyan-600 text-white hover:bg-cyan-500 shadow-md shadow-cyan-950'
           }`}
-          title={isPlaying ? 'Pause Time-Lapse' : 'Play Time-Lapse'}
         >
           {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-white" />}
         </button>
@@ -78,17 +84,20 @@ export const TimelinePlayer: React.FC<TimelinePlayerProps> = ({
         <button
           onClick={() => onSelectIndex(Math.min(observations.length - 1, currentIndex + 1))}
           disabled={currentIndex >= observations.length - 1}
+          aria-label="Next observation epoch"
           title="Next Epoch"
-          className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg disabled:opacity-40 transition"
+          className="p-1.5 sm:p-2 text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg disabled:opacity-40 transition focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none"
         >
           <SkipForward className="w-4 h-4" />
         </button>
 
         <button
           onClick={() => setIsLoop(!isLoop)}
+          aria-pressed={isLoop}
+          aria-label="Loop playback animation"
           title="Loop Animation"
-          className={`p-2 rounded-lg transition ${
-            isLoop ? 'bg-cyan-500/20 text-cyan-300' : 'text-slate-500 hover:text-slate-300'
+          className={`p-1.5 sm:p-2 rounded-lg transition focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${
+            isLoop ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30' : 'text-slate-400 hover:text-slate-200'
           }`}
         >
           <Repeat className="w-4 h-4" />
@@ -101,33 +110,60 @@ export const TimelinePlayer: React.FC<TimelinePlayerProps> = ({
             setIsBlinkActive(nextBlink);
             if (nextBlink) setIsPlaying(true);
           }}
-          className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 border transition ${
+          aria-pressed={isBlinkActive}
+          aria-label="Toggle rapid 2-epoch blink comparator"
+          title="Toggle rapid blink comparison between first two epochs"
+          className={`px-2 sm:px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 border transition focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${
             isBlinkActive
-              ? 'bg-fuchsia-950/60 border-fuchsia-500 text-fuchsia-300'
-              : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+              ? 'bg-fuchsia-950/60 border-fuchsia-500 text-fuchsia-200'
+              : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white'
           }`}
         >
-          <Zap className="w-3.5 h-3.5" />
-          <span>Blink Mode</span>
+          <Zap className="w-3.5 h-3.5 text-fuchsia-400" />
+          <span className="hidden xs:inline">Blink Mode</span>
         </button>
       </div>
 
       {/* Scrubber Timeline */}
-      <div className="flex-1 flex flex-col justify-center">
-        <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 mb-1.5">
-          <span className="flex items-center gap-2">
-            <span className="text-cyan-400 font-semibold">Epoch {currentIndex + 1} of {observations.length}</span>
+      <div className="flex-1 flex flex-col justify-center min-w-0">
+        <div className="flex items-center justify-between text-[11px] font-mono text-slate-300 mb-1.5">
+          <span className="flex items-center gap-2 truncate">
+            <span className="text-cyan-300 font-semibold">Epoch {currentIndex + 1}/{observations.length}</span>
             {currentObs?.utc_date && (
-              <span className="text-slate-300 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
-                {currentObs.utc_date} UTC
+              <span className="text-slate-200 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800 truncate">
+                {currentObs.utc_date.split('T')[0]}
               </span>
             )}
           </span>
-          <span className="text-slate-500">{currentObs?.detector}</span>
+          <span className="text-indigo-300 font-semibold shrink-0 ml-2">{currentObs?.detector}</span>
         </div>
 
         {/* Frame markers / Scrubber bar */}
-        <div className="relative w-full h-2 bg-slate-900 rounded-full cursor-pointer flex items-center">
+        <div
+          role="slider"
+          aria-label="Observation timeline epoch slider"
+          aria-valuemin={1}
+          aria-valuemax={observations.length}
+          aria-valuenow={currentIndex + 1}
+          aria-valuetext={`Epoch ${currentIndex + 1} of ${observations.length}, ${currentObs?.detector}, ${currentObs?.utc_date || ''}`}
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+              e.preventDefault();
+              onSelectIndex(Math.max(0, currentIndex - 1));
+            } else if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+              e.preventDefault();
+              onSelectIndex(Math.min(observations.length - 1, currentIndex + 1));
+            } else if (e.key === 'Home') {
+              e.preventDefault();
+              onSelectIndex(0);
+            } else if (e.key === 'End') {
+              e.preventDefault();
+              onSelectIndex(observations.length - 1);
+            }
+          }}
+          className="relative w-full h-3 bg-slate-900 rounded-full cursor-pointer flex items-center focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none"
+        >
           <div
             className="h-full bg-gradient-to-r from-cyan-500 to-indigo-500 rounded-full transition-all duration-150"
             style={{ width: `${((currentIndex + 1) / observations.length) * 100}%` }}
@@ -136,8 +172,9 @@ export const TimelinePlayer: React.FC<TimelinePlayerProps> = ({
             <button
               key={obs.id || idx}
               onClick={() => onSelectIndex(idx)}
+              aria-label={`Jump to Epoch ${idx + 1}: ${obs.utc_date || ''} (${obs.detector})`}
               title={`${obs.utc_date || ''} (${obs.detector})`}
-              className={`absolute w-3 h-3 -ml-1.5 rounded-full border transition-all ${
+              className={`absolute w-3 h-3 -ml-1.5 rounded-full border transition-all focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${
                 idx === currentIndex
                   ? 'bg-cyan-400 border-white scale-125 z-10 shadow-sm shadow-cyan-400'
                   : 'bg-slate-800 border-slate-600 hover:bg-slate-600'
@@ -148,17 +185,19 @@ export const TimelinePlayer: React.FC<TimelinePlayerProps> = ({
         </div>
       </div>
 
-      {/* FPS selector */}
-      <div className="flex items-center space-x-1 text-xs">
-        <span className="text-[11px] text-slate-500 font-mono mr-1">Speed:</span>
+      {/* FPS speed selector */}
+      <div className="flex items-center justify-end space-x-1 text-xs shrink-0" role="group" aria-label="Playback frame rate">
+        <span className="text-[11px] text-slate-400 font-mono mr-1">Speed:</span>
         {[1, 2, 4].map((speed) => (
           <button
             key={speed}
             onClick={() => setFps(speed)}
-            className={`px-2 py-1 rounded text-[11px] font-mono transition ${
+            aria-pressed={fps === speed}
+            aria-label={`Set playback speed to ${speed} frames per second`}
+            className={`px-2 py-0.5 rounded text-[11px] font-mono transition focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${
               fps === speed
                 ? 'bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30'
-                : 'text-slate-400 hover:text-slate-200'
+                : 'text-slate-400 hover:text-white'
             }`}
           >
             {speed}x

@@ -174,7 +174,7 @@ export const GuidedTourModal: React.FC<GuidedTourModalProps> = ({
   const step = steps[currentStep];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4" role="dialog" aria-modal="true" aria-label="Interactive guided walkthrough of SPHEREx Discovery">
       <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-xl shadow-2xl overflow-hidden flex flex-col">
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-800 bg-slate-950/80 flex items-center justify-between">
@@ -189,7 +189,11 @@ export const GuidedTourModal: React.FC<GuidedTourModalProps> = ({
               </span>
             </div>
           </div>
-          <button onClick={onClose} className="p-1 rounded text-slate-400 hover:text-white">
+          <button
+            onClick={onClose}
+            aria-label="Close guided tour"
+            className="p-1 rounded text-slate-400 hover:text-white focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -204,7 +208,8 @@ export const GuidedTourModal: React.FC<GuidedTourModalProps> = ({
           <button
             onClick={() => setCurrentStep((s) => Math.max(0, s - 1))}
             disabled={currentStep === 0}
-            className={`px-3 py-1.5 text-xs font-medium rounded-lg flex items-center gap-1 transition ${
+            aria-label="Previous step"
+            className={`px-3 py-1.5 text-xs font-medium rounded-lg flex items-center gap-1 transition focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${
               currentStep === 0
                 ? 'opacity-40 cursor-not-allowed text-slate-500'
                 : 'bg-slate-800 hover:bg-slate-700 text-slate-200'
@@ -215,12 +220,15 @@ export const GuidedTourModal: React.FC<GuidedTourModalProps> = ({
           </button>
 
           {/* Step dots */}
-          <div className="flex items-center space-x-1.5">
+          <div className="flex items-center space-x-1.5" role="tablist" aria-label="Tour step indicators">
             {steps.map((_, i) => (
-              <div
+              <button
                 key={i}
+                role="tab"
+                aria-selected={i === currentStep}
+                aria-label={`Jump to step ${i + 1}: ${steps[i].title}`}
                 onClick={() => setCurrentStep(i)}
-                className={`w-2 h-2 rounded-full cursor-pointer transition ${
+                className={`w-2 h-2 rounded-full cursor-pointer transition focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${
                   i === currentStep ? 'bg-cyan-400 w-4' : 'bg-slate-700 hover:bg-slate-500'
                 }`}
               />
@@ -230,7 +238,8 @@ export const GuidedTourModal: React.FC<GuidedTourModalProps> = ({
           {currentStep < steps.length - 1 ? (
             <button
               onClick={() => setCurrentStep((s) => Math.min(steps.length - 1, s + 1))}
-              className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white flex items-center gap-1 transition"
+              aria-label="Next step"
+              className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white flex items-center gap-1 transition focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none"
             >
               Next
               <ChevronRight className="w-3.5 h-3.5" />
@@ -238,7 +247,8 @@ export const GuidedTourModal: React.FC<GuidedTourModalProps> = ({
           ) : (
             <button
               onClick={onClose}
-              className="px-4 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1 transition shadow-lg shadow-emerald-900/30"
+              aria-label="Complete tour and start exploring"
+              className="px-4 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1 transition shadow-lg shadow-emerald-900/30 focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none"
             >
               Start Exploring
               <CheckCircle className="w-3.5 h-3.5" />

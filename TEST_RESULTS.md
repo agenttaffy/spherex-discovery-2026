@@ -1,8 +1,8 @@
 # SPHEREx Discovery — Test Execution Record
 
-**Execution Timestamp:** 2026-11-14T20:18:00Z  
+**Execution Timestamp:** 2026-11-14T20:36:00Z  
 **Platform:** Windows 11 / Python 3.11.4 / Node.js v22.19.0  
-**Test Suite Status:** 81 passed in 6.95s | Frontend Build: 0 errors in 2.63s
+**Test Suite Status:** 81 backend pytest tests passed in 6.71s | 34 automated UI accessibility checks passed | Frontend Build: 0 errors in 2.52s
 
 ---
 
@@ -115,7 +115,56 @@ transforming...
 rendering chunks...
 computing gzip size...
 dist/index.html                   0.96 kB │ gzip:  0.60 kB
-dist/assets/index-Dj4VbrJv.css   29.89 kB │ gzip:  5.95 kB
-dist/assets/index-UQN39fzA.js   266.14 kB │ gzip: 73.81 kB
-✓ built in 2.63s
+dist/assets/index-BgS7o9yA.css   32.90 kB │ gzip:  6.56 kB
+dist/assets/index-Bgrcvlw6.js   288.62 kB │ gzip: 78.19 kB
+✓ built in 2.52s
+```
+
+---
+
+## 3. Automated UI Accessibility & Responsive Verification (`node scripts/verify_accessibility_and_responsive.mjs`)
+
+```text
+============================================================
+SPHEREx Discovery Accessibility & Responsive Verification
+============================================================
+
+[PASS] index.css defines global :focus-visible indicators
+[PASS] index.css respects prefers-reduced-motion media query
+[PASS] index.css defines 320px minimum viewport safety constraint
+[PASS] index.css prevents horizontal document scroll
+[PASS] CanvasViewer implements handleKeyDown handler
+[PASS] CanvasViewer implements Arrow key panning
+[PASS] CanvasViewer implements "+" / "=" zoom in
+[PASS] CanvasViewer implements "-" / "_" zoom out
+[PASS] CanvasViewer implements "0" reset view
+[PASS] CanvasViewer has aria-live="polite" region for screen reader announcements
+[PASS] CanvasViewer container has tabIndex={0} keyboard focusability
+[PASS] CanvasViewer has high-visibility focus ring
+[PASS] CanvasViewer viewer switcher uses role="tablist" and role="tab"
+[PASS] SpectrumChart includes expandable <details> disclosure
+[PASS] SpectrumChart includes "View Accessible Data Table" summary
+[PASS] SpectrumChart data table has role="table"
+[PASS] SpectrumChart table headers have scope="col"
+[PASS] SpectrumChart table includes screen-reader caption
+[PASS] LightCurveChart includes expandable <details> disclosure
+[PASS] LightCurveChart includes "View Accessible Data Table" summary
+[PASS] LightCurveChart data table has role="table"
+[PASS] LightCurveChart table headers have scope="col"
+[PASS] Header navigation uses role="tablist"
+[PASS] Header navigation buttons use role="tab"
+[PASS] Header wraps gracefully on narrow viewports
+[PASS] App implements mobilePanel state for deliberate panel stacking
+[PASS] App implements mobile tabs for Canvas, Target, and Telemetry
+[PASS] App displays side-by-side multi-dock layout on lg (>=1024px) screens
+[PASS] SearchControls uses responsive full width on mobile and 320px on desktop
+[PASS] MetadataPanel uses responsive full width on mobile and 320px on desktop
+[PASS] ComparisonView operation mode switcher uses role="tablist"
+[PASS] ComparisonView operation mode buttons use role="tab"
+[PASS] GuidedTourModal has role="dialog" and aria-modal="true"
+[PASS] DiscoveryReportModal has role="dialog" and aria-modal="true"
+
+============================================================
+Results: 34 passed, 0 failed
+============================================================
 ```

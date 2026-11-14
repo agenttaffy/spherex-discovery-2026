@@ -1,11 +1,18 @@
 # SPHEREx Discovery — Project State
 
-**Last Updated:** 2026-11-14T20:18:00Z  
-**Current Implementation Stage:** Phase 6 Scientific Audit & Codebase Hardening (Documented SPHEREx FLAGS Bit Definitions, Nominal SOURCE Mask Distinction, WCS-Transformed Photometry & VARIANCE Error Propagation, WCS-WAVE Dispersion Tabular Calibration, Boundary Aperture Area Coverage Correction, 102-Channel Estimated Continuum Modeling Separation, WCS Celestial Target Astrometric Tracking with Equatorial Proper Motion Vectors, LVF Passband Compatibility & Mask-Preserving Differencing, Mask-Aware Compatible Stacking with Variance Propagation, Catalog Provenance Labeling, 81 Passing Pytest Tests, Clean Production Build).
+**Last Updated:** 2026-11-14T20:35:00Z  
+**Current Implementation Stage:** Phase 7 UI/UX Refinement & WCAG 2.2 AA Accessibility (Accessible Tabular Data Tables, Canvas Keyboard Controls with Live Announcements, Contrast >= 4.5:1, Standardized Focus Rings, ARIA Navigation Roles, 320px Responsive Viewport Reflow, 81 Passing Pytest Tests, 34 Automated UI Accessibility Checks, Clean Production Build).
 
 ---
 
 ## 1. Verified Working Features
+- **NASA Data Visualization & WCAG 2.2 AA Accessibility (`SpectrumChart.tsx`, `LightCurveChart.tsx`, `CanvasViewer.tsx`, `index.css`):**
+  - **Accessible Tabular Data Alternatives:** Implemented `<details><summary>View Accessible Data Table</summary>...` alongside SVG charts with semantic `role="table"`, `<caption className="sr-only">`, and `<th scope="col">` column headers for full screen-reader accessibility.
+  - **Canvas Keyboard Controls:** Added arrow key panning (ArrowUp, ArrowDown, ArrowLeft, ArrowRight), zoom (`+`/`-`), and reset (`0`) with `tabIndex={0}`, visible focus indicators, and screen-reader announcements via `aria-live="polite"`.
+  - **WCAG 2.2 AA Color Contrast:** Upgraded typography and metadata text across the application to meet or exceed 4.5:1 contrast against dark space-navy backgrounds.
+  - **High-Visibility Focus Indicators:** Standardized global `focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none` in `index.css` and on all interactive controls.
+  - **ARIA Role Hierarchy:** Equipped all primary navigation tabs, telemetry modes, viewer modes, and comparison modes with `role="tablist"` and `role="tab"` (`aria-selected`, `aria-controls`), and modal dialogs with `role="dialog"` (`aria-modal="true"`).
+  - **320px Responsive Viewport Reflow:** Added a deliberate mobile workspace panel switcher tabs (`[Canvas] [Target] [SED & Telemetry]`), responsive wrapping on headers and timeline player, and `min-width: 320px` safety preventing horizontal page overflow.
 - **SPHEREx Level 2 FLAGS Bit Definitions & Source Mask Distinction (`fits_processing.py`):**
   - Parses documented `MSKN*`/`MSKM*` FITS header cards dynamically.
   - Distinguishes nominal astronomical source detections (`SOURCE`, bit 21 = 2,097,152; `FULLSAMPLE`, bit 12 = 4,096) from fatal detector defects (`NONFUNC` dead pixel = 64, `OVERFLOW` saturation = 2, `SUR_ERROR` ramp fit error = 4, `HOT` = 1,024, `COLD` = 2,048, `NONLINEAR` = 32,768, `SNOWBALL` cosmic ray = 134,217,728, `TRANSIENT` = 1).

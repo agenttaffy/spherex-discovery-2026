@@ -44,7 +44,7 @@ export const DiscoveryReportModal: React.FC<DiscoveryReportModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" role="dialog" aria-modal="true" aria-label="Scientific Discovery Report">
       <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
         {/* Modal Header */}
         <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/80">
@@ -59,14 +59,15 @@ export const DiscoveryReportModal: React.FC<DiscoveryReportModalProps> = ({
                   {report.report_id}
                 </span>
               </h3>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-slate-300">
                 {report.target.name} • {report.target.sexagesimal}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-md text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition"
+            aria-label="Close discovery report modal"
+            className="p-1 rounded-md text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none"
           >
             <X className="w-5 h-5" />
           </button>

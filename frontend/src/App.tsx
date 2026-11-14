@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Telescope, Search, Activity } from 'lucide-react';
 import { Header } from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
 import { SearchControls } from './components/controls/SearchControls';
@@ -33,6 +34,7 @@ import {
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'explorer' | 'blink' | 'diff' | 'about'>('explorer');
+  const [mobilePanel, setMobilePanel] = useState<'canvas' | 'search' | 'telemetry'>('canvas');
   const [irsaConnected, setIrsaConnected] = useState(false);
 
   // Search parameters
@@ -214,6 +216,7 @@ export const App: React.FC = () => {
     setDec(String(preset.dec));
     setCollection(preset.default_collection);
     searchWithCoords(preset.ra, preset.dec, fov, preset.default_collection);
+    setMobilePanel('canvas');
 
     // Update URL without reload
     const url = new URL(window.location.href);
@@ -225,6 +228,7 @@ export const App: React.FC = () => {
 
   const handleManualSearch = () => {
     searchWithCoords(ra, dec, fov, collection);
+    setMobilePanel('canvas');
     const url = new URL(window.location.href);
     url.searchParams.set('ra', ra);
     url.searchParams.set('dec', dec);
@@ -307,90 +311,152 @@ export const App: React.FC = () => {
       />
 
       {/* Main Workspace Layout */}
-      <div className="flex flex-1 overflow-hidden relative">
+      <main id="main-workspace" className="flex flex-col flex-1 overflow-hidden relative">
         {activeTab === 'about' ? (
           <AboutPage />
         ) : activeTab === 'diff' ? (
           <ComparisonView observations={observations} />
         ) : (
           <>
-            {/* Left Controls Dock */}
-            <SearchControls
-              ra={ra}
-              setRa={setRa}
-              dec={dec}
-              setDec={setDec}
-              fov={fov}
-              setFov={setFov}
-              collection={collection}
-              setCollection={setCollection}
-              detector={detector}
-              setDetector={setDetector}
-              loading={loadingObs}
-              onSearch={handleManualSearch}
-              presets={presets}
-              onSelectPreset={handleSelectPreset}
-              selectedPresetId={selectedPresetId}
-            />
+            {/* Mobile Panel Switcher & Observation Identity Strip (< lg) */}
+            <div className="lg:hidden bg-slate-900 border-b border-slate-800 px-3 py-1.5 flex flex-wrap items-center justify-between gap-2 shrink-0">
+              <div role="tablist" aria-label="Mobile workspace view tabs" className="flex items-center gap-1">
+                <button
+                  role="tab"
+                  aria-selected={mobilePanel === 'canvas'}
+                  aria-label="View astronomical canvas and timeline"
+                  onClick={() => setMobilePanel('canvas')}
+                  className={`px-2.5 py-1 rounded text-xs font-medium transition flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${
+                    mobilePanel === 'canvas'
+                      ? 'bg-cyan-500/20 text-cyan-300 font-semibold border border-cyan-500/40'
+                      : 'text-slate-300 hover:text-white'
+                  }`}
+                >
+                  <Telescope className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Canvas</span>
+                </button>
+                <button
+                  role="tab"
+                  aria-selected={mobilePanel === 'search'}
+                  aria-label="Target search and coordinate parameters"
+                  onClick={() => setMobilePanel('search')}
+                  className={`px-2.5 py-1 rounded text-xs font-medium transition flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${
+                    mobilePanel === 'search'
+                      ? 'bg-cyan-500/20 text-cyan-300 font-semibold border border-cyan-500/40'
+                      : 'text-slate-300 hover:text-white'
+                  }`}
+                >
+                  <Search className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Target</span>
+                </button>
+                <button
+                  role="tab"
+                  aria-selected={mobilePanel === 'telemetry'}
+                  aria-label="Scientific telemetry and SED spectra"
+                  onClick={() => setMobilePanel('telemetry')}
+                  className={`px-2.5 py-1 rounded text-xs font-medium transition flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${
+                    mobilePanel === 'telemetry'
+                      ? 'bg-cyan-500/20 text-cyan-300 font-semibold border border-cyan-500/40'
+                      : 'text-slate-300 hover:text-white'
+                  }`}
+                >
+                  <Activity className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>SED &amp; Data</span>
+                </button>
+              </div>
 
-            {/* Central Astronomical Viewing Canvas */}
-            <div className="flex-1 flex flex-col overflow-hidden relative">
-              {errorMessage && (
-                <div className="bg-rose-950/70 border-b border-rose-800 text-rose-300 text-xs px-4 py-2 flex items-center justify-between">
-                  <span>{errorMessage}</span>
-                  <button onClick={() => setErrorMessage(null)} className="text-rose-400 hover:text-white">
-                    ✕
-                  </button>
-                </div>
-              )}
-
-              <CanvasViewer
-                frame={currentFrame}
-                loading={loadingFrame}
-                stretch={stretch}
-                setStretch={handleSetStretch}
-                colormap={colormap}
-                setColormap={setColormap}
-                catalogSources={catalogSources}
-                showCatalog={showCatalog}
-                setShowCatalog={setShowCatalog}
-                title={observations[currentIndex]?.obs_id}
-                subtitle={
-                  observations[currentIndex]
-                    ? `${observations[currentIndex].collection.toUpperCase()} • ${observations[currentIndex].detector} • ${observations[currentIndex].utc_date || ''}`
-                    : undefined
-                }
-                targetRa={Number(ra)}
-                targetDec={Number(dec)}
-                targetFov={fov}
-              />
-
-              {/* Bottom Multi-Epoch Timeline & Blink Player */}
-              <TimelinePlayer
-                observations={observations}
-                currentIndex={currentIndex}
-                onSelectIndex={handleSelectIndex}
-                isBlinkActive={isBlinkActive || activeTab === 'blink'}
-                setIsBlinkActive={setIsBlinkActive}
-              />
+              {/* Current target identity indicator */}
+              <div className="text-[11px] font-mono text-slate-300 truncate max-w-[200px]">
+                <span className="text-cyan-300 font-semibold">
+                  {presets.find((p) => p.id === selectedPresetId)?.name || 'Target'}
+                </span>{' '}
+                • {observations[currentIndex]?.detector || 'D1'}
+              </div>
             </div>
 
-            {/* Right Telemetry & Provenance Dock */}
-            <MetadataPanel
-              frame={currentFrame}
-              lightCurve={lightCurve}
-              loadingPhotometry={loadingPhotometry}
-              spectrum={spectrum}
-              loadingSpectrum={loadingSpectrum}
-              onSelectObsId={(obsId) => {
-                const idx = observations.findIndex((o) => o.obs_id === obsId);
-                if (idx >= 0) handleSelectIndex(idx);
-              }}
-              onOpenDiscoveryReport={handleExportDiscoveryReport}
-            />
+            <div className="flex flex-1 overflow-hidden relative">
+              {/* Left Controls Dock */}
+              <div className={`${mobilePanel === 'search' ? 'flex' : 'hidden'} lg:flex w-full lg:w-80 lg:shrink-0 h-full overflow-hidden`}>
+                <SearchControls
+                  ra={ra}
+                  setRa={setRa}
+                  dec={dec}
+                  setDec={setDec}
+                  fov={fov}
+                  setFov={setFov}
+                  collection={collection}
+                  setCollection={setCollection}
+                  detector={detector}
+                  setDetector={setDetector}
+                  loading={loadingObs}
+                  onSearch={handleManualSearch}
+                  presets={presets}
+                  onSelectPreset={handleSelectPreset}
+                  selectedPresetId={selectedPresetId}
+                />
+              </div>
+
+              {/* Central Astronomical Viewing Canvas */}
+              <div className={`${mobilePanel === 'canvas' ? 'flex' : 'hidden'} lg:flex flex-1 flex-col overflow-hidden relative h-full`}>
+                {errorMessage && (
+                  <div className="bg-rose-950/70 border-b border-rose-800 text-rose-300 text-xs px-4 py-2 flex items-center justify-between">
+                    <span>{errorMessage}</span>
+                    <button onClick={() => setErrorMessage(null)} className="text-rose-400 hover:text-white">
+                      ✕
+                    </button>
+                  </div>
+                )}
+
+                <CanvasViewer
+                  frame={currentFrame}
+                  loading={loadingFrame}
+                  stretch={stretch}
+                  setStretch={handleSetStretch}
+                  colormap={colormap}
+                  setColormap={setColormap}
+                  catalogSources={catalogSources}
+                  showCatalog={showCatalog}
+                  setShowCatalog={setShowCatalog}
+                  title={observations[currentIndex]?.obs_id}
+                  subtitle={
+                    observations[currentIndex]
+                      ? `${observations[currentIndex].collection.toUpperCase()} • ${observations[currentIndex].detector} • ${observations[currentIndex].utc_date || ''}`
+                      : undefined
+                  }
+                  targetRa={Number(ra)}
+                  targetDec={Number(dec)}
+                  targetFov={fov}
+                />
+
+                {/* Bottom Multi-Epoch Timeline & Blink Player */}
+                <TimelinePlayer
+                  observations={observations}
+                  currentIndex={currentIndex}
+                  onSelectIndex={handleSelectIndex}
+                  isBlinkActive={isBlinkActive || activeTab === 'blink'}
+                  setIsBlinkActive={setIsBlinkActive}
+                />
+              </div>
+
+              {/* Right Telemetry & Provenance Dock */}
+              <div className={`${mobilePanel === 'telemetry' ? 'flex' : 'hidden'} lg:flex w-full lg:w-80 lg:shrink-0 h-full overflow-hidden`}>
+                <MetadataPanel
+                  frame={currentFrame}
+                  lightCurve={lightCurve}
+                  loadingPhotometry={loadingPhotometry}
+                  spectrum={spectrum}
+                  loadingSpectrum={loadingSpectrum}
+                  onSelectObsId={(obsId) => {
+                    const idx = observations.findIndex((o) => o.obs_id === obsId);
+                    if (idx >= 0) handleSelectIndex(idx);
+                  }}
+                  onOpenDiscoveryReport={handleExportDiscoveryReport}
+                />
+              </div>
+            </div>
           </>
         )}
-      </div>
+      </main>
 
       <Footer />
 
