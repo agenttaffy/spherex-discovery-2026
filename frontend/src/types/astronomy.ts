@@ -201,9 +201,7 @@ export interface SpectrumSummary {
   peak_flux_mjy_sr?: number | null;
   peak_is_measured?: boolean;
   estimated_temperature_k?: number | null;
-  continuum_shape?: string;
-  spectral_class: string;
-  spectral_class_limitations?: string;
+  continuum_shape: string;
   integrated_flux_mjy_sr_um?: number | null;
   total_channels: number;
   temperature_fit?: any;

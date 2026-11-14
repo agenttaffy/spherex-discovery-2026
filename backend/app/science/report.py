@@ -83,7 +83,7 @@ def generate_discovery_report(
         obs_bands = spectrum_data.get("observed_channels") or spectrum_data.get("observed_detector_bands") or []
         total_obs = spectrum_data.get("total_observed_bands", len(obs_bands))
         summary = spectrum_data.get("summary", {})
-        shape_desc = summary.get("continuum_shape") or summary.get("spectral_class") or "insufficient observed coverage"
+        shape_desc = summary.get("continuum_shape") or "insufficient observed coverage"
         bb_fit = spectrum_data.get("temperature_fit") or summary.get("temperature_fit") or {}
 
         md_lines.extend([

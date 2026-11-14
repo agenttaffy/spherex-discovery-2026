@@ -149,7 +149,7 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
         <svg
           viewBox={`0 0 ${width} ${height}`}
           role="img"
-          aria-label={`SPHEREx Spectral Energy Distribution Chart. Observed across ${total_observed_bands} detector bands with wavelength range 0.75 to 5.0 micrometers. ${summary.peak_wavelength_um != null && summary.peak_detector ? `Peak wavelength ${summary.peak_wavelength_um.toFixed(2)} micrometers in band ${summary.peak_detector}.` : 'Peak wavelength and band unavailable (no observed archive bands).'}`}
+          aria-label={`SPHEREx Spectral Energy Distribution Chart. Observed across ${total_observed_bands} detector bands with wavelength range 0.75 to 5.0 micrometers. Broadband continuum shape: ${summary.continuum_shape}. This is not an astrophysical classification. ${summary.peak_wavelength_um != null && summary.peak_detector ? `Peak wavelength ${summary.peak_wavelength_um.toFixed(2)} micrometers in band ${summary.peak_detector}.` : 'Peak wavelength and band unavailable (no observed archive bands).'}`}
           className="w-full h-32 bg-slate-900/60 rounded border border-slate-800 select-none overflow-hidden"
         >
           {/* Detector Range Color Bands Background */}
@@ -516,8 +516,8 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
       <div className="bg-slate-900/80 border border-slate-800 rounded p-2 space-y-1.5 font-mono">
         <div className="flex items-center justify-between text-[10px]">
           <span className="text-slate-400">Continuum Shape:</span>
-          <span className="text-indigo-300 font-semibold text-right truncate max-w-[170px]" title={summary.continuum_shape || summary.spectral_class}>
-            {summary.continuum_shape || summary.spectral_class}
+          <span className="text-indigo-300 font-semibold text-right truncate max-w-[170px]" title={summary.continuum_shape}>
+            {summary.continuum_shape}
           </span>
         </div>
         <div className="text-[8.5px] text-slate-500 italic">

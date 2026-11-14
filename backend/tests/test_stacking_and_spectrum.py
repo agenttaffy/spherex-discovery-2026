@@ -97,7 +97,8 @@ def test_spectrum_endpoint_barnard():
     assert "target" in data
     assert len(data["bands"]) == 6
     assert len(data["channels_102"]) == 102
-    assert "spectral_class" in data["summary"]
+    assert "continuum_shape" in data["summary"]
+    assert "spectral_class" not in data["summary"]
     assert data["summary"]["total_channels"] == 102
     assert data["total_observed_bands"] >= 1
 
@@ -110,8 +111,8 @@ def test_spectrum_endpoint_wise0855_brown_dwarf():
     # Cold brown dwarf should peak at longer mid-IR wavelengths (D5 or D6, > 4.0 µm)
     assert data["summary"]["peak_wavelength_um"] >= 4.0
     # Neutral measured broadband shape description (no inferred astrophysical classifications)
-    assert "flux rises toward longer measured bands" in data["summary"]["spectral_class"]
-    assert "Brown Dwarf" not in data["summary"]["spectral_class"]
+    assert "flux rises toward longer measured bands" in data["summary"]["continuum_shape"]
+    assert "Brown Dwarf" not in data["summary"]["continuum_shape"]
     # With only 2 observed bands in demo, temperature fit is unavailable (dof < 1)
     assert data["summary"]["estimated_temperature_k"] is None
 

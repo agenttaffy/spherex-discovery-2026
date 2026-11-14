@@ -830,7 +830,7 @@ def test_audit_spectrum_truthfulness_and_documented_bb_fit():
     assert spec["summary"]["estimated_temperature_k"] is None
     assert spec["summary"]["integrated_flux_mjy_sr_um"] is None
     assert spec["summary"]["continuum_shape"] == "insufficient observed coverage (no observed archive bands)"
-    assert spec["summary"]["spectral_class"] == "insufficient observed coverage (no observed archive bands)"
+    assert "spectral_class" not in spec["summary"]
     # Channels 102 must be labeled as illustrative estimated continuum
     for ch in spec["channels_102"]:
         assert ch["is_interpolated"] is True

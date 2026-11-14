@@ -652,7 +652,6 @@ def generate_spectrum_for_target(
     estimated_temp = int(round(bb_fit["temperature_k"])) if bb_fit.get("temperature_k") is not None else None
 
     continuum_classification = {
-        "profile_name": shape_desc,
         "continuum_shape": shape_desc,
         "classification_type": "broadband_continuum_shape",
         "method": "Empirical broad-band continuum shape across measured SPHEREx detector bands",
@@ -689,8 +688,6 @@ def generate_spectrum_for_target(
             "peak_is_measured": peak_is_measured,
             "estimated_temperature_k": estimated_temp,
             "continuum_shape": shape_desc,
-            "spectral_class": shape_desc,
-            "spectral_class_limitations": "Empirical broad-band continuum shape across measured detector bands; not an astrophysical classification or spectral type. Definitive classification requires resolved spectroscopic absorption features.",
             "temperature_fit": bb_fit,
             "continuum_classification": continuum_classification,
             "integrated_flux_mjy_sr_um": total_flux_integral,
