@@ -14,6 +14,7 @@
 - Created Docker configurations (`backend/Dockerfile`, `frontend/Dockerfile`, `docker-compose.yml`, `frontend/nginx.conf`) and cloud configs (`render.yaml`, `frontend/vercel.json`).
 
 ## 2. Current Working State
+- **Current Commit:** `5fcdc6c` on branch `main`
 - **Backend:** Starts cleanly with `python -m uvicorn app.main:app --port 8000`. All 44 tests pass in 1.87s.
 - **Frontend:** Builds cleanly with `npm run build` in 1.93s (0 type errors, 0 warnings).
 - **Demo Mode:** Instantaneous local caching of 22 real FITS cutouts enables immediate offline presentation and judging with circuit breaker fallback on remote outages.
