@@ -38,7 +38,7 @@ export const App: React.FC = () => {
   const [mobilePanel, setMobilePanel] = useState<'canvas' | 'search' | 'telemetry'>('canvas');
   const [searchOpen, setSearchOpen] = useState(true);
   const [analysisOpen, setAnalysisOpen] = useState(false);
-  const [irsaConnected, setIrsaConnected] = useState(false);
+  const [irsaConnected, setIrsaConnected] = useState<boolean | null>(null);
 
   // Search parameters
   const [ra, setRa] = useState('269.45208'); // Barnard's Star default

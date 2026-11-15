@@ -138,51 +138,18 @@ export const TimelinePlayer: React.FC<TimelinePlayerProps> = ({
           <span className="text-indigo-300 font-semibold shrink-0 ml-2">{currentObs?.detector}</span>
         </div>
 
-        {/* Frame markers / Scrubber bar */}
-        <div
-          role="slider"
+        {/* Native range provides a single keyboard stop for any number of epochs. */}
+        <input
+          type="range"
           aria-label="Observation timeline epoch slider"
-          aria-valuemin={1}
-          aria-valuemax={observations.length}
-          aria-valuenow={currentIndex + 1}
+          min={1}
+          max={observations.length}
+          step={1}
+          value={currentIndex + 1}
           aria-valuetext={`Epoch ${currentIndex + 1} of ${observations.length}, ${currentObs?.detector}, ${currentObs?.utc_date || ''}`}
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
-              e.preventDefault();
-              onSelectIndex(Math.max(0, currentIndex - 1));
-            } else if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
-              e.preventDefault();
-              onSelectIndex(Math.min(observations.length - 1, currentIndex + 1));
-            } else if (e.key === 'Home') {
-              e.preventDefault();
-              onSelectIndex(0);
-            } else if (e.key === 'End') {
-              e.preventDefault();
-              onSelectIndex(observations.length - 1);
-            }
-          }}
-          className="relative w-full h-3 bg-slate-900 rounded-full cursor-pointer flex items-center focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none"
-        >
-          <div
-            className="h-full bg-gradient-to-r from-cyan-500 to-indigo-500 rounded-full transition-all duration-150"
-            style={{ width: `${((currentIndex + 1) / observations.length) * 100}%` }}
-          />
-          {observations.map((obs, idx) => (
-            <button
-              key={obs.id || idx}
-              onClick={() => onSelectIndex(idx)}
-              aria-label={`Jump to Epoch ${idx + 1}: ${obs.utc_date || ''} (${obs.detector})`}
-              title={`${obs.utc_date || ''} (${obs.detector})`}
-              className={`absolute w-3 h-3 -ml-1.5 rounded-full border transition-all focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${
-                idx === currentIndex
-                  ? 'bg-cyan-400 border-white scale-125 z-10 shadow-sm shadow-cyan-400'
-                  : 'bg-slate-800 border-slate-600 hover:bg-slate-600'
-              }`}
-              style={{ left: `${(idx / (observations.length - 1 || 1)) * 100}%` }}
-            />
-          ))}
-        </div>
+          onChange={(event) => onSelectIndex(Number(event.target.value) - 1)}
+          className="w-full h-5 cursor-pointer accent-cyan-400 focus-visible:ring-2 focus-visible:ring-cyan-400 rounded"
+        />
       </div>
 
       {/* FPS speed selector */}

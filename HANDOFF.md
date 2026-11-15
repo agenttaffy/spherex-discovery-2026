@@ -2,6 +2,7 @@
 
 ## 2026-11-14 — Sky context and exploration update
 
+- Follow-up: the observation timeline uses one native range control rather than a keyboard stop for every epoch. Browser testing moved from epoch 1 to 2 with the right-arrow key and inspected the native canvas and metadata at 375px width. The initial archive connectivity badge now reports a check, not the provenance of the displayed observation. The panel no longer presents a fixed pixel scale as measured, a pixel standard deviation as noise, or non-archive fixtures as NASA links. The target controls explain FOV and detector choices.
 - Aladin Lite is loaded lazily from the installed v3 package, after `A.init`. It centers on the last successful search coordinates and overlays a distinct target marker and the actual pixel-edge celestial WCS footprint. A missing or simulated cutout has no fabricated footprint. The catalog overlay uses the cutout's inverse WCS and does not extrapolate proper motion.
 - The native canvas identifies live, cached, demo, simulated, and local-fixture image provenance. Search and analysis panels can be collapsed, expensive analysis is loaded when opened, and viewer controls no longer float over the image. Search field edits do not change the active coordinates or cutout size until a search succeeds.
 - 2MASS and DSS2 context imagery is served by IRSA's HiPS mirror; credits and survey-specific terms are shown in the app. See RESEARCH.md for sources and service observations.

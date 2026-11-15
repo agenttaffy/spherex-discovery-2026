@@ -2,7 +2,7 @@ import React from 'react';
 import { Telescope, Radio, Sparkles, Orbit, BookOpen, Share2, Check, Download, Layers } from 'lucide-react';
 
 interface HeaderProps {
-  irsaConnected: boolean;
+  irsaConnected: boolean | null;
   activeTab: 'explorer' | 'blink' | 'diff' | 'about';
   setActiveTab: (tab: 'explorer' | 'blink' | 'diff' | 'about') => void;
   onOpenGuidedTour?: () => void;
@@ -144,7 +144,8 @@ export const Header: React.FC<HeaderProps> = ({
         {/* NASA Connection Status Indicator */}
         <div
           role="status"
-          aria-label={`Archive connection status: ${irsaConnected ? 'NASA/IPAC IRSA Live' : 'Demo Cache Active'}`}
+          aria-label={`Initial archive connection check: ${irsaConnected === null ? 'checking' : irsaConnected ? 'reachable' : 'unavailable'}`}
+          title="Initial connection check; individual observations show their own source."
           className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-md border text-[11px] font-mono ${
             irsaConnected
               ? 'bg-emerald-950/50 border-emerald-800/70 text-emerald-300'
@@ -152,7 +153,7 @@ export const Header: React.FC<HeaderProps> = ({
           }`}
         >
           <Radio className={`w-3 h-3 ${irsaConnected ? 'animate-pulse text-emerald-400' : 'text-amber-400'}`} />
-          <span className="truncate max-w-[120px] sm:max-w-none">{irsaConnected ? 'IRSA Live' : 'Demo Active'}</span>
+          <span className="truncate max-w-[120px] sm:max-w-none">{irsaConnected === null ? 'Checking IRSA' : irsaConnected ? 'IRSA reachable' : 'IRSA check failed'}</span>
         </div>
       </div>
     </header>

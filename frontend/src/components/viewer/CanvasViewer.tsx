@@ -332,11 +332,11 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
           <div
             role="group"
             aria-label="Image stretch and palette controls"
-            className="bg-slate-900/90 backdrop-blur-md border border-slate-800 p-1 rounded-lg pointer-events-auto flex items-center gap-1.5 text-xs"
+            className="bg-slate-900/90 backdrop-blur-md border border-slate-800 p-1 rounded-lg pointer-events-auto flex flex-wrap items-center gap-1.5 text-xs"
           >
             <div className="flex items-center gap-1 px-2 py-0.5 border-r border-slate-800 text-slate-300 font-medium">
               <Sliders className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Stretch:</span>
+              <span>Stretch (display contrast):</span>
             </div>
             {(['asinh', 'zscale', 'linear'] as const).map((s) => (
               <button

@@ -128,11 +128,11 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({
                     <span className="text-slate-200">{pixel_stats.min_mjy_sr.toFixed(3)}</span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-400 block">Mean Flux</span>
+                    <span className="text-[10px] text-slate-400 block">Mean brightness</span>
                     <span className="text-slate-200">{pixel_stats.mean_mjy_sr.toFixed(3)}</span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-400 block">Noise (Std)</span>
+                    <span className="text-[10px] text-slate-400 block">Pixel standard deviation</span>
                     <span className="text-slate-300">±{pixel_stats.std_mjy_sr.toFixed(3)}</span>
                   </div>
                 </div>
@@ -144,6 +144,7 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({
                   <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
                   Data Quality Flags
                 </label>
+                <p className="text-[11px] text-slate-300 mb-2">Flags mark pixels that may be affected by detector or observation issues; they do not by themselves identify an object.</p>
                 <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-3 space-y-1.5">
                   {flag_summary.quality_state === 'documented_metadata' ? <div className="flex justify-between items-center text-[11px]">
                     <span className="text-slate-400">Flagged Pixels:</span>
@@ -178,10 +179,6 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({
                       <span className="text-slate-400">WCS reference Dec:</span>
                       <span className="text-slate-200">{wcs.crval2?.toFixed(5)}°</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">Scale:</span>
-                      <span className="text-slate-300">6.2″/pixel</span>
-                    </div>
                   </div>
                 </div>
               )}
@@ -200,16 +197,16 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({
 
               {/* Provenance & Citation Link */}
               <div className="mt-auto pt-1">
-                <a
+                {/^https?:\/\//i.test(frame.provenance_url) && !frame.is_synthetic ? <a
                   href={frame.provenance_url}
                   target="_blank"
                   rel="noreferrer"
-                  aria-label="View raw NASA FITS cutout archive source in new window"
+                  aria-label="View the NASA archive product in a new window"
                   className="w-full py-1.5 px-3 bg-slate-950 border border-slate-800 hover:border-cyan-500/50 rounded-lg text-slate-300 hover:text-cyan-300 text-[11px] flex items-center justify-center gap-1.5 transition font-mono focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none"
                 >
-                  <span>Raw NASA FITS Cutout</span>
+                  <span>View archive product</span>
                   <ExternalLink className="w-3 h-3 text-cyan-400" />
-                </a>
+                </a> : <p className="text-slate-300">No archive product link is available for this image.</p>}
               </div>
             </>
           );

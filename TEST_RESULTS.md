@@ -2,6 +2,7 @@
 
 ## 2026-11-14 — Sky-context update (supersedes the historical summary below)
 
+- Follow-up browser check: the native timeline slider changed from epoch 1 to epoch 2 on Right Arrow in a 60-observation live search. The native canvas, updated controls and metadata panel were inspected at a 375px viewport; the archive link and WCS reference labels were present. The connectivity badge wording was corrected after that observation and was build-checked, not separately browser-inspected.
 - Backend: `python -m pytest -q`: 110 passed, two Astropy FITSFixedWarnings. Coverage includes rotated pixel-edge WCS corners across the RA seam, five cached preset cutouts, unavailable WCS, and catalog coordinate projection.
 - Frontend: `npm run build` passed. Aladin is a separate lazy chunk (about 2.6 MB minified / 840 KB gzip), producing Vite's large-chunk warning. `node scripts/verify_accessibility_and_responsive.mjs`: 41 source checks passed; these are not a complete accessibility audit.
 - Browser: inspected the native cached SPHEREx image and real 2MASS sky imagery at desktop and a 375-pixel mobile viewport. The selected RW Aur coordinates matched Aladin's reported position; all five presets were selected and their displayed target coordinates checked. Cached preset footprint calculations were independently compared with Astropy WCS in tests. A manual position near RA 359.999 degrees showed the footprint across the RA seam. The screenshots do not independently establish an astronomical source identification.
