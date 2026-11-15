@@ -411,17 +411,9 @@ def generate_spectrum_for_target(
                 b = cache_service.get(reg_item["cached_cutout_url"])
 
         if not b and obs_access:
-            from app.services.demo_service import demo_service
-            b = demo_service.get_cached_cutout_for_url(obs_access)
-            if not b:
-                from app.services.cache_service import cache_service
-                exact_cutout_url = f"{obs_access}?center={obs_ra:.6f},{obs_dec:.6f}&size={fov_deg:.4f}"
-                b = cache_service.get(exact_cutout_url)
-                if not b:
-                    exact_cutout_url_target = f"{obs_access}?center={ra:.6f},{dec:.6f}&size={fov_deg:.4f}"
-                    b = cache_service.get(exact_cutout_url_target)
-                if not b:
-                    b = cache_service.get(obs_access)
+            from app.services.cache_service import cache_service
+            from app.services.cutout_service import cutout_cache_key
+            b = cache_service.get(cutout_cache_key(obs_access, obs_ra, obs_dec, fov_deg))
 
         if b:
             try:

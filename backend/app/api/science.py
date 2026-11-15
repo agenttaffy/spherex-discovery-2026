@@ -200,9 +200,6 @@ async def get_spectrum(
             from app.services.cache_service import cache_service
             has_cached = cache_service.get(reg_item["cached_cutout_url"]) is not None
         if not has_cached and obs.access_url:
-            from app.services.demo_service import demo_service
-            has_cached = demo_service.get_cached_cutout_for_url(obs.access_url) is not None
-        if not has_cached and obs.access_url:
             try:
                 await cutout_service.fetch_cutout_fits(obs.access_url, obs.ra, obs.dec, fov_deg=fov)
             except Exception:

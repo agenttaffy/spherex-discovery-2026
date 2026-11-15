@@ -159,9 +159,6 @@ async def stack_frames(req: StackRequest = Body(...)):
             from app.services.cache_service import cache_service
             b = cache_service.get(meta["cached_cutout_url"])
         if not b and "access_url" in meta:
-            from app.services.demo_service import demo_service
-            b = demo_service.get_cached_cutout_for_url(meta["access_url"])
-        if not b and "access_url" in meta:
             b = await cutout_service.fetch_cutout_fits(meta["access_url"], meta["ra"], meta["dec"])
 
         if not b:

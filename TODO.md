@@ -99,4 +99,4 @@
 
 - **Scientific validation:** Verify within-detector effective wavelength compatibility, demo/live provenance throughout derived analyses, and independently validate actual target detections, motion and variability.
 - **Human accessibility:** Test keyboard workflows, narrow screens and physical screen readers; source-pattern checks alone do not establish accessibility conformance.
-- **Cached cutout selection:** Audit base-URL demo cache reuse: it may return a fixed-position, fixed-size cutout for a different requested coordinate or field of view. Do not claim arbitrary FOV is honored until corrected and tested.
+- **Cached cutout selection:** Live requests now use isolated exact-coordinate and size cache keys; old potentially contaminated cache entries are retained but not trusted. Demo cutouts have fixed coverage, which the viewer labels. Verify actual coverage and size across additional live and offline cases.

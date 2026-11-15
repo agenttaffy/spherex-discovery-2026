@@ -43,6 +43,33 @@ def test_flag_summary_preserves_unknown_quality_state():
                           total_pixels=400, flag_breakdown={})
     assert summary.model_dump()["quality_state"] == "unknown_metadata_missing"
 
+
+def test_cutout_cache_does_not_reuse_a_different_demo_cutout(monkeypatch):
+    import asyncio
+    from app.services.cutout_service import CutoutService, cutout_cache_key
+    from app.services.cache_service import cache_service
+    import app.services.cutout_service as cutout_module
+
+    requested = "https://example.invalid/image.fits"
+    old_key = f"{requested}?center=1.000000,2.000000&size=0.0400"
+    entries = {old_key: b"untrusted-old-cache"}
+    monkeypatch.setattr(cache_service, "get", entries.get)
+    monkeypatch.setattr(cache_service, "set", lambda key, value: entries.update({key: value}))
+
+    class Client:
+        def __init__(self, **kwargs): pass
+        async def __aenter__(self): return self
+        async def __aexit__(self, *args): pass
+        async def get(self, url, **kwargs):
+            assert url == old_key
+            return type("Response", (), {"status_code": 200, "content": b"fresh"})()
+
+    monkeypatch.setattr(cutout_module.httpx, "AsyncClient", Client)
+    result = asyncio.run(CutoutService().fetch_cutout_fits(requested, 1, 2, 0.04))
+    assert result == b"fresh"
+    assert entries[cutout_cache_key(requested, 1, 2, 0.04)] == b"fresh"
+    assert cutout_cache_key(requested, 1, 2, 0.04) != cutout_cache_key(requested, 1, 2, 0.08)
+
 def test_aperture_photometry_gaussian_source():
     # Create 21x21 image with a Gaussian peak in center
     h, w = 21, 21

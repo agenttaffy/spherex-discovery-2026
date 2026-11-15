@@ -19,6 +19,10 @@ from app.science.fits_processing import (
 )
 from app.models.schemas import FrameResponse, PixelStats, FlagSummary, WCSInfo
 
+def cutout_cache_key(base_access_url: str, ra: float, dec: float, fov_deg: float) -> str:
+    # Older cache keys could contain a demo cutout copied under a different request.
+    return f"cutout-v2:{base_access_url}?center={ra:.6f},{dec:.6f}&size={fov_deg:.4f}"
+
 class CutoutService:
     async def fetch_cutout_fits(
         self,
@@ -34,17 +38,10 @@ class CutoutService:
         cutout_url = f"{base_access_url}?center={ra:.6f},{dec:.6f}&size={fov_deg:.4f}"
 
         # 1. Check exact key in cache
-        cached = cache_service.get(cutout_url)
+        cache_key = cutout_cache_key(base_access_url, ra, dec, fov_deg)
+        cached = cache_service.get(cache_key)
         if cached:
             return cached
-
-        # 2. Check demo service cache by base access URL
-        from app.services.demo_service import demo_service
-        demo_cached = demo_service.get_cached_cutout_for_url(base_access_url)
-        if demo_cached:
-            # Also populate exact URL cache for faster subsequent hits
-            cache_service.set(cutout_url, demo_cached)
-            return demo_cached
 
         # 3. Fetch live from NASA IRSA IBE
         ssl_ctx = ssl.create_default_context(cafile=certifi.where())
@@ -55,7 +52,7 @@ class CutoutService:
 
             fits_bytes = resp.content
             # Cache the valid cutout
-            cache_service.set(cutout_url, fits_bytes)
+            cache_service.set(cache_key, fits_bytes)
             return fits_bytes
 
     def generate_synthetic_fixture(self, obs_id: str, detector: str) -> bytes:

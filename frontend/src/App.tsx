@@ -458,7 +458,7 @@ export const App: React.FC = () => {
                 {observations[currentIndex] && (
                   <p className="px-3 py-2 text-xs text-slate-200 bg-slate-900" role="status">
                     {observations[currentIndex].search_provenance === 'cached_demo'
-                      ? 'Cached demonstration observation · not a live archive search result'
+                      ? 'Cached demonstration observation · fixed cutout coverage, not a live search result'
                       : observations[currentIndex].search_provenance === 'irsa_query'
                         ? 'IRSA archive search result · image may be served from cache'
                         : 'Observation search provenance unavailable'}
