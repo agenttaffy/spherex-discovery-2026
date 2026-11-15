@@ -75,7 +75,7 @@ export const TimelinePlayer: React.FC<TimelinePlayerProps> = ({
           className={`p-2 sm:p-2.5 rounded-lg font-semibold transition flex items-center justify-center focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${
             isPlaying
               ? 'bg-amber-500/20 text-amber-200 border border-amber-500/40'
-              : 'bg-cyan-600 text-white hover:bg-cyan-500 shadow-md shadow-cyan-950'
+              : 'bg-cyan-700 text-white hover:bg-cyan-800 shadow-md shadow-cyan-950'
           }`}
         >
           {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-white" />}

@@ -239,7 +239,7 @@ export const GuidedTourModal: React.FC<GuidedTourModalProps> = ({
             <button
               onClick={() => setCurrentStep((s) => Math.min(steps.length - 1, s + 1))}
               aria-label="Next step"
-              className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white flex items-center gap-1 transition focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none"
+              className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-cyan-700 hover:bg-cyan-800 text-white flex items-center gap-1 transition focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none"
             >
               Next
               <ChevronRight className="w-3.5 h-3.5" />

@@ -111,7 +111,7 @@ export const DiscoveryReportModal: React.FC<DiscoveryReportModalProps> = ({
             </button>
             <button
               onClick={handleDownloadMd}
-              className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white flex items-center gap-1.5 transition shadow-lg shadow-cyan-900/30"
+              className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-cyan-700 hover:bg-cyan-800 text-white flex items-center gap-1.5 transition shadow-lg shadow-cyan-900/30"
             >
               <FileDown className="w-3.5 h-3.5" />
               Download Markdown
