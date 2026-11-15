@@ -277,9 +277,10 @@ Testing IRSA SIA connectivity to: https://irsa.ipac.caltech.edu/SIA?COLLECTION=s
 
 ## Current session verification (2026-11-14)
 
-- Full backend: 97 passed, 2 Astropy FITSFixedWarnings with normal local networking. Restricted execution stalled on the first TestClient request and was interrupted.
+- Full backend: 98 passed, 2 Astropy FITSFixedWarnings with normal local networking. Restricted execution stalled on the first TestClient request and was interrupted.
 - Frontend production build passed; accessibility/responsive source-check script passed 41 checks; demo asset validator passed 22/22. These checks do not establish WCAG conformance or target-object scientific validity.
 - IRSA SIA environment probe returned HTTP 200 with CSV using normal networking.
 - Desktop and 375px viewer layouts were visually inspected, including the mobile science panel. An updated-backend preview showed an IRSA search result. The final observed-band table correction was built but not rechecked visually. Physical screen-reader audio was not tested.
 
 - Cache regression: verifies that a legacy entry is not reused as a live cutout and that differing field sizes have distinct keys. The demo cache remains fixed coverage.
+- Release-selection regression: empty selected-release searches do not silently retry across all releases for photometry or spectrum.

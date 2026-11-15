@@ -70,6 +70,20 @@ def test_cutout_cache_does_not_reuse_a_different_demo_cutout(monkeypatch):
     assert entries[cutout_cache_key(requested, 1, 2, 0.04)] == b"fresh"
     assert cutout_cache_key(requested, 1, 2, 0.04) != cutout_cache_key(requested, 1, 2, 0.08)
 
+
+def test_science_endpoints_do_not_silently_change_release(monkeypatch):
+    from unittest.mock import AsyncMock
+    from app.services.irsa_client import irsa_client
+
+    query = AsyncMock(return_value=[])
+    monkeypatch.setattr(irsa_client, "query_observations", query)
+    for endpoint in ("photometry", "spectrum"):
+        query.reset_mock()
+        response = client.get(f"/api/science/{endpoint}?ra=1&dec=2&collection=spherex_dr1")
+        assert response.status_code == 200
+        assert query.await_count == 1
+        assert query.await_args.kwargs["collection"] == "spherex_dr1"
+
 def test_aperture_photometry_gaussian_source():
     # Create 21x21 image with a Gaussian peak in center
     h, w = 21, 21

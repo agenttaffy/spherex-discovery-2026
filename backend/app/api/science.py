@@ -96,17 +96,6 @@ async def get_photometry(
         limit=20,
     )
 
-    if not observations and coll_filter is not None:
-        # Also check without collection filter
-        observations = await irsa_client.query_observations(
-            ra=ra_deg,
-            dec=dec_deg,
-            radius_deg=fov,
-            collection=None,
-            detector=detector,
-            limit=20,
-        )
-
     # 2. Extract image cutouts for each epoch
     epoch_frames = []
     for obs in observations:
@@ -182,15 +171,6 @@ async def get_spectrum(
         collection=coll_filter,
         limit=50,
     )
-
-    if not observations and coll_filter is not None:
-        observations = await irsa_client.query_observations(
-            ra=ra_deg,
-            dec=dec_deg,
-            radius_deg=max(fov, 0.08),
-            collection=None,
-            limit=50,
-        )
 
     # Preload cutouts for observations if accessible
     for obs in observations:
