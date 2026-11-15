@@ -126,7 +126,7 @@ export async function fetchCatalogs(
   });
   const resp = await fetch(`${API_BASE}/science/catalogs?${params.toString()}`);
   if (!resp.ok) {
-    return { total_sources: 0, sources: [] };
+    throw new Error('Reference catalog request failed');
   }
   return resp.json();
 }

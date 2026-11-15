@@ -17,6 +17,8 @@ interface CanvasViewerProps {
   colormap: string;
   setColormap: (c: string) => void;
   catalogSources?: CatalogSource[];
+  loadingCatalog?: boolean;
+  catalogQueryError?: boolean;
   showCatalog?: boolean;
   setShowCatalog?: (show: boolean) => void;
   title?: string;
@@ -34,6 +36,8 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
   colormap,
   setColormap,
   catalogSources = [],
+  loadingCatalog = false,
+  catalogQueryError = false,
   showCatalog = false,
   setShowCatalog,
   title,
@@ -429,7 +433,7 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
           {/* Bottom Floating Telemetry & Zoom Dock */}
           <div className="shrink-0 z-20 flex flex-wrap items-center justify-between gap-2 px-3 py-2 border-t border-slate-800 bg-slate-950">
             {showCatalog && <div className="w-full text-[11px] text-slate-300" role="status">
-              <p>{catalogError || 'Catalog coordinates are projected as provided; proper motion is not applied and a marker does not confirm identity.'}</p>
+              <p>{targetRa == null || targetDec == null ? 'Search for coordinates to load reference sources.' : loadingCatalog ? 'Loading reference catalog…' : catalogQueryError ? 'The reference catalog request failed. Turn the overlay off and on to retry.' : catalogSources.length === 0 ? 'No reference sources returned; the catalog may be unavailable.' : catalogError || (!frame ? 'Select an observation to project reference positions.' : catalogPixels.length === 0 ? 'Projecting reference positions onto the image…' : !catalogPixels.some(Boolean) ? 'No returned reference positions fall within this image.' : 'Catalog coordinates are projected as provided; proper motion is not applied and a marker does not confirm identity.')}</p>
               {catalogSources.length > 0 && (() => {
                 const nearest = catalogSources.reduce((a, b) => a.separation_arcsec <= b.separation_arcsec ? a : b);
                 const source = nearest.provenance || nearest.catalog_source || 'Unknown catalog source';

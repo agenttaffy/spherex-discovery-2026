@@ -61,6 +61,8 @@ export const App: React.FC = () => {
 
   // Gaia DR3 & Photometry Science state
   const [catalogSources, setCatalogSources] = useState<CatalogSource[]>([]);
+  const [loadingCatalog, setLoadingCatalog] = useState(false);
+  const [catalogQueryError, setCatalogQueryError] = useState(false);
   const [showCatalog, setShowCatalog] = useState(false);
   const [lightCurve, setLightCurve] = useState<LightCurveSeries | null>(null);
   const [loadingPhotometry, setLoadingPhotometry] = useState(false);
@@ -207,11 +209,18 @@ export const App: React.FC = () => {
   }, [searchedQuery, analysisOpen, mobilePanel]);
 
   useEffect(() => {
-    if (!showCatalog || !searchedQuery) return;
+    if (!showCatalog || !searchedQuery) {
+      setLoadingCatalog(false);
+      return;
+    }
     let active = true;
+    setLoadingCatalog(true);
+    setCatalogQueryError(false);
+    setCatalogSources([]);
     fetchCatalogs(searchedQuery.ra, searchedQuery.dec, 0.08)
       .then(result => { if (active) setCatalogSources(result.sources); })
-      .catch(() => { if (active) setCatalogSources([]); });
+      .catch(() => { if (active) { setCatalogSources([]); setCatalogQueryError(true); } })
+      .finally(() => { if (active) setLoadingCatalog(false); });
     return () => { active = false; };
   }, [showCatalog, searchedQuery]);
 
@@ -494,6 +503,8 @@ export const App: React.FC = () => {
                   colormap={colormap}
                   setColormap={setColormap}
                   catalogSources={catalogSources}
+                  loadingCatalog={loadingCatalog}
+                  catalogQueryError={catalogQueryError}
                   showCatalog={showCatalog}
                   setShowCatalog={setShowCatalog}
                   title={observations[currentIndex]?.obs_id}
