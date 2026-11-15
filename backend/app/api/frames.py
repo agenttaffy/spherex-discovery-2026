@@ -38,6 +38,58 @@ class StackRequest(BaseModel):
     format: Optional[str] = "png"
     stretch: Optional[str] = "asinh"
 
+
+class CatalogProjectionRequest(BaseModel):
+    frame_id: str
+    fov: float = 0.05
+    coordinates: List[List[float]]
+
+
+@router.post("/frames/project-catalog")
+async def project_catalog(req: CatalogProjectionRequest):
+    """Project ICRS catalog positions through the displayed cutout's celestial WCS."""
+    from astropy.coordinates import SkyCoord
+    import astropy.units as u
+    from astropy.wcs.utils import wcs_to_celestial_frame
+    from app.science.fits_processing import extract_astropy_wcs
+    from app.services.cache_service import cache_service
+
+    if req.fov <= 0 or req.fov > 2 or len(req.coordinates) > 500:
+        raise HTTPException(status_code=400, detail="Invalid field of view or too many coordinates.")
+    meta = OBSERVATION_REGISTRY.get(req.frame_id)
+    if not meta:
+        raise HTTPException(status_code=404, detail="Observation not found.")
+    if any(len(p) != 2 or not np.isfinite(p).all() or not -90 <= p[1] <= 90 for p in req.coordinates):
+        raise HTTPException(status_code=400, detail="Invalid ICRS coordinate.")
+    try:
+        data = cache_service.get(meta["cached_cutout_url"]) if meta.get("cached_cutout_url") else None
+        if not data:
+            data = await cutout_service.fetch_cutout_fits(meta["access_url"], meta["ra"], meta["dec"], fov_deg=req.fov)
+        image, header = extract_primary_image(load_fits_cutout(data), preserve_nan=True)
+        wcs = extract_astropy_wcs(header)
+        if wcs is None or not wcs.has_celestial:
+            raise ValueError("Celestial WCS is unavailable")
+        if not req.coordinates:
+            return {"positions": []}
+        coords = np.asarray(req.coordinates, dtype=float)
+        sky = SkyCoord(ra=coords[:, 0] * u.deg, dec=coords[:, 1] * u.deg, frame="icrs")
+        celestial = wcs.celestial
+        native = sky.transform_to(wcs_to_celestial_frame(celestial))
+        positions = []
+        for lon, lat in zip(native.spherical.lon.deg, native.spherical.lat.deg):
+            try:
+                px, py = celestial.all_world2pix([[lon, lat]], 0, quiet=False)[0]
+                if np.isfinite(px) and np.isfinite(py) and -0.5 <= px < image.shape[1] - 0.5 and -0.5 <= py < image.shape[0] - 0.5:
+                    positions.append({"x": float(px), "y": float(py)})
+                else:
+                    positions.append(None)
+            except Exception:
+                # A failed inverse WCS must never be presented as a matched source.
+                positions.append(None)
+        return {"positions": positions}
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"Catalog projection unavailable: {exc}") from exc
+
 @router.get("/frames/{frame_id}", response_model=FrameResponse)
 async def get_frame(
     frame_id: str,

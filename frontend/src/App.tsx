@@ -21,6 +21,7 @@ import {
 } from './types/astronomy';
 import {
   checkHealth,
+  clearFrameCache,
   fetchObservations,
   fetchFrame,
   prefetchFrame,
@@ -35,6 +36,8 @@ import {
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'explorer' | 'blink' | 'diff' | 'about'>('explorer');
   const [mobilePanel, setMobilePanel] = useState<'canvas' | 'search' | 'telemetry'>('canvas');
+  const [searchOpen, setSearchOpen] = useState(true);
+  const [analysisOpen, setAnalysisOpen] = useState(false);
   const [irsaConnected, setIrsaConnected] = useState(false);
 
   // Search parameters
@@ -48,6 +51,8 @@ export const App: React.FC = () => {
   const [observations, setObservations] = useState<ObservationRecord[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [currentFrame, setCurrentFrame] = useState<FrameResponse | null>(null);
+  const [searchedTarget, setSearchedTarget] = useState<{ra: number; dec: number} | null>(null);
+  const [searchedQuery, setSearchedQuery] = useState<{ra: number; dec: number; fov: number; collection: string; detector: string} | null>(null);
 
   // UI & Stretch state
   const [stretch, setStretch] = useState('asinh');
@@ -145,7 +150,10 @@ export const App: React.FC = () => {
     ) => {
       const requestId = ++searchRequest.current;
       ++frameRequest.current;
+      clearFrameCache();
       setCurrentFrame(null);
+      setSearchedTarget(null);
+      setSearchedQuery(null);
       setObservations([]);
       setLightCurve(null);
       setSpectrum(null);
@@ -157,6 +165,8 @@ export const App: React.FC = () => {
       try {
         const res = await fetchObservations(searchRa, searchDec, searchFov, searchColl, detector);
         if (requestId !== searchRequest.current) return;
+        setSearchedTarget({ra: res.target.ra, dec: res.target.dec});
+        setSearchedQuery({ra: res.target.ra, dec: res.target.dec, fov: searchFov, collection: searchColl, detector});
         setObservations(res.observations);
         let startIdx = 0;
         if (targetObsId && res.observations.length > 0) {
@@ -170,25 +180,6 @@ export const App: React.FC = () => {
           setCurrentFrame(null);
         }
 
-        // Fetch Catalogs in background
-        fetchCatalogs(searchRa, searchDec, 0.08)
-          .then((cat) => { if (requestId === searchRequest.current) setCatalogSources(cat.sources); })
-          .catch(() => { if (requestId === searchRequest.current) setCatalogSources([]); });
-
-        // Fetch Photometric light curve in background
-        setLoadingPhotometry(true);
-        fetchPhotometry(searchRa, searchDec, searchColl, detector, searchFov)
-          .then((value) => { if (requestId === searchRequest.current) setLightCurve(value); })
-          .catch(() => { if (requestId === searchRequest.current) setLightCurve(null); })
-          .finally(() => { if (requestId === searchRequest.current) setLoadingPhotometry(false); });
-
-        // Fetch Infrared Spectrum SED in background
-        setLoadingSpectrum(true);
-        fetchSpectrum(searchRa, searchDec, searchColl, searchFov)
-          .then((value) => { if (requestId === searchRequest.current) setSpectrum(value); })
-          .catch(() => { if (requestId === searchRequest.current) setSpectrum(null); })
-          .finally(() => { if (requestId === searchRequest.current) setLoadingSpectrum(false); });
-
       } catch (err: any) {
         if (requestId === searchRequest.current) setErrorMessage(err.message || 'Observation discovery failed');
       } finally {
@@ -197,6 +188,32 @@ export const App: React.FC = () => {
     },
     [detector, stretch]
   );
+
+  useEffect(() => {
+    if (!searchedQuery || (!analysisOpen && mobilePanel !== 'telemetry')) return;
+    let active = true;
+    const q = searchedQuery;
+    setLoadingPhotometry(true);
+    setLoadingSpectrum(true);
+    fetchPhotometry(q.ra, q.dec, q.collection, q.detector, q.fov)
+      .then(value => { if (active) setLightCurve(value); })
+      .catch(() => { if (active) setLightCurve(null); })
+      .finally(() => { if (active) setLoadingPhotometry(false); });
+    fetchSpectrum(q.ra, q.dec, q.collection, q.fov)
+      .then(value => { if (active) setSpectrum(value); })
+      .catch(() => { if (active) setSpectrum(null); })
+      .finally(() => { if (active) setLoadingSpectrum(false); });
+    return () => { active = false; };
+  }, [searchedQuery, analysisOpen, mobilePanel]);
+
+  useEffect(() => {
+    if (!showCatalog || !searchedQuery) return;
+    let active = true;
+    fetchCatalogs(searchedQuery.ra, searchedQuery.dec, 0.08)
+      .then(result => { if (active) setCatalogSources(result.sources); })
+      .catch(() => { if (active) setCatalogSources([]); });
+    return () => { active = false; };
+  }, [showCatalog, searchedQuery]);
 
   const loadFrame = useCallback(
     async (frameId: string, currentStretch: string, currentFov: number) => {
@@ -220,7 +237,7 @@ export const App: React.FC = () => {
     setCurrentIndex(idx);
     const obs = observations[idx];
     if (obs) {
-      loadFrame(obs.id, stretch, fov);
+      loadFrame(obs.id, stretch, searchedQuery?.fov ?? fov);
       // Synchronize active observation with URL search params
       const url = new URL(window.location.href);
       url.searchParams.set('obs', obs.id);
@@ -228,10 +245,10 @@ export const App: React.FC = () => {
 
       // Prefetch adjacent frames for smooth playback and blink comparison
       if (idx + 1 < observations.length) {
-        prefetchFrame(observations[idx + 1].id, stretch, fov);
+        prefetchFrame(observations[idx + 1].id, stretch, searchedQuery?.fov ?? fov);
       }
       if (idx - 1 >= 0) {
-        prefetchFrame(observations[idx - 1].id, stretch, fov);
+        prefetchFrame(observations[idx - 1].id, stretch, searchedQuery?.fov ?? fov);
       }
     }
   };
@@ -241,7 +258,7 @@ export const App: React.FC = () => {
     setStretch(newStretch);
     const obs = observations[currentIndex];
     if (obs) {
-      loadFrame(obs.id, newStretch, fov);
+      loadFrame(obs.id, newStretch, searchedQuery?.fov ?? fov);
     }
   };
 
@@ -347,7 +364,7 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-slate-950 text-slate-100 overflow-hidden">
+    <div className="flex flex-col min-h-screen lg:h-screen w-full bg-slate-950 text-slate-100 overflow-x-hidden lg:overflow-hidden">
       <Header
         irsaConnected={irsaConnected}
         activeTab={activeTab}
@@ -359,7 +376,7 @@ export const App: React.FC = () => {
       />
 
       {/* Main Workspace Layout */}
-      <main id="main-workspace" className="flex flex-col flex-1 overflow-hidden relative">
+      <main id="main-workspace" className="flex flex-col flex-1 min-h-[760px] lg:min-h-0 lg:overflow-hidden relative">
         {activeTab === 'about' ? (
           <AboutPage />
         ) : activeTab === 'diff' ? (
@@ -424,7 +441,7 @@ export const App: React.FC = () => {
 
             <div className="flex flex-1 overflow-hidden relative">
               {/* Left Controls Dock */}
-              <div className={`${mobilePanel === 'search' ? 'flex' : 'hidden'} lg:flex w-full lg:w-80 lg:shrink-0 h-full overflow-hidden`}>
+              <div className={`${mobilePanel === 'search' ? 'flex' : 'hidden'} ${searchOpen ? 'lg:flex' : 'lg:hidden'} w-full lg:w-80 lg:shrink-0 h-full overflow-hidden`}>
                 <SearchControls
                   ra={ra}
                   setRa={setRa}
@@ -445,7 +462,12 @@ export const App: React.FC = () => {
               </div>
 
               {/* Central Astronomical Viewing Canvas */}
-              <div className={`${mobilePanel === 'canvas' ? 'flex' : 'hidden'} lg:flex flex-1 flex-col overflow-hidden relative h-full`}>
+              <div className={`${mobilePanel === 'canvas' ? 'flex' : 'hidden'} lg:flex flex-1 min-w-0 flex-col overflow-hidden relative h-full`}>
+                <div className="hidden lg:flex items-center gap-2 px-3 py-2 border-b border-slate-800 bg-slate-950 text-xs">
+                  <button type="button" aria-expanded={searchOpen} onClick={() => setSearchOpen(!searchOpen)} className="rounded px-3 py-1.5 hover:bg-slate-800 text-slate-200">{searchOpen ? 'Hide target search' : 'Search targets'}</button>
+                  <span className="text-slate-400">{searchedTarget ? `RA ${searchedTarget.ra.toFixed(5)}° · Dec ${searchedTarget.dec.toFixed(5)}°` : 'Choose a target or search coordinates'}</span>
+                  <button type="button" aria-expanded={analysisOpen} onClick={() => setAnalysisOpen(!analysisOpen)} className="ml-auto rounded px-3 py-1.5 hover:bg-slate-800 text-slate-200">{analysisOpen ? 'Hide analysis' : 'Open analysis'}</button>
+                </div>
                 {errorMessage && (
                   <div className="bg-rose-950/70 border-b border-rose-800 text-rose-300 text-xs px-4 py-2 flex items-center justify-between">
                     <span>{errorMessage}</span>
@@ -461,7 +483,7 @@ export const App: React.FC = () => {
                       ? 'Cached demonstration observation · fixed cutout coverage, not a live search result'
                       : observations[currentIndex].search_provenance === 'irsa_query'
                         ? 'IRSA archive search result · image may be served from cache'
-                        : 'Observation search provenance unavailable'}
+                        : <>Observation search provenance unavailable. <button className="underline text-cyan-300" onClick={handleManualSearch}>Search again</button> to request current source details.</>}
                   </p>
                 )}
                 <CanvasViewer
@@ -480,9 +502,9 @@ export const App: React.FC = () => {
                       ? `${observations[currentIndex].collection.toUpperCase()} • ${observations[currentIndex].detector} • ${observations[currentIndex].utc_date || ''}`
                       : undefined
                   }
-                  targetRa={Number(ra)}
-                  targetDec={Number(dec)}
-                  targetFov={fov}
+                  targetRa={searchedTarget?.ra}
+                  targetDec={searchedTarget?.dec}
+                  targetFov={searchedQuery?.fov ?? fov}
                 />
 
                 {/* Bottom Multi-Epoch Timeline & Blink Player */}
@@ -496,7 +518,7 @@ export const App: React.FC = () => {
               </div>
 
               {/* Right Telemetry & Provenance Dock */}
-              <div className={`${mobilePanel === 'telemetry' ? 'flex' : 'hidden'} lg:flex w-full lg:w-80 lg:shrink-0 h-full overflow-hidden`}>
+              <div className={`${mobilePanel === 'telemetry' ? 'flex' : 'hidden'} ${analysisOpen ? 'lg:flex' : 'lg:hidden'} w-full lg:w-80 lg:shrink-0 h-full overflow-hidden`}>
                 <MetadataPanel
                   frame={currentFrame}
                   lightCurve={lightCurve}

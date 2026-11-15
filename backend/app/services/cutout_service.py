@@ -11,6 +11,7 @@ from app.science.fits_processing import (
     load_fits_cutout,
     extract_primary_image,
     extract_wcs_info,
+    cutout_footprint,
     evaluate_quality_flags,
     calculate_pixel_stats,
     apply_stretch,
@@ -31,6 +32,12 @@ class CutoutService:
         dec: float,
         fov_deg: float = 0.05
     ) -> bytes:
+        data, _ = await self.fetch_cutout_with_source(base_access_url, ra, dec, fov_deg)
+        return data
+
+    async def fetch_cutout_with_source(
+        self, base_access_url: str, ra: float, dec: float, fov_deg: float = 0.05
+    ) -> Tuple[bytes, str]:
         """
         Fetches FITS cutout from local cache or NASA IRSA IBE service.
         Checks exact cutout URL hash, demo manifest cache mappings, and live IRSA endpoints.
@@ -41,7 +48,7 @@ class CutoutService:
         cache_key = cutout_cache_key(base_access_url, ra, dec, fov_deg)
         cached = cache_service.get(cache_key)
         if cached:
-            return cached
+            return cached, "cached_archive_cutout"
 
         # 3. Fetch live from NASA IRSA IBE
         ssl_ctx = ssl.create_default_context(cafile=certifi.where())
@@ -53,7 +60,7 @@ class CutoutService:
             fits_bytes = resp.content
             # Cache the valid cutout
             cache_service.set(cache_key, fits_bytes)
-            return fits_bytes
+            return fits_bytes, "live_archive_cutout"
 
     def generate_synthetic_fixture(self, obs_id: str, detector: str) -> bytes:
         """
@@ -99,6 +106,7 @@ class CutoutService:
         processes extensions, and returns FrameResponse.
         """
         is_synthetic = False
+        image_provenance = "unknown"
 
         # Look up metadata in active registry
         meta = OBSERVATION_REGISTRY.get(frame_id)
@@ -112,6 +120,7 @@ class CutoutService:
                 detector = "SPHEREx-D1"
                 utc_date = "2025-05-01T00:00:00"
                 access_url = "local://fixtures"
+                image_provenance = "local_fixture"
             else:
                 raise KeyError(f"Frame ID '{frame_id}' not found in active observations registry.")
         else:
@@ -128,14 +137,17 @@ class CutoutService:
             fits_bytes = None
             if cached_url:
                 fits_bytes = cache_service.get(cached_url)
+                if fits_bytes:
+                    image_provenance = "cached_demo_cutout"
 
             if not fits_bytes:
                 try:
-                    fits_bytes = await self.fetch_cutout_fits(access_url, ra, dec, fov_deg=fov_deg)
+                    fits_bytes, image_provenance = await self.fetch_cutout_with_source(access_url, ra, dec, fov_deg=fov_deg)
                 except Exception as e:
                     print(f"[CutoutService] Failed to fetch real cutout: {e}. Falling back to labeled synthetic fixture.")
                     fits_bytes = self.generate_synthetic_fixture(obs_id, detector)
                     is_synthetic = True
+                    image_provenance = "simulated"
 
         # Parse FITS
         hdul = load_fits_cutout(fits_bytes)
@@ -161,10 +173,12 @@ class CutoutService:
             pixel_stats=PixelStats(**stats_dict),
             flag_summary=FlagSummary(**flags_dict),
             wcs=WCSInfo(**wcs_dict),
+            footprint_icrs_deg=cutout_footprint(header, img_array.shape) if not is_synthetic else None,
             image_base64=gray_b64,
             colormapped_base64=inferno_b64,
             provenance_url=access_url if not is_synthetic else f"simulated://synthetic_fixture/{obs_id}",
             is_synthetic=is_synthetic,
+            image_provenance=image_provenance,
         )
 
 cutout_service = CutoutService()

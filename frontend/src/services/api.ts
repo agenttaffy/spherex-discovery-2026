@@ -14,6 +14,12 @@ import {
 const API_BASE = '/api';
 
 const frameCache = new Map<string, FrameResponse>();
+let frameCacheGeneration = 0;
+
+export function clearFrameCache(): void {
+  frameCacheGeneration += 1;
+  frameCache.clear();
+}
 
 export async function checkHealth(): Promise<{ status: string; irsa_connected: boolean; cached_frames: number }> {
   const resp = await fetch(`${API_BASE}/health`);
@@ -28,7 +34,7 @@ export async function fetchObservations(
   collection: string = 'spherex_dr1',
   detector?: string,
   limit: number = 60
-): Promise<{ observations: ObservationRecord[]; total_found: number }> {
+): Promise<{ target: {ra: number; dec: number; fov: number}; observations: ObservationRecord[]; total_found: number }> {
   const params = new URLSearchParams({
     ra: String(ra),
     dec: String(dec),
@@ -55,6 +61,7 @@ export async function fetchFrame(
   format: string = 'webp'
 ): Promise<FrameResponse> {
   const cacheKey = `${frameId}_${stretch}_${fov}_${format}`;
+  const generation = frameCacheGeneration;
   if (frameCache.has(cacheKey)) {
     return frameCache.get(cacheKey)!;
   }
@@ -66,7 +73,7 @@ export async function fetchFrame(
     throw new Error(err.detail || 'Failed to fetch frame');
   }
   const data: FrameResponse = await resp.json();
-  frameCache.set(cacheKey, data);
+  if (generation === frameCacheGeneration) frameCache.set(cacheKey, data);
   return data;
 }
 
@@ -122,6 +129,15 @@ export async function fetchCatalogs(
     return { total_sources: 0, sources: [] };
   }
   return resp.json();
+}
+
+export async function projectCatalog(frameId: string, fov: number, sources: CatalogSource[]): Promise<({x: number; y: number} | null)[]> {
+  const response = await fetch(`${API_BASE}/frames/project-catalog`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ frame_id: frameId, fov, coordinates: sources.map(source => [source.ra, source.dec]) }),
+  });
+  if (!response.ok) throw new Error('Catalog positions could not be projected onto this image.');
+  return (await response.json()).positions;
 }
 
 export async function fetchPhotometry(

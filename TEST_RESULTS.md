@@ -1,5 +1,15 @@
 # SPHEREx Discovery — Test Execution Record
 
+## 2026-11-14 — Sky-context update (supersedes the historical summary below)
+
+- Backend: `python -m pytest -q`: 110 passed, two Astropy FITSFixedWarnings. Coverage includes rotated pixel-edge WCS corners across the RA seam, five cached preset cutouts, unavailable WCS, and catalog coordinate projection.
+- Frontend: `npm run build` passed. Aladin is a separate lazy chunk (about 2.6 MB minified / 840 KB gzip), producing Vite's large-chunk warning. `node scripts/verify_accessibility_and_responsive.mjs`: 41 source checks passed; these are not a complete accessibility audit.
+- Browser: inspected the native cached SPHEREx image and real 2MASS sky imagery at desktop and a 375-pixel mobile viewport. The selected RW Aur coordinates matched Aladin's reported position; all five presets were selected and their displayed target coordinates checked. Cached preset footprint calculations were independently compared with Astropy WCS in tests. A manual position near RA 359.999 degrees showed the footprint across the RA seam. The screenshots do not independently establish an astronomical source identification.
+- A deliberately invalid survey endpoint showed a contextual failure and Retry; switching to DSS2 rendered imagery. Direct checks of the IRSA mirror metadata and all-sky image returned HTTP 200. A subsequent Chrome browser resource inventory showed actual requests for 2MASS properties, the all-sky image, the coverage map, and several order-6 and order-9 image tiles while the RW Aur sky visibly rendered; Chrome's captured console had no warnings or errors. The resource inventory does not expose individual HTTP status codes, so it is not a complete network audit.
+- Keyboard Tab and Enter navigation and visible focus were exercised for the search/analysis flow. Reduced-motion CSS was checked by the source script, but actual reduced-motion emulation and physical screen-reader testing were not performed. Contrast and complete keyboard coverage have not been formally audited.
+
+The following sections are historical records and their counts do not describe the current revision.
+
 **Execution Timestamp:** 2026-11-14T23:27:00Z  
 **Platform:** Windows 11 / Python 3.11.4 / Node.js v22.19.0  
 **Test Suite Status:** 93 backend pytest tests passed (with 2 Astropy FITSFixedWarnings) in 10.11s | 41 automated UI accessibility checks passed | Frontend Build: 1,497 modules transformed, 0 errors in 2.55s | Demo Assets: 22/22 verified | NASA/IPAC IRSA SIA: 200 OK

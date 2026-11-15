@@ -40,6 +40,7 @@ export interface WCSInfo {
 }
 
 export interface FrameResponse {
+  footprint_icrs_deg?: number[][] | null;
   frame_id: string;
   obs_id: string;
   collection: string;
@@ -53,6 +54,7 @@ export interface FrameResponse {
   colormapped_base64?: string;
   provenance_url: string;
   is_synthetic?: boolean;
+  image_provenance?: string;
 }
 
 export interface DemoPreset {

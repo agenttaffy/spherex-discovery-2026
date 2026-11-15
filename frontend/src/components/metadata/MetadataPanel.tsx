@@ -171,11 +171,11 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({
                   </label>
                   <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-3 font-mono space-y-1 text-[11px]">
                     <div className="flex justify-between">
-                      <span className="text-slate-400">Center RA:</span>
+                      <span className="text-slate-400">WCS reference RA:</span>
                       <span className="text-slate-200">{wcs.crval1.toFixed(5)}°</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-slate-400">Center Dec:</span>
+                      <span className="text-slate-400">WCS reference Dec:</span>
                       <span className="text-slate-200">{wcs.crval2?.toFixed(5)}°</span>
                     </div>
                     <div className="flex justify-between">

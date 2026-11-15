@@ -1,400 +1,231 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Globe, Layers, ZoomIn, ZoomOut, RotateCcw, Crosshair } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { ExternalLink, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
 
-export interface AladinViewerProps {
+interface AladinViewerProps {
   ra: number;
   dec: number;
   fov?: number;
-  obsId?: string;
-  detector?: string;
-  dimensions?: number[];
-  collection?: string;
+  footprint?: number[][] | null;
 }
 
-interface SurveyOption {
-  id: string;
-  name: string;
-  band: string;
-  description: string;
+type Phase = 'library' | 'webgl' | 'tiles' | 'ready' | 'error';
+const SURVEYS = [
+  { id: '2mass', name: '2MASS color', url: 'https://irsa.ipac.caltech.edu/data/hips/CDS/2MASS/Color', credit: 'University of Massachusetts & IPAC/Caltech; HiPS by CDS, served by IRSA', terms: 'https://www.ipac.caltech.edu/2mass/releases/second/faq.html' },
+  { id: 'dss', name: 'DSS2 color', url: 'https://irsa.ipac.caltech.edu/data/hips/CDS/DSS2/color', credit: 'STScI/NASA; color HiPS by CDS, served by IRSA. DSS data: CC BY-NC-SA 4.0', terms: 'https://archive.stsci.edu/publishing/data-use' },
+] as const;
+
+function fitFieldOfView(ra: number, dec: number, fov: number, footprint: number[][] | null | undefined, element: HTMLElement | null): number {
+  const aspect = element && element.clientHeight > 0 ? element.clientWidth / element.clientHeight : 1;
+  let halfWidth = fov / 2;
+  let halfHeight = fov / 2;
+  for (const [pointRa, pointDec] of footprint || []) {
+    const deltaRa = ((pointRa - ra + 540) % 360) - 180;
+    halfWidth = Math.max(halfWidth, Math.abs(deltaRa * Math.cos(dec * Math.PI / 180)));
+    halfHeight = Math.max(halfHeight, Math.abs(pointDec - dec));
+  }
+  return Math.min(180, Math.max(0.02, 2.6 * Math.max(halfWidth, halfHeight * aspect)));
 }
 
-const SURVEY_OPTIONS: SurveyOption[] = [
-  {
-    id: 'P/2MASS/color',
-    name: '2MASS Color',
-    band: 'Near-Infrared (JHK: 1.25–2.17 µm)',
-    description: 'Direct celestial baseline for SPHEREx Band 1-2 infrared sources',
-  },
-  {
-    id: 'P/allWISE/color',
-    name: 'AllWISE Color',
-    band: 'Mid-Infrared (W1-W4: 3.4–22 µm)',
-    description: 'Longer wavelength infrared archive for SPHEREx dust & variability',
-  },
-  {
-    id: 'P/DSS2/color',
-    name: 'DSS2 Color',
-    band: 'Optical (Blue/Red/IR)',
-    description: 'Digitized Sky Survey optical baseline for stellar identification',
-  },
-  {
-    id: 'P/PanSTARRS/DR1/color-z-zg-g',
-    name: 'Pan-STARRS DR1',
-    band: 'Deep Optical (g/r/i/z/y)',
-    description: 'High-resolution optical sky survey for host galaxy and stellar counterparts',
-  },
-];
+async function hasRenderedSky(instance: any): Promise<boolean> {
+  const dataUrl = await instance.getViewDataURL({ format: 'image/png', logo: false });
+  const image = new Image();
+  await new Promise<void>((resolve, reject) => {
+    image.onload = () => resolve();
+    image.onerror = () => reject(new Error('Unable to inspect the sky view'));
+    image.src = dataUrl;
+  });
+  const canvas = document.createElement('canvas');
+  canvas.width = 32;
+  canvas.height = 32;
+  const context = canvas.getContext('2d');
+  if (!context) return false;
+  context.drawImage(image, 0, 0, 32, 32);
+  const pixels = context.getImageData(0, 0, 32, 32).data;
+  let min = 255;
+  let max = 0;
+  for (let y = 4; y < 28; y++) for (let x = 4; x < 28; x++) {
+    const index = (y * 32 + x) * 4;
+    const value = (pixels[index] + pixels[index + 1] + pixels[index + 2]) / 3;
+    min = Math.min(min, value);
+    max = Math.max(max, value);
+  }
+  return max - min > 8;
+}
 
-export const AladinViewer: React.FC<AladinViewerProps> = ({
-  ra,
-  dec,
-  fov = 0.04,
-  obsId,
-  detector,
-  dimensions = [128, 128],
-  collection = 'SPHEREx DR1',
-}) => {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const aladinInstanceRef = useRef<any>(null);
+export const AladinViewer: React.FC<AladinViewerProps> = ({ ra, dec, fov = 0.04, footprint }) => {
+  const mountRef = useRef<HTMLDivElement | null>(null);
+  const instanceRef = useRef<any>(null);
+  const apiRef = useRef<any>(null);
   const overlayRef = useRef<any>(null);
-  const [activeSurvey, setActiveSurvey] = useState<string>('P/2MASS/color');
-  const [scriptLoaded, setScriptLoaded] = useState<boolean>(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [currentZoomFov, setCurrentZoomFov] = useState<number>(fov * 2.5);
+  const targetRef = useRef<any>(null);
+  const latestRef = useRef({ ra, dec, fov, footprint });
+  latestRef.current = { ra, dec, fov, footprint };
+  const [surveyId, setSurveyId] = useState<string>('2mass');
+  const [attempt, setAttempt] = useState(0);
+  const [phase, setPhase] = useState<Phase>('library');
+  const [message, setMessage] = useState('Loading Aladin Lite library…');
+  const survey = SURVEYS.find(item => item.id === surveyId) || SURVEYS[0];
 
-  // Robust bounding box footprint coordinates with celestial boundary normalization
-  const halfFovDeg = fov / 2;
-  const clampedDec = Math.max(-89.9, Math.min(89.9, dec));
-  const cosDec = Math.max(Math.cos((clampedDec * Math.PI) / 180), 0.001);
-  const halfRaDeg = halfFovDeg / cosDec;
-
-  const decMin = Math.max(-90, dec - halfFovDeg);
-  const decMax = Math.min(90, dec + halfFovDeg);
-  const normRa = (r: number) => ((r % 360) + 360) % 360;
-  const raMin = normRa(ra - halfRaDeg);
-  const raMax = normRa(ra + halfRaDeg);
-
-  // Helper to load Aladin Lite script dynamically
   useEffect(() => {
-    if ((window as any).A) {
-      setScriptLoaded(true);
-      return;
-    }
-
-    const scriptSrc = 'https://cdn.jsdelivr.net/npm/aladin-lite@3.3.0/dist/aladin.umd.cjs';
-    const existing = document.querySelector(`script[src="${scriptSrc}"]`);
-    if (existing) {
-      existing.addEventListener('load', () => setScriptLoaded(true));
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.src = scriptSrc;
-    script.async = true;
-    script.onload = () => {
-      setScriptLoaded(true);
-    };
-    script.onerror = () => {
-      // Secondary fallback to unpkg mirror
-      const fallbackScript = document.createElement('script');
-      fallbackScript.src = 'https://unpkg.com/aladin-lite@3.3.0/dist/aladin.umd.cjs';
-      fallbackScript.async = true;
-      fallbackScript.onload = () => setScriptLoaded(true);
-      fallbackScript.onerror = () => {
-        setLoadError('Aladin Lite library could not be loaded from external CDN.');
-      };
-      document.head.appendChild(fallbackScript);
-    };
-    document.head.appendChild(script);
-  }, []);
-
-  // Update SPHEREx coverage footprint overlay
-  const updateFootprintOverlay = useCallback((aladin: any) => {
-    try {
-      const A = (window as any).A;
-      if (!A || !aladin) return;
-
-      // Reuse existing overlay to avoid memory/rendering leaks
-      if (!overlayRef.current) {
-        overlayRef.current = A.graphicOverlay({
-          name: 'SPHEREx Footprint',
-          color: '#06b6d4', // Cyan-500
-          lineWidth: 2,
+    let cancelled = false;
+    let instance: any = null;
+    let mount: HTMLDivElement | null = null;
+    let stage: 'library' | 'webgl' | 'tiles' = 'library';
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 20000);
+    const run = async () => {
+      try {
+        setPhase('library');
+        setMessage('Loading Aladin Lite library…');
+        const A = (await import('aladin-lite')).default;
+        if (cancelled) return;
+        apiRef.current = A;
+        stage = 'webgl';
+        setPhase('webgl');
+        setMessage('Initializing WebGL sky viewer…');
+        await A.init;
+        if (cancelled || !mountRef.current) return;
+        mount = mountRef.current;
+        const target = latestRef.current;
+        instance = A.aladin(mountRef.current, {
+          survey: survey.url,
+          target: `${target.ra} ${target.dec}`,
+          fov: fitFieldOfView(target.ra, target.dec, target.fov, target.footprint, mountRef.current),
+          showReticle: false,
+          showZoomControl: false,
+          showFullscreenControl: false,
+          showLayersControl: false,
+          showGotoControl: false,
+          hipsList: [],
+          log: false,
         });
-        aladin.addOverlay(overlayRef.current);
-      } else {
-        overlayRef.current.removeAll();
+        instanceRef.current = instance;
+        stage = 'tiles';
+        setPhase('tiles');
+        setMessage('Loading context survey tiles…');
+        const [properties, tiles] = await Promise.all([
+          fetch(`${survey.url}/properties`, { signal: controller.signal }),
+          fetch(`${survey.url}/Norder3/Allsky.jpg`, { signal: controller.signal }),
+        ]);
+        if (!properties.ok || !tiles.ok || !tiles.headers.get('content-type')?.startsWith('image/')) {
+          throw new Error('The survey service did not return its metadata and image tiles.');
+        }
+        if (cancelled) return;
+        let rendered = false;
+        for (let i = 0; i < 20 && !cancelled && !controller.signal.aborted; i++) {
+          await new Promise(resolve => window.setTimeout(resolve, 500));
+          try {
+            const layer = instance.getBaseImageLayer?.();
+            const actualUrl = typeof layer?.url === 'string' ? layer.url.replace(/\/$/, '') : '';
+            rendered = actualUrl === survey.url.replace(/\/$/, '') && await hasRenderedSky(instance);
+          } catch { rendered = false; }
+          if (rendered) break;
+        }
+        if (cancelled) return;
+        if (!rendered) throw new Error('Survey tiles are reachable, but the sky image could not be confirmed in this view.');
+        setPhase('ready');
+        setMessage('Sky image rendered from the selected context survey.');
+      } catch (error) {
+        if (cancelled) return;
+        setPhase('error');
+        const detail = error instanceof Error ? error.message : String(error);
+        setMessage(controller.signal.aborted ? 'The sky context request timed out.' :
+          stage === 'library' ? `Aladin library could not load: ${detail}` :
+          stage === 'webgl' ? `WebGL initialization failed: ${detail}` : `Survey tile failure: ${detail}`);
+      } finally {
+        window.clearTimeout(timeout);
       }
-
-      // Handle meridian wrap-around (RA = 0° / 360° crossing)
-      if (raMin > raMax) {
-        const polyWest = A.polygon([
-          [raMin, decMin],
-          [360, decMin],
-          [360, decMax],
-          [raMin, decMax],
-        ]);
-        const polyEast = A.polygon([
-          [0, decMin],
-          [raMax, decMin],
-          [raMax, decMax],
-          [0, decMax],
-        ]);
-        overlayRef.current.add(polyWest);
-        overlayRef.current.add(polyEast);
-      } else {
-        const polygon = A.polygon([
-          [raMin, decMin],
-          [raMax, decMin],
-          [raMax, decMax],
-          [raMin, decMax],
-        ]);
-        overlayRef.current.add(polygon);
-      }
-    } catch (err) {
-      console.warn('[AladinViewer] Could not draw footprint overlay:', err);
-    }
-  }, [raMin, raMax, decMin, decMax]);
-
-  // Clean up references on unmount
-  useEffect(() => {
+    };
+    void run();
     return () => {
-      aladinInstanceRef.current = null;
+      cancelled = true;
+      window.clearTimeout(timeout);
+      controller.abort();
+      try { instance?.remove?.(); } catch { /* Viewer may already be gone. */ }
+      mount?.replaceChildren();
+      instanceRef.current = null;
       overlayRef.current = null;
+      targetRef.current = null;
     };
+  }, [surveyId, attempt]);
+
+  useEffect(() => {
+    const instance = instanceRef.current;
+    const A = apiRef.current;
+    if (!instance || !A || phase !== 'ready') return;
+    instance.gotoRaDec(ra, dec);
+    instance.setFoV(fitFieldOfView(ra, dec, fov, footprint, mountRef.current));
+    if (!overlayRef.current) {
+      overlayRef.current = A.graphicOverlay({ name: 'SPHEREx cutout footprint', color: '#38bdf8', lineWidth: 2 });
+      instance.addOverlay(overlayRef.current);
+    }
+    overlayRef.current.removeAll();
+    if (footprint?.length === 4) {
+      // Aladin draws great-circle edges and handles polygons crossing RA=0°.
+      overlayRef.current.add(A.polygon(footprint.map(point => [point[0], point[1]])));
+    }
+    if (targetRef.current) instance.removeCatalog?.(targetRef.current);
+    const catalog = A.catalog({ name: 'Selected target coordinate', sourceSize: 14, color: '#fbbf24', shape: 'cross' });
+    catalog.addSources([A.marker(ra, dec, { popupTitle: 'Selected search coordinate' })]);
+    instance.addCatalog(catalog);
+    targetRef.current = catalog;
+  }, [ra, dec, fov, footprint, phase]);
+
+  useEffect(() => {
+    const mount = mountRef.current;
+    if (!mount) return;
+    let previousWidth = mount.clientWidth;
+    let previousHeight = mount.clientHeight;
+    const observer = new ResizeObserver(() => {
+      if (mount.clientWidth === previousWidth && mount.clientHeight === previousHeight) return;
+      previousWidth = mount.clientWidth;
+      previousHeight = mount.clientHeight;
+      const target = latestRef.current;
+      instanceRef.current?.setFoV(fitFieldOfView(target.ra, target.dec, target.fov, target.footprint, mount));
+    });
+    observer.observe(mount);
+    return () => observer.disconnect();
   }, []);
 
-  // Initialize or re-target Aladin Lite instance
-  useEffect(() => {
-    if (!scriptLoaded || !containerRef.current) return;
-    const A = (window as any).A;
-    if (!A) return;
-
-    try {
-      if (!aladinInstanceRef.current) {
-        // Clear previous content
-        containerRef.current.innerHTML = '';
-        const aladinDiv = document.createElement('div');
-        aladinDiv.id = 'aladin-lite-mount-point';
-        aladinDiv.style.width = '100%';
-        aladinDiv.style.height = '100%';
-        containerRef.current.appendChild(aladinDiv);
-
-        const initPromise = typeof A.init === 'function'
-          ? A.init()
-          : (A.init && typeof A.init.then === 'function' ? A.init : Promise.resolve());
-
-        initPromise.then(() => {
-          const inst = A.aladin(aladinDiv, {
-            survey: activeSurvey,
-            fov: currentZoomFov,
-            target: `${ra} ${dec}`,
-            showReticle: true,
-            showZoomControl: false,
-            showFullscreenControl: false,
-            showLayersControl: false,
-            showGotoControl: false,
-          });
-          aladinInstanceRef.current = inst;
-          updateFootprintOverlay(inst);
-        }).catch((e: any) => {
-          console.warn('[AladinViewer] WebGL initialization fallback:', e);
-          setLoadError(String(e));
-        });
-      } else {
-        const inst = aladinInstanceRef.current;
-        if (inst.gotoRaDec) {
-          inst.gotoRaDec(ra, dec);
-        }
-        if (inst.setFov) {
-          inst.setFov(currentZoomFov);
-        }
-        updateFootprintOverlay(inst);
-      }
-    } catch (err: any) {
-      console.warn('[AladinViewer] Aladin initialization error:', err);
-      setLoadError(err.message || 'Aladin initialization error');
-    }
-  }, [scriptLoaded, ra, dec, currentZoomFov, updateFootprintOverlay]);
-
-  // Survey switch handler
-  const handleSelectSurvey = (surveyId: string) => {
-    setActiveSurvey(surveyId);
-    if (aladinInstanceRef.current && aladinInstanceRef.current.setImageSurvey) {
-      aladinInstanceRef.current.setImageSurvey(surveyId);
-    }
-  };
-
-  const handleZoom = (factor: number) => {
-    const newFov = Math.max(Math.min(currentZoomFov * factor, 15.0), 0.005);
-    setCurrentZoomFov(newFov);
-    if (aladinInstanceRef.current && aladinInstanceRef.current.setFov) {
-      aladinInstanceRef.current.setFov(newFov);
-    }
-  };
-
-  const handleReset = () => {
-    const resetFov = fov * 2.5;
-    setCurrentZoomFov(resetFov);
-    if (aladinInstanceRef.current) {
-      if (aladinInstanceRef.current.gotoRaDec) {
-        aladinInstanceRef.current.gotoRaDec(ra, dec);
-      }
-      if (aladinInstanceRef.current.setFov) {
-        aladinInstanceRef.current.setFov(resetFov);
-      }
-      updateFootprintOverlay(aladinInstanceRef.current);
-    }
+  const reset = () => {
+    instanceRef.current?.gotoRaDec(ra, dec);
+    instanceRef.current?.setFoV(fitFieldOfView(ra, dec, fov, footprint, mountRef.current));
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-slate-950 relative overflow-hidden select-none">
-      {/* Top Header & Survey Switcher Bar */}
-      <div className="absolute top-3 left-4 right-4 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
-        {/* Sky Context Target Badge */}
-        <div className="bg-slate-900/90 backdrop-blur-md border border-slate-800 px-3.5 py-1.5 rounded-xl pointer-events-auto flex items-center gap-3 shadow-lg">
-          <div className="p-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
-            <Globe className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-xs font-semibold text-slate-100">Aladin Lite Sky Context</h3>
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
-                CDS v3 HiPS
-              </span>
-            </div>
-            <p className="text-[10px] text-slate-400 font-mono">
-              RA {ra.toFixed(5)}° Dec {dec >= 0 ? `+${dec.toFixed(5)}` : dec.toFixed(5)}° • {obsId || 'Active Target'}
-            </p>
-          </div>
-        </div>
-
-        {/* Survey Selection Bar */}
-        <div className="bg-slate-900/90 backdrop-blur-md border border-slate-800 p-1 rounded-xl pointer-events-auto flex items-center gap-1 shadow-lg">
-          <div className="flex items-center gap-1 px-2 py-0.5 text-xs text-slate-400 border-r border-slate-800">
-            <Layers className="w-3.5 h-3.5 text-cyan-400" />
-            <span className="hidden sm:inline">Survey:</span>
-          </div>
-          {SURVEY_OPTIONS.map((srv) => (
-            <button
-              key={srv.id}
-              onClick={() => handleSelectSurvey(srv.id)}
-              title={`${srv.band} — ${srv.description}`}
-              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
-                activeSurvey === srv.id
-                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm font-semibold'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-              }`}
-            >
-              {srv.name}
-            </button>
-          ))}
+    <section className="flex-1 min-h-[390px] lg:min-h-0 flex flex-col bg-slate-950" aria-label="Sky context survey">
+      <div className="shrink-0 flex flex-wrap items-center gap-2 px-3 py-2 border-b border-slate-800 text-xs">
+        <label htmlFor="context-survey" className="text-slate-300">Context survey</label>
+        <select id="context-survey" value={surveyId} onChange={e => setSurveyId(e.target.value)} className="bg-slate-900 text-slate-100 rounded px-2 py-1.5 border border-slate-700">
+          {SURVEYS.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+        </select>
+        <span className="text-slate-300">Background imagery, not SPHEREx measurements</span>
+        <div className="ml-auto flex items-center gap-1" role="toolbar" aria-label="Sky context navigation">
+          <button aria-label="Zoom in sky context" className="p-2 rounded hover:bg-slate-800" onClick={() => instanceRef.current?.increaseZoom()}><ZoomIn size={16} /></button>
+          <button aria-label="Zoom out sky context" className="p-2 rounded hover:bg-slate-800" onClick={() => instanceRef.current?.decreaseZoom()}><ZoomOut size={16} /></button>
+          <button aria-label="Recenter on selected coordinates" className="p-2 rounded hover:bg-slate-800" onClick={reset}><RotateCcw size={16} /></button>
         </div>
       </div>
-
-      {/* Main Aladin Lite Mount Area */}
-      <div className="flex-1 w-full h-full relative" ref={containerRef}>
-        {/* Offline / WebGL Fallback Card when CDN or WebGL is not available */}
-        {loadError && (
-          <div className="absolute inset-0 bg-slate-950 flex flex-col items-center justify-center p-6 text-center z-10">
-            <div className="max-w-lg bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-2xl backdrop-blur-md">
-              <div className="w-12 h-12 rounded-full bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center mx-auto mb-3 text-cyan-400">
-                <Globe className="w-6 h-6" />
-              </div>
-              <h4 className="text-sm font-semibold text-slate-100 mb-1">
-                Aladin Lite Sky Context Overlay
-              </h4>
-              <p className="text-xs text-slate-400 mb-4 font-mono">
-                Synchronized Target Footprint: RA {ra.toFixed(5)}°, Dec {dec.toFixed(5)}°
-              </p>
-
-              {/* High-fidelity SVG Sky Footprint Simulation */}
-              <div className="w-full h-48 bg-slate-950/80 rounded-xl border border-slate-800 relative overflow-hidden flex items-center justify-center mb-4">
-                <svg className="w-full h-full" viewBox="0 0 400 200">
-                  {/* Sky grid lines */}
-                  <line x1="50" y1="100" x2="350" y2="100" stroke="#334155" strokeDasharray="4 4" strokeWidth="1" />
-                  <line x1="200" y1="20" x2="200" y2="180" stroke="#334155" strokeDasharray="4 4" strokeWidth="1" />
-                  <circle cx="200" cy="100" r="70" fill="none" stroke="#1e293b" strokeWidth="1" />
-                  <circle cx="200" cy="100" r="40" fill="none" stroke="#1e293b" strokeWidth="1" />
-
-                  {/* SPHEREx Observation Footprint Box */}
-                  <rect
-                    x="165"
-                    y="75"
-                    width="70"
-                    height="50"
-                    fill="rgba(6, 182, 212, 0.15)"
-                    stroke="#06b6d4"
-                    strokeWidth="2"
-                    strokeDasharray="6 3"
-                    rx="4"
-                  />
-                  {/* Center Crosshair */}
-                  <line x1="190" y1="100" x2="210" y2="100" stroke="#38bdf8" strokeWidth="1.5" />
-                  <line x1="200" y1="90" x2="200" y2="110" stroke="#38bdf8" strokeWidth="1.5" />
-                  <circle cx="200" cy="100" r="3" fill="#38bdf8" />
-
-                  <text x="200" y="65" textAnchor="middle" fill="#38bdf8" fontSize="10" fontFamily="monospace">
-                    SPHEREx Cutout ({dimensions[0]}×{dimensions[1]} px)
-                  </text>
-                  <text x="200" y="145" textAnchor="middle" fill="#94a3b8" fontSize="9" fontFamily="monospace">
-                    FOV: ~{(fov * 60).toFixed(1)} arcmin • {detector || 'All Detectors'}
-                  </text>
-                </svg>
-              </div>
-
-              <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono bg-slate-950/60 p-2.5 rounded-lg border border-slate-800">
-                <span>Active Baseline: <strong className="text-cyan-400">{SURVEY_OPTIONS.find(s => s.id === activeSurvey)?.name}</strong></span>
-                <span>Coverage: <strong className="text-slate-200">{collection}</strong></span>
-              </div>
-            </div>
+      <div className="relative flex-1 min-h-[220px] lg:min-h-0" aria-label="Aladin sky map">
+        <div ref={mountRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} />
+        {phase !== 'ready' && <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-950/90 p-5 text-center" role="status">
+          <div className="max-w-md space-y-3">
+            <p className="text-sm text-slate-100">{phase === 'error' ? 'Sky context could not load' : message}</p>
+            {phase === 'error' && <>
+              <p className="text-xs text-slate-300">{message} The SPHEREx canvas remains available.</p>
+              <button onClick={() => setAttempt(value => value + 1)} className="px-3 py-2 rounded bg-cyan-700 text-white">Retry</button>
+              <a className="inline-flex items-center gap-1 ml-3 text-cyan-300 underline" href={`https://aladin.cds.unistra.fr/AladinLite/?target=${encodeURIComponent(`${ra} ${dec}`)}&fov=${Math.max(fov * 2.5, 0.02)}`} target="_blank" rel="noreferrer">Open external Aladin <ExternalLink size={13} /></a>
+            </>}
           </div>
-        )}
+        </div>}
       </div>
-
-      {/* Bottom Floating Telemetry & Controls */}
-      <div className="absolute bottom-3 left-4 right-4 z-20 flex items-center justify-between pointer-events-none">
-        <div className="bg-slate-900/90 backdrop-blur-md border border-slate-800 px-3.5 py-1.5 rounded-xl pointer-events-auto text-[11px] font-mono text-slate-300 flex items-center gap-3 shadow-lg">
-          <div className="flex items-center gap-1.5 text-cyan-400">
-            <Crosshair className="w-3.5 h-3.5" />
-            <span>Target:</span>
-          </div>
-          <span>RA {ra.toFixed(5)}°</span>
-          <span className="text-slate-600">|</span>
-          <span>Dec {dec >= 0 ? `+${dec.toFixed(5)}` : dec.toFixed(5)}°</span>
-          <span className="text-slate-600">|</span>
-          <span className="text-cyan-300">FOV: {(currentZoomFov * 60).toFixed(1)}′</span>
-          <span className="text-slate-600">|</span>
-          <span className="text-slate-400 hidden sm:inline">
-            Footprint: {((fov * 3600) / 60).toFixed(1)}′ × {((fov * 3600) / 60).toFixed(1)}′
-          </span>
-        </div>
-
-        {/* Zoom & View Controls */}
-        <div className="bg-slate-900/90 backdrop-blur-md border border-slate-800 p-1 rounded-xl pointer-events-auto flex items-center gap-1 shadow-lg">
-          <button
-            onClick={() => handleZoom(0.7)}
-            title="Zoom In Sky Context"
-            className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition"
-          >
-            <ZoomIn className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => handleZoom(1.4)}
-            title="Zoom Out Sky Context"
-            className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition"
-          >
-            <ZoomOut className="w-4 h-4" />
-          </button>
-          <button
-            onClick={handleReset}
-            title="Reset to SPHEREx Coverage Center"
-            className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition"
-          >
-            <RotateCcw className="w-4 h-4" />
-          </button>
-        </div>
+      <div className="shrink-0 px-3 py-2 border-t border-slate-800 text-[11px] text-slate-300 flex flex-wrap gap-x-4 gap-y-1">
+        <span>Selected coordinate: RA {ra.toFixed(5)}°, Dec {dec >= 0 ? '+' : ''}{dec.toFixed(5)}°</span>
+        <span>Amber marker: selected coordinate · Cyan outline: {footprint?.length === 4 ? 'SPHEREx image footprint' : 'footprint unavailable'}</span>
+        <span>{survey.name}: {survey.credit}</span>
+        <a className="text-cyan-300 underline" href={survey.terms} target="_blank" rel="noreferrer">Survey data terms</a>
+        <span role="status">{message}</span>
       </div>
-    </div>
+    </section>
   );
 };

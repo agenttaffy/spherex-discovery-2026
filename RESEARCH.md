@@ -1,5 +1,12 @@
 # SPHEREx Discovery — Research Summary
 
+## 2026-11-14 — Sky context and interface sources
+
+- [WCAG 2.2](https://www.w3.org/TR/WCAG22/) informed keyboard, focus, labels and non-color state cues. [Nielsen Norman Group on complex applications](https://www.nngroup.com/articles/complex-application-design/) and [progressive disclosure](https://www.nngroup.com/articles/progressive-disclosure/) informed the collapsible analysis and prioritization of the image. These references do not establish conformance.
+- The supplied CDS Aladin documentation paths returned HTTP 404 during this session. The installed `aladin-lite` npm package and [Aladin API](https://cds-astro.github.io/aladin-lite/Aladin.html) document the v3 `A.init` lifecycle. The CDS direct script and tested CDS HiPS endpoints also returned 404; this is a point-in-time observation, not a diagnosis of a general outage.
+- IRSA's HiPS mirror returned metadata and all-sky image HTTP 200 for 2MASS Color and DSS2 color. 2MASS metadata identifies all-sky coverage, ODbL-1.0, University of Massachusetts/IPAC-Caltech and CDS HiPS production. [MAST DSS data-use guidance](https://archive.stsci.edu/publishing/data-use) specifies CC BY-NC-SA 4.0; DSS usage is restricted to scientific/nonprofit purposes. These layers are contextual survey imagery, not SPHEREx measurements.
+- [IRSA SPHEREx data-product documentation](https://caltech-ipac.github.io/spherex-archive-documentation/spherex-data-products/) describes separate per-pixel wavelength calibration products. One header UUID was resolved via IRSA's artifact table to a D1 calibration file and its published MD5 was verified; using the file in cutout-to-detector compatibility calculations is unfinished and remains guarded.
+
 ## 1. NASA SPHEREx Mission & Data Architecture
 - **Mission Overview:** The Spectro-Photometer for the History of the Universe, Epoch of Reionization and Ices Explorer (SPHEREx) is a NASA MIDEX mission conducting an all-sky infrared survey across 0.75 to 5.0 µm in 102 spectral channels.
 - **Instrument Design:** 6 optical detectors with Linear Variable Filters (LVF) (Detectors 1 through 6). The effective passband shifts continuously across the detector surface.

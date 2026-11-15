@@ -97,6 +97,31 @@ def extract_wcs_info(header: fits.Header) -> Dict[str, Any]:
         "ctype2": header.get("CTYPE2"),
     }
 
+
+def cutout_footprint(header: fits.Header, shape: Tuple[int, int]) -> Optional[list]:
+    """Transform the four pixel-edge corners through the complete celestial WCS.
+
+    Returns ICRS/RA-Dec pairs in degrees, or None when the WCS cannot provide
+    a finite footprint. The corners describe the image edges, not pixel centers.
+    """
+    try:
+        height, width = shape
+        if height <= 0 or width <= 0:
+            return None
+        wcs = WCS(header)
+        if not wcs.has_celestial:
+            return None
+        celestial = wcs.celestial
+        x = np.array([-0.5, width - 0.5, width - 0.5, -0.5])
+        y = np.array([-0.5, -0.5, height - 0.5, height - 0.5])
+        coordinates = celestial.pixel_to_world(x, y).icrs
+        ra, dec = coordinates.ra.deg, coordinates.dec.deg
+        if not (np.all(np.isfinite(ra)) and np.all(np.isfinite(dec)) and np.all(np.abs(dec) <= 90)):
+            return None
+        return [[float(r % 360), float(d)] for r, d in zip(ra, dec)]
+    except Exception:
+        return None
+
 def parse_spherex_mask_planes(flags_header: Optional[fits.Header]) -> Dict[str, int]:
     """
     Parses documented SPHEREx Level 2 mask planes from FITS header cards (MSKNxxxx, MSKMxxxx).

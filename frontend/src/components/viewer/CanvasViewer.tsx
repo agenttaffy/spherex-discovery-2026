@@ -2,6 +2,12 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { FrameResponse, CatalogSource } from '../../types/astronomy';
 import { ZoomIn, ZoomOut, RotateCcw, Crosshair, Palette, Sliders, Star, Globe, Keyboard } from 'lucide-react';
 import { AladinViewer } from './AladinViewer';
+import { projectCatalog } from '../../services/api';
+
+const IMAGE_PROVENANCE: Record<string, string> = {
+  live_archive_cutout: 'live IRSA cutout', cached_archive_cutout: 'cached IRSA cutout',
+  cached_demo_cutout: 'cached demonstration cutout', simulated: 'simulated fixture', local_fixture: 'local fixture',
+};
 
 interface CanvasViewerProps {
   frame: FrameResponse | null;
@@ -48,6 +54,22 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
   const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
   const [cachedImg, setCachedImg] = useState<HTMLImageElement | null>(null);
   const [announcement, setAnnouncement] = useState<string>('');
+  const [catalogPixels, setCatalogPixels] = useState<({x: number; y: number} | null)[]>([]);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    setCatalogPixels([]);
+    setCatalogError(null);
+    if (showCatalog && frame && !frame.is_synthetic && catalogSources.length > 0) {
+      projectCatalog(frame.frame_id, targetFov ?? 0.04, catalogSources)
+        .then(points => { if (active) setCatalogPixels(points); })
+        .catch(() => { if (active) setCatalogError('Catalog positions are unavailable for this image.'); });
+    } else if (showCatalog && frame?.is_synthetic) {
+      setCatalogError('Catalog positions cannot be overlaid on a simulated image.');
+    }
+    return () => { active = false; };
+  }, [frame, showCatalog, catalogSources, targetFov]);
 
   const resetView = useCallback(() => {
     setZoom(1.0);
@@ -154,25 +176,13 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
     ctx.drawImage(cachedImg, -drawW / 2, -drawH / 2, drawW, drawH);
 
     // Gaia DR3 Celestial Catalog Overlay
-    if (showCatalog && catalogSources.length > 0 && frame?.wcs?.crval1 && frame?.wcs?.crval2) {
-      const crval1 = frame.wcs.crval1;
-      const crval2 = frame.wcs.crval2;
-      const meanDecRad = (crval2 * Math.PI) / 180.0;
-
-      catalogSources.forEach((src) => {
-        // Safely wrap RA difference across 0/360 boundary to [-180, +180]
-        const rawDeltaRa = src.ra - crval1;
-        const wrappedDeltaRa = ((rawDeltaRa + 180) % 360 + 360) % 360 - 180;
-        const deltaRaDeg = wrappedDeltaRa * Math.cos(meanDecRad);
-        const deltaDecDeg = src.dec - crval2;
-
-        const deltaRaArcsec = deltaRaDeg * 3600.0;
-        const deltaDecArcsec = deltaDecDeg * 3600.0;
-
-        // Convert arcseconds to canvas image units (6.2" per pixel * 14 canvas scale)
-        // East is left (-x), North is up (-y)
-        const markerX = -(deltaRaArcsec / 6.2) * 14;
-        const markerY = -(deltaDecArcsec / 6.2) * 14;
+    if (showCatalog && catalogSources.length > 0) {
+      catalogSources.forEach((src, index) => {
+        const pixel = catalogPixels[index];
+        if (!pixel) return;
+        const markerX = (pixel.x + 0.5) * 14 - drawW / 2;
+        // FITS arrays are flipped vertically for display by the backend.
+        const markerY = drawH / 2 - (pixel.y + 0.5) * 14;
 
         ctx.strokeStyle = '#38bdf8'; // Cyan-400
         ctx.fillStyle = '#38bdf8';
@@ -186,18 +196,6 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
         ctx.lineTo(markerX - 7, markerY);
         ctx.closePath();
         ctx.stroke();
-
-        // Proper Motion Vector Arrow (if pm > 200 mas/yr)
-        if (src.pm_ra || src.pm_dec) {
-          const pmScale = 0.008; // visual scaling
-          const vecX = -(src.pm_ra || 0) * pmScale;
-          const vecY = -(src.pm_dec || 0) * pmScale;
-          ctx.strokeStyle = '#f59e0b'; // Amber-500
-          ctx.beginPath();
-          ctx.moveTo(markerX, markerY);
-          ctx.lineTo(markerX + vecX, markerY + vecY);
-          ctx.stroke();
-        }
 
         // Designation label & provenance badge
         ctx.font = '10px monospace';
@@ -228,7 +226,7 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
     }
 
     ctx.restore();
-  }, [cachedImg, zoom, offset, showCrosshair, showCatalog, catalogSources, frame, viewerMode]);
+  }, [cachedImg, zoom, offset, showCrosshair, showCatalog, catalogSources, catalogPixels, frame, viewerMode]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     setIsDragging(true);
@@ -261,7 +259,7 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-slate-950 relative overflow-hidden select-none" ref={containerRef}>
+    <div className="flex-1 min-h-[440px] lg:min-h-0 flex flex-col bg-slate-950 relative overflow-hidden select-none" ref={containerRef}>
       {/* Screen reader live announcements */}
       <div className="sr-only" aria-live="polite" aria-atomic="true">
         {announcement}
@@ -271,16 +269,17 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
       </div>
 
       {/* Top Overlay Controls */}
-      <div className="absolute top-3 left-4 right-4 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+      <div className="shrink-0 z-20 flex flex-wrap items-center justify-between gap-2 px-3 py-2 border-b border-slate-800 bg-slate-950">
         <div className="bg-slate-900/90 backdrop-blur-md border border-slate-800 px-3 py-1.5 rounded-lg pointer-events-auto flex items-center gap-3">
           <div>
             <h3 className="text-xs font-semibold text-slate-100">{title || (frame ? frame.obs_id : 'Astronomical Viewer')}</h3>
             <p className="text-[10px] text-slate-300 font-mono">
               {subtitle || (frame ? `${frame.detector} • ${frame.utc_date?.split('T')[0] || ''}` : 'Select an observation')}
             </p>
+            {frame && <p className="text-[11px] text-slate-300">Image source: {IMAGE_PROVENANCE[frame.image_provenance || ''] || 'unknown'}</p>}
             {frame?.is_synthetic && (
               <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold bg-amber-500/20 text-amber-200 border border-amber-500/40">
-                SIMULATED FIXTURE (ARCHIVE OFFLINE)
+                SIMULATED FIXTURE (CUTOUT UNAVAILABLE)
               </span>
             )}
           </div>
@@ -380,23 +379,20 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
           </div>
         ) : (
           <div className="hidden sm:block pointer-events-auto">
-            <span className="px-2.5 py-1 rounded-lg text-[11px] font-mono bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
-              Multi-Wavelength Sky Correlation
-            </span>
+            <span className="text-[11px] text-slate-300">Context survey</span>
           </div>
         )}
       </div>
 
-      {viewerMode === 'aladin' ? (
+      {viewerMode === 'aladin' && targetRa != null && targetDec != null ? (
         <AladinViewer
-          ra={frame?.wcs?.crval1 ?? targetRa ?? 269.45208}
-          dec={frame?.wcs?.crval2 ?? targetDec ?? 4.69339}
+          ra={targetRa}
+          dec={targetDec}
           fov={targetFov ?? 0.04}
-          obsId={frame?.obs_id || title}
-          detector={frame?.detector}
-          dimensions={frame?.dimensions}
-          collection={frame?.collection}
+          footprint={frame?.footprint_icrs_deg ?? null}
         />
+      ) : viewerMode === 'aladin' ? (
+        <div className="flex-1 flex items-center justify-center p-6 text-sm text-slate-300" role="status">Search for coordinates to open sky context.</div>
       ) : (
         <>
           {/* Canvas Area with Keyboard Focus & Navigation */}
@@ -431,7 +427,8 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
           </div>
 
           {/* Bottom Floating Telemetry & Zoom Dock */}
-          <div className="absolute bottom-3 left-4 right-4 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+          <div className="shrink-0 z-20 flex flex-wrap items-center justify-between gap-2 px-3 py-2 border-t border-slate-800 bg-slate-950">
+            {showCatalog && <p className="w-full text-[11px] text-slate-300" role="status">{catalogError || 'Catalog positions are projected at their catalog epoch; proper motion is not applied and a marker does not confirm identity.'}</p>}
             <div className="bg-slate-900/90 backdrop-blur-md border border-slate-800 px-3 py-1 rounded-md pointer-events-auto text-[11px] font-mono text-slate-300 flex items-center gap-3">
               <span>Scale: {(zoom * 100).toFixed(0)}%</span>
               {frame && (
@@ -494,8 +491,8 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
                   setAnnouncement(!showCrosshair ? 'Celestial crosshair enabled' : 'Celestial crosshair disabled');
                 }}
                 aria-pressed={showCrosshair}
-                aria-label="Toggle Celestial Crosshair"
-                title="Toggle Celestial Crosshair"
+                  aria-label="Toggle image-center crosshair"
+                  title="Toggle image-center crosshair"
                 className={`p-1.5 rounded transition focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${
                   showCrosshair ? 'bg-cyan-500/20 text-cyan-300' : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
                 }`}

@@ -22,7 +22,7 @@ export const Footer: React.FC = () => {
 
       <div className="flex items-center space-x-2 text-[11px] text-slate-400">
         <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
-        <span>Calibrated surface brightness in MJy/sr. Display stretches are non-destructive browser previews.</span>
+        <span>Display stretch changes appearance only. Check each frame for source and quality details.</span>
       </div>
     </footer>
   );

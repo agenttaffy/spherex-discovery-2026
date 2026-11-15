@@ -55,10 +55,12 @@ class FrameResponse(BaseModel):
     pixel_stats: PixelStats
     flag_summary: FlagSummary
     wcs: WCSInfo
+    footprint_icrs_deg: Optional[List[List[float]]] = None
     image_base64: str
     colormapped_base64: Optional[str] = None
     provenance_url: str
     is_synthetic: bool = False
+    image_provenance: str = "unknown"
 
 class HealthResponse(BaseModel):
     status: str
