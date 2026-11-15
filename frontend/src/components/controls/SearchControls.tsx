@@ -40,26 +40,27 @@ export const SearchControls: React.FC<SearchControlsProps> = ({
   return (
     <aside
       aria-label="Target search and coordinate parameters"
-      className="w-full lg:w-80 lg:shrink-0 bg-slate-900/60 border-b lg:border-b-0 lg:border-r border-slate-800 p-4 flex flex-col gap-4 overflow-y-auto"
+      className="w-full lg:w-80 lg:shrink-0 bg-slate-950 border-b lg:border-b-0 lg:border-r border-slate-800 p-4 flex flex-col gap-4 overflow-y-auto"
     >
       {/* Official Challenge Presets */}
       <div>
         <div className="flex items-center justify-between mb-2">
           <label className="text-xs font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
             <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-            Official Targets
+            Explore a target
           </label>
         </div>
-        <div className="grid grid-cols-1 gap-1.5" role="group" aria-label="Official Challenge Presets">
+        <p className="text-xs text-slate-400 mb-2">Starting coordinates for the challenge; a position alone does not identify a source.</p>
+        <div className="grid grid-cols-1 gap-0.5" role="group" aria-label="Official Challenge Presets">
           {presets.map((p) => (
             <button
               key={p.id}
               onClick={() => onSelectPreset(p)}
               aria-pressed={selectedPresetId === p.id}
-              className={`w-full text-left p-2 rounded-lg text-xs transition border focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${
+              className={`w-full text-left px-2 py-2 rounded text-xs transition focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${
                 selectedPresetId === p.id
-                  ? 'bg-cyan-950/70 border-cyan-500/60 text-cyan-100 ring-1 ring-cyan-500/40'
-                  : 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-200'
+                  ? 'bg-cyan-950/70 text-cyan-100 ring-1 ring-inset ring-cyan-500/60'
+                  : 'text-slate-200 hover:bg-slate-900'
               }`}
             >
               <div className="font-semibold text-slate-100 flex items-center justify-between">
@@ -68,7 +69,6 @@ export const SearchControls: React.FC<SearchControlsProps> = ({
                   {p.ra.toFixed(2)}°, {p.dec.toFixed(2)}°
                 </span>
               </div>
-              <p className="text-[11px] text-slate-300 line-clamp-1 mt-0.5">{p.notable_feature}</p>
             </button>
           ))}
         </div>
@@ -79,6 +79,7 @@ export const SearchControls: React.FC<SearchControlsProps> = ({
           <Compass className="w-3.5 h-3.5 text-cyan-400" />
           Coordinates (J2000)
         </label>
+        <p className="text-xs text-slate-400 mb-2">Enter sky coordinates in degrees or sexagesimal format.</p>
 
         <div className="space-y-2">
           <div>
@@ -122,6 +123,7 @@ export const SearchControls: React.FC<SearchControlsProps> = ({
             <Layers className="w-3.5 h-3.5 text-cyan-400" />
             Field of View (Cutout Size)
           </label>
+          <p className="text-[11px] text-slate-300 mb-2">The width of sky requested around the coordinates. One arcminute is 1/60 of a degree.</p>
           <div className="grid grid-cols-3 gap-1.5" role="group" aria-label="Field of view options">
             {[0.02, 0.04, 0.08].map((size) => (
               <button
@@ -194,6 +196,7 @@ export const SearchControls: React.FC<SearchControlsProps> = ({
             <Filter className="w-3.5 h-3.5 text-cyan-400" />
             Detector Band Filter
           </label>
+          <p className="text-[11px] text-slate-300 mb-2">Each detector covers a range of infrared wavelengths; choose All to include every detector.</p>
           <select
             id="detector-select"
             value={detector}
@@ -217,7 +220,7 @@ export const SearchControls: React.FC<SearchControlsProps> = ({
           onClick={onSearch}
           disabled={loading}
           aria-label="Discover Observations from NASA IRSA"
-          className="w-full py-2.5 px-4 bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white rounded-lg font-semibold text-xs transition flex items-center justify-center gap-2 shadow-lg shadow-cyan-950/50 disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none"
+          className="w-full py-2.5 px-4 bg-gradient-to-r from-cyan-700 to-indigo-700 hover:from-cyan-800 hover:to-indigo-800 text-white rounded-lg font-semibold text-xs transition flex items-center justify-center gap-2 shadow-lg shadow-cyan-950/50 disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none"
         >
           {loading ? (
             <>
