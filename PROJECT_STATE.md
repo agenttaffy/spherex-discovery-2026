@@ -7,6 +7,8 @@
 
 > **Current verification note:** Claims below describe implemented features and historical results, not independently validated scientific performance or WCAG conformance. See HANDOFF.md and TEST_RESULTS.md for current evidence and limitations.
 
+> **Comparison safety:** Difference and co-add endpoints are temporarily guarded until per-pixel wavelength compatibility is validated using separate spectral WCS products. Blink remains available. Statements below about arithmetic are historical implementation descriptions.
+
 ## 1. Implemented Features
 - **NASA Data Visualization & WCAG 2.2 AA Accessibility (`SpectrumChart.tsx`, `LightCurveChart.tsx`, `CanvasViewer.tsx`, `ComparisonView.tsx`, `index.css`):**
   - **Diverging Colormap for Difference Imagery (`fits_processing.py`, `ComparisonView.tsx`):** Implemented `apply_diverging_colormap` (Cool-Warm: Blue -> Light Neutral -> Crimson Red) centered strictly at 128 (zero net flux residual) per NASA Data Visualization guidelines, complete with palette toggle and colorbar legend.
@@ -52,7 +54,7 @@
 - **On-The-Fly Spectra Generation (`/api/science/spectrum`, `spectrum.py`, `SpectrumChart.tsx`):**
   - Instantaneous calibrated Spectral Energy Distribution (SED: Flux vs. Wavelength $\lambda$) across SPHEREx's 0.75 µm to 5.00 µm range.
   - Queries and aggregates multi-epoch circular aperture photometry across up to 6 SPHEREx detector arrays (D1: 0.75–1.12 µm, D2: 1.12–1.68 µm, D3: 1.68–2.42 µm, D4: 2.42–3.82 µm, D5: 3.82–4.42 µm, D6: 4.42–5.00 µm).
-  - Synthesizes up to six measured detector-band points (D1–D6) with WCS-WAVE calibrated effective wavelengths and `VARIANCE` error bars where available, accompanied by an illustrative/interpolated 102-point continuum (17 channels per detector array).
+  - Synthesizes up to six measured detector-band points (D1–D6) with approximate WCS-WAVE effective wavelengths and `VARIANCE` error bars where available, accompanied by an illustrative/interpolated 102-point continuum (17 channels per detector array).
   - **Truthfulness Boundary:** This is explicitly **not 102 observed resolved SPHEREx channels**. The 102 channels represent an interpolated continuum curve.
   - Neutral broadband shape descriptor (`continuum_shape`) describing empirical trends ("flux rises toward longer measured bands", "flux falls toward longer measured bands", "peak among measured detector bands", or "insufficient observed coverage"). Inferred astrophysical classifications were removed from the API (`spectral_class` removed).
   - Constrained single-temperature blackbody continuum fit ($B_\nu(T)$): Requires $\ge 3$ distinct measured detector bands with valid propagated photometric uncertainties to guarantee positive residual degrees of freedom ($\text{dof} \ge 1$). Unsupported 10% error substitutions are disallowed. The temperature is strictly an optional single-temperature continuum fit, not an object's known physical temperature.

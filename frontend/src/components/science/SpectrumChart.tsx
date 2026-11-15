@@ -115,6 +115,8 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
         </button>
       </div>
 
+      <p className="text-[10px] text-slate-300">Wavelengths from the image lookup are approximate. Scientific calibration requires separate spectral WCS products.</p>
+
       {/* Detector Array Quick Filter Pills */}
       <div className="flex items-center justify-between gap-1 text-[9px] font-mono" role="group" aria-label="Filter spectrum by detector">
         {detectorBands.map((db) => {
@@ -371,7 +373,7 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
             <div className="pt-0.5 text-[9px]">
               {hoveredBand.is_observed ? (
                 <span className="text-emerald-400 font-semibold">
-                  Observed detector band · wavelength calibration: {hoveredBand.calibration_source}
+                  Observed detector band · wavelength source: {hoveredBand.calibration_source}
                 </span>
               ) : (
                 <span className="text-amber-300">○ Modeled SED Profile Continuum</span>

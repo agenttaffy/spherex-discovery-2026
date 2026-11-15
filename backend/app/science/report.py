@@ -92,7 +92,7 @@ def generate_discovery_report(
         md_lines.extend([
             "",
             "## 5. Spectral Energy Distribution (SED)",
-            f"- **Observed Detector Bands:** {total_obs} of 6 bands (calibrated WCS-WAVE where available)",
+            f"- **Observed Detector Bands:** {total_obs} of 6 bands. WCS-WAVE wavelengths are approximate visualization estimates; science analysis requires separate spectral WCS products.",
             "- **Spectrophotometric Continuum:** Estimated Continuum Model (Interpolated across 6 detector bandpasses)",
             "- **Spectral Line Caveat:** The 102 individual channel values represent an interpolated continuum curve across the 6 SPHEREx detector arrays, not 102 independently resolved spectral line measurements.",
             f"- **Broadband Continuum Shape:** {shape_desc} (Note: broadband continuum shape across measured detector bands, not an astrophysical classification)",

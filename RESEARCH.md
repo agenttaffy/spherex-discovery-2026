@@ -46,3 +46,5 @@ Live queries via `probe_irsa.py` confirmed observations in both DR1 and QR3:
 - [IRSA visualization guide](https://irsa.ipac.caltech.edu/onlinehelp/spherex/spherex/visualization.html): Level 2 products include IMAGE, FLAGS, VARIANCE and WCS-WAVE extensions. Missing metadata must stay unknown.
 - [CDS HiPS documentation](https://aladin.cds.unistra.fr/hips/): context surveys are separate progressive image layers, not SPHEREx science images.
 - These references support explicit provenance, wavelength and uncertainty labels. Automated source checks are not a substitute for keyboard, screen-reader and visual testing.
+
+- [IRSA SPHEREx Explanatory Supplement, v2.1](https://irsa.ipac.caltech.edu/data/SPHEREx/docs/SPHEREx_Expsupp.pdf): the embedded WCS-WAVE lookup is suitable for visualization; science analysis should use separate spectral WCS files. A shared detector does not verify per-pixel wavelength compatibility. Difference and stacking are guarded pending integration and validation.

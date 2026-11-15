@@ -17,6 +17,16 @@ from app.science.fits_processing import (
 
 router = APIRouter()
 
+def require_validated_spectral_compatibility() -> None:
+    """Prevent image arithmetic until per-pixel spectral calibration is validated."""
+    raise HTTPException(
+        status_code=422,
+        detail=("Difference and co-addition are unavailable: per-pixel wavelength "
+                "compatibility has not been validated using the separate spectral WCS "
+                "calibration products. Matching detector labels alone is insufficient. "
+                "Use blink playback for visual inspection."),
+    )
+
 class DiffRequest(BaseModel):
     frame_id_1: str
     frame_id_2: str
@@ -67,6 +77,8 @@ async def diff_frames(req: DiffRequest = Body(...)):
     eligible, reason = check_comparison_eligibility(meta1, meta2)
     if not eligible:
         raise HTTPException(status_code=400, detail=f"Comparison ineligible: {reason}")
+
+    require_validated_spectral_compatibility()
 
     try:
         # Fetch cutouts using cache or cutout service
@@ -151,6 +163,8 @@ async def stack_frames(req: StackRequest = Body(...)):
                 status_code=400,
                 detail=f"Frame '{m.get('id')}' pointing is too far from reference frame ({dist_deg:.2f}° > 0.5°). Co-addition requires overlapping celestial footprints."
             )
+
+    require_validated_spectral_compatibility()
 
     for fid, meta in zip(req.frame_ids, metas):
 

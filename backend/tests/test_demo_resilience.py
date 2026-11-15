@@ -43,11 +43,8 @@ def test_diff_on_demo_epochs():
             "frame_id_1": d3_recs[0].id,
             "frame_id_2": d3_recs[1].id
         })
-        assert diff_resp.status_code == 200
-        diff_data = diff_resp.json()
-        assert diff_data["eligible"] is True
-        assert "diff_stats" in diff_data
-        assert not any(str(v) == "nan" for v in diff_data["diff_stats"].values())
+        assert diff_resp.status_code == 422
+        assert "per-pixel wavelength compatibility" in diff_resp.json()["detail"]
 
 def test_webp_frame_and_diff_endpoints():
     barnard_recs = demo_service.find_matching_observations(269.45208, 4.69339, radius_deg=0.1)
@@ -67,8 +64,6 @@ def test_webp_frame_and_diff_endpoints():
         "frame_id_2": d3_recs[1].id,
         "format": "webp"
     })
-    assert diff_resp.status_code == 200
-    d_data = diff_resp.json()
-    assert d_data["image_base64"].startswith("data:image/webp;base64,")
-    assert "alignment_method" in d_data["diff_stats"]
+    assert diff_resp.status_code == 422
+    assert "spectral WCS" in diff_resp.json()["detail"]
 

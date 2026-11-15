@@ -88,7 +88,7 @@ Retrieves calibrated FITS image cutout, Astropy celestial WCS parameters, qualit
 ```
 
 ### `POST /frames/diff`
-Computes scientific calibrated difference image ($I_2 - I_1$) with 2D sub-pixel registration and NaN-safe mid-gray mapping.
+Temporarily returns HTTP 422: per-pixel wavelength compatibility has not been validated with separate spectral WCS products. Same-detector labels and broad wavelength ranges are insufficient.
 
 **Request Body:**
 ```json
@@ -223,7 +223,7 @@ Measures candidate astrometric displacement and annual proper motion rate ($\mu$
 ```
 
 ### `GET /science/spectrum`
-Computes Spectral Energy Distribution (SED) by extracting circular aperture photometry across up to six SPHEREx detector arrays (D1: 0.75–1.12 µm, D2: 1.12–1.68 µm, D3: 1.68–2.42 µm, D4: 2.42–3.82 µm, D5: 3.82–4.42 µm, D6: 4.42–5.00 µm) with WCS-WAVE wavelengths and propagated `VARIANCE` uncertainties where available; otherwise nominal wavelengths or background-estimated uncertainties are labeled. Accompanied by an illustrative/interpolated 102-point continuum model.
+Computes Spectral Energy Distribution (SED) by extracting circular aperture photometry across up to six SPHEREx detector arrays (D1: 0.75–1.12 µm, D2: 1.12–1.68 µm, D3: 1.68–2.42 µm, D4: 2.42–3.82 µm, D5: 3.82–4.42 µm, D6: 4.42–5.00 µm) with approximate WCS-WAVE visualization wavelengths and propagated `VARIANCE` uncertainties where available; otherwise nominal wavelengths or background-estimated uncertainties are labeled. Accompanied by an illustrative/interpolated 102-point continuum model.
 
 > [!IMPORTANT]
 > **Spectrophotometry Truthfulness:**
@@ -300,3 +300,6 @@ Generates a formal, structured Space Apps scientific discovery report with J2000
 
 
 Observation records identify search provenance as `irsa_query`, `cached_demo`, or `unknown`; an IRSA search result may still use cached image bytes. Spectrum band `uncertainty_source` distinguishes `variance_propagated`, `background_estimate`, `unknown`, and illustrative model errors. Only valid propagated uncertainties can enter the temperature fit. The `is_variable` light-curve field is a heuristic flag and does not establish variability or stability.
+
+
+**Current comparison limitation:** `/api/frames/diff` and `/api/frames/stack` return HTTP 422 for otherwise eligible frames until per-pixel spectral compatibility can be validated. Blink remains available. The embedded WCS-WAVE lookup is approximate and intended for visualization; see the [IRSA explanatory supplement](https://irsa.ipac.caltech.edu/data/SPHEREx/docs/SPHEREx_Expsupp.pdf).

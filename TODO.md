@@ -100,3 +100,7 @@
 - **Scientific validation:** Verify within-detector effective wavelength compatibility, demo/live provenance throughout derived analyses, and independently validate actual target detections, motion and variability.
 - **Human accessibility:** Test keyboard workflows, narrow screens and physical screen readers; source-pattern checks alone do not establish accessibility conformance.
 - **Cached cutout selection:** Live requests now use isolated exact-coordinate and size cache keys; old potentially contaminated cache entries are retained but not trusted. Demo cutouts have fixed coverage, which the viewer labels. Verify actual coverage and size across additional live and offline cases.
+
+- **Restore scientifically validated image arithmetic:** Integrate the correct release-specific spectral WCS files, align per-pixel passbands with celestial reprojection, define and validate a defensible compatibility criterion, and test actual compatible and incompatible observations. The public difference and co-addition endpoints intentionally return 422 until then; blink remains available.
+
+  - IRSA documents detector-pixel `CWAVE` and `CBAND` arrays in release-specific spectral WCS calibration FITS files; calibration files are not available through SIA2. Identify each observation’s matching calibration version before retrieval. Sources: https://caltech-ipac.github.io/spherex-archive-documentation/spherex-data-products/ and https://caltech-ipac.github.io/spherex-archive-documentation/spherex-data-access/.

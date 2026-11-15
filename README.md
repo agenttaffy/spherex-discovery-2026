@@ -12,7 +12,7 @@ The application enables citizen scientists, educators, and professional astronom
 
 > [!NOTE]
 > **Spectrophotometry Truthfulness & Scope:**
-> On-the-fly SED analysis measures aperture photometry across up to six detector-band points (D1–D6) with WCS-WAVE calibration and propagated `VARIANCE` uncertainties where available; otherwise wavelength or uncertainty estimates are labeled, accompanied by an illustrative/interpolated 102-point continuum. This is **not 102 observed resolved SPHEREx channels**. The API reports `continuum_shape` as a neutral broadband descriptor (e.g. "flux rises toward longer measured bands"); `spectral_class` was removed from the API to avoid false impressions of spectral typing. Any fitted temperature is strictly an optional constrained single-temperature blackbody continuum fit (requiring $\ge 3$ distinct measured bands with valid propagated uncertainties, $\text{dof} \ge 1$), not an object's known physical temperature.
+> On-the-fly SED analysis measures aperture photometry across up to six detector-band points (D1–D6) with approximate WCS-WAVE wavelengths and propagated `VARIANCE` uncertainties where available; otherwise wavelength or uncertainty estimates are labeled, accompanied by an illustrative/interpolated 102-point continuum. This is **not 102 observed resolved SPHEREx channels**. The API reports `continuum_shape` as a neutral broadband descriptor (e.g. "flux rises toward longer measured bands"); `spectral_class` was removed from the API to avoid false impressions of spectral typing. Any fitted temperature is strictly an optional constrained single-temperature blackbody continuum fit (requiring $\ge 3$ distinct measured bands with valid propagated uncertainties, $\text{dof} \ge 1$), not an object's known physical temperature.
 
 ---
 
@@ -26,7 +26,9 @@ The application enables citizen scientists, educators, and professional astronom
    - Recreating Clyde Tombaugh's classic discovery workflow with high-frequency alternate epoch toggling.
    - Chronological video-like time-lapse playback with variable frame rates (1x, 2x, 4x) and looping.
 
-3. **Differential Image Engine ($I_2 - I_1$):**
+3. **Difference and co-addition (temporarily unavailable):**
+   - The endpoints are guarded until per-pixel wavelength compatibility can be validated with separate spectral WCS products. Use blink playback for visual comparisons.
+   - Historical implementation:
    - Sub-pixel celestial differencing to isolate astrometric and photometric transients.
    - Telemetry measuring RMS difference flux, peak positive arrival flux, and peak negative departure flux in calibrated units ($\text{MJy/sr}$).
 

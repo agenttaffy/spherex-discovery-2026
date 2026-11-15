@@ -30,7 +30,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations }) 
   const obs1 = observations[safeIndex1];
   const obs2 = observations[safeIndex2];
 
-  // Auto-select a compatible second epoch with matching detector band when available
+  // Prefer a second epoch with the same detector; that alone does not establish compatibility.
   useEffect(() => {
     if (observations.length >= 2) {
       const d1 = observations[safeIndex1]?.detector;
@@ -131,7 +131,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations }) 
         <Sparkles className="w-12 h-12 text-cyan-500/40 mb-3" />
         <h3 className="text-base font-semibold text-slate-200">Insufficient Epochs</h3>
         <p className="text-xs text-slate-400 max-w-md mt-1">
-          Astronomical comparison requires at least two epochs from the same or compatible detector band.
+          At least two epochs are needed. Matching detector bands does not establish wavelength compatibility.
         </p>
       </div>
     );
@@ -145,6 +145,9 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations }) 
 
   return (
     <div className="flex-1 flex flex-col p-3 sm:p-6 bg-slate-950 overflow-y-auto max-w-full">
+      <p className="mb-4 rounded border border-amber-700 bg-amber-950/40 p-3 text-xs text-amber-100" role="status">
+        Difference and co-addition are temporarily unavailable until per-pixel wavelength compatibility can be validated with the separate spectral WCS products. Use Blink to inspect epochs visually.
+      </p>
       {/* Top Header & Mode Switcher */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between pb-4 border-b border-slate-800 gap-4">
         <div>

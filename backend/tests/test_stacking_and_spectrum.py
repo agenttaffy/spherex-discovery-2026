@@ -136,14 +136,8 @@ def test_stack_frames_endpoint_on_demo_epochs():
         "method": "mean",
         "format": "png",
     })
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data["success"] is True
-    assert data["frame_count"] == 2
-    assert data["theoretical_snr_gain"] == pytest.approx(1.414, rel=1e-2)
-    assert "image_base64" in data
-    assert data["image_base64"].startswith("data:image/png;base64,")
-    assert "noise_stats" in data
+    assert resp.status_code == 422
+    assert "per-pixel wavelength compatibility" in resp.json()["detail"]
 
 def test_stack_frames_endpoint_validation():
     # Empty list -> 400
@@ -174,11 +168,8 @@ def test_stack_frames_endpoint_webp_and_median():
         "method": "median",
         "format": "webp",
     })
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data["success"] is True
-    assert data["method"] == "median"
-    assert data["image_base64"].startswith("data:image/webp;base64,")
+    assert resp.status_code == 422
+    assert "spectral WCS" in resp.json()["detail"]
 
 def test_compute_coadd_stack_edge_cases():
     with pytest.raises(ValueError, match="Cannot stack an empty list"):

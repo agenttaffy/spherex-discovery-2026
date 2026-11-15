@@ -284,3 +284,9 @@ Testing IRSA SIA connectivity to: https://irsa.ipac.caltech.edu/SIA?COLLECTION=s
 
 - Cache regression: verifies that a legacy entry is not reused as a live cutout and that differing field sizes have distinct keys. The demo cache remains fixed coverage.
 - Release-selection regression: empty selected-release searches do not silently retry across all releases for photometry or spectrum.
+
+
+## Wavelength safety follow-up (2026-11-14)
+- Backend: 98 passed, 2 Astropy FITSFixedWarnings with normal local networking. Frontend build passed; the 41 source-based accessibility checks and 22 demo asset checks passed.
+- Endpoint tests now verify HTTP 422 for difference and co-addition until per-pixel spectral compatibility is established. Numerical difference and stack unit tests still exercise their internal algorithms; they do not validate science compatibility. WCS-WAVE checks reject missing mapping cards and positions outside the lookup grid.
+- Visual checks predate this safety notice; the updated notice and new unavailable state have not been manually inspected.

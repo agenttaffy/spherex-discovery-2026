@@ -696,6 +696,10 @@ def test_audit_fits_processing_wavelength_and_mask_semantics():
     img_hdr = fits.Header()
     img_hdr["NAXIS1"] = 20
     img_hdr["NAXIS2"] = 20
+    img_hdr["CRPIX1W"] = 0.0
+    img_hdr["CRPIX2W"] = 0.0
+    img_hdr["CRVAL1W"] = 1.0
+    img_hdr["CRVAL2W"] = 1.0
     img_hdu = fits.ImageHDU(data=np.ones((20, 20), dtype=np.float32), header=img_hdr, name="IMAGE")
     hdul = fits.HDUList([fits.PrimaryHDU(), img_hdu, wave_hdu])
 
@@ -707,12 +711,20 @@ def test_audit_fits_processing_wavelength_and_mask_semantics():
     wave_center = extract_calibrated_wavelength(hdul, target_coord=None)
     assert wave_center is not None
     assert wave_center["wavelength_um"] == pytest.approx(3.12, rel=1e-3)
+    del hdul["IMAGE"].header["CRPIX1W"]
+    assert extract_calibrated_wavelength(hdul) is None
+    hdul["IMAGE"].header["CRPIX1W"] = -3000.0
+    assert extract_calibrated_wavelength(hdul) is None
 
     # Target coord with valid celestial 3D WCS (NAXIS=3)
     img_hdr3d = fits.Header()
     img_hdr3d["NAXIS1"] = 20
     img_hdr3d["NAXIS2"] = 20
     img_hdr3d["NAXIS3"] = 1
+    img_hdr3d["CRPIX1W"] = 0.0
+    img_hdr3d["CRPIX2W"] = 0.0
+    img_hdr3d["CRVAL1W"] = 1.0
+    img_hdr3d["CRVAL2W"] = 1.0
     img_hdr3d["CTYPE1"] = "RA---TAN"
     img_hdr3d["CTYPE2"] = "DEC--TAN"
     img_hdr3d["CTYPE3"] = "WAVE"

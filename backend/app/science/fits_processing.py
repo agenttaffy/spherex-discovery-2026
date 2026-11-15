@@ -181,8 +181,9 @@ def extract_calibrated_wavelength(
     target_coord: Optional[Tuple[float, float]] = None,
 ) -> Optional[Dict[str, Any]]:
     """
-    Extracts calibrated wavelength and bandwidth from the official SPHEREx WCS-WAVE
-    tabular extension. Evaluates the 2D dispersion calibration at the target's celestial
+    Estimates wavelength and bandwidth from the SPHEREx WCS-WAVE
+    tabular extension. This lookup is intended for visualization; scientific analysis
+    requires the separate spectral WCS calibration product. Evaluates at the target's celestial
     coordinates (or image center) on the detector focal plane.
     If target_coord was provided but could not be projected via WCS, returns None (unavailable).
     Only measures at image center when target_coord is explicitly None.
@@ -224,19 +225,23 @@ def extract_calibrated_wavelength(
             px = (naxis1 - 1.0) / 2.0
             py = (naxis2 - 1.0) / 2.0
 
-        crpix1w = float(img_hdr.get("CRPIX1W", 0.0))
-        crpix2w = float(img_hdr.get("CRPIX2W", 0.0))
-        crval1w = float(img_hdr.get("CRVAL1W", 1.0))
-        crval2w = float(img_hdr.get("CRVAL2W", 1.0))
+        if any(key not in img_hdr for key in ("CRPIX1W", "CRPIX2W", "CRVAL1W", "CRVAL2W")):
+            return None
+        crpix1w = float(img_hdr["CRPIX1W"])
+        crpix2w = float(img_hdr["CRPIX2W"])
+        crval1w = float(img_hdr["CRVAL1W"])
+        crval2w = float(img_hdr["CRVAL2W"])
 
         full_x = (float(px) + 1.0 - crpix1w) + crval1w - 1.0
         full_y = (float(py) + 1.0 - crpix2w) + crval2w - 1.0
 
-        interp_wave = RegularGridInterpolator((y_grid, x_grid), vals[:, :, 0], bounds_error=False, fill_value=None)
-        interp_dwave = RegularGridInterpolator((y_grid, x_grid), vals[:, :, 1], bounds_error=False, fill_value=None)
+        interp_wave = RegularGridInterpolator((y_grid, x_grid), vals[:, :, 0], bounds_error=False, fill_value=np.nan)
+        interp_dwave = RegularGridInterpolator((y_grid, x_grid), vals[:, :, 1], bounds_error=False, fill_value=np.nan)
 
         wave = float(interp_wave([[full_y, full_x]])[0])
         dwave = float(interp_dwave([[full_y, full_x]])[0])
+        if not np.isfinite(wave) or not np.isfinite(dwave) or wave <= 0 or dwave <= 0:
+            return None
 
         return {
             "wavelength_um": round(wave, 4),
