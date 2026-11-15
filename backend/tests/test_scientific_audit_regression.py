@@ -275,7 +275,7 @@ def test_priority_1_extract_source_mask():
 
 def test_priority_2_aperture_photometry_boundary_and_wcs_wave():
     """
-    Priority 2: Ensure aperture photometry applies boundary clipping area correction when target
+    Priority 2: Ensure aperture photometry rejects an unsupported clipped aperture when target
     is near the edge, and extract_calibrated_wavelength reads WCS-WAVE extension.
     """
     # 1. Boundary clipping test
@@ -292,7 +292,8 @@ def test_priority_2_aperture_photometry_boundary_and_wcs_wave():
     )
     assert phot_corner["coverage_fraction"] < 1.0
     assert phot_corner["coverage_fraction"] > 0.1
-    assert phot_corner["net_flux"] > 0.0
+    assert phot_corner["valid"] is False
+    assert phot_corner["net_flux"] is None
 
     # 2. WCS-WAVE wavelength calibration extraction test
     wcs_wave_hdr = fits.Header()

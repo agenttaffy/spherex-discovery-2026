@@ -205,16 +205,33 @@ def test_discovery_report_endpoint():
     assert "Barnard's Star" in data["markdown_report"]
 
 def test_photometry_preset_differentiation():
-    # RW Aurigae (76.95420, 30.40140) should be variable across epochs
+    # Exercise cached targets without assuming the data establish variability.
     resp_rw = client.get("/api/science/photometry?ra=76.95420&dec=30.40140")
     assert resp_rw.status_code == 200
     data_rw = resp_rw.json()
     assert data_rw["total_points"] >= 2
-    assert data_rw["is_variable"] is True
+    assert data_rw["valid_points_count"] == sum(p["valid"] for p in data_rw["points"])
+    assert all(p["net_flux_mjy_sr"] is None for p in data_rw["points"] if not p["valid"])
 
-    # Barnard's Star (269.45208, 4.69339) is a stable red dwarf within its bands
+    # A non-triggered heuristic does not establish stability.
     resp_b = client.get("/api/science/photometry?ra=269.45208&dec=4.69339&detector=SPHEREx-D3")
     assert resp_b.status_code == 200
     data_b = resp_b.json()
     assert data_b["total_points"] >= 2
-    assert data_b["is_variable"] is False
+    assert data_b["valid_points_count"] == sum(p["valid"] for p in data_b["points"])
+
+
+def test_photometry_rejects_clipped_and_masked_apertures_without_biasing_subpixel_centers():
+    image = np.ones((21, 21))
+    image[10, 10] = 20
+    full = compute_aperture_photometry(image, center_x=10.4, center_y=10.3)
+    assert full["valid"] is True
+    assert full["coverage_fraction"] == 1.0
+    mask = np.zeros_like(image, dtype=bool)
+    mask[10, 10] = True
+    masked = compute_aperture_photometry(image, center_x=10.4, center_y=10.3, mask=mask)
+    assert masked["valid"] is False and masked["net_flux"] is None
+    clipped = compute_aperture_photometry(image, center_x=0.4, center_y=0.3)
+    assert clipped["valid"] is False and clipped["flux_err"] is None
+    no_background = compute_aperture_photometry(image, center_x=10, center_y=10, source_mask=np.ones_like(mask))
+    assert no_background["valid"] is False and no_background["net_flux"] is None

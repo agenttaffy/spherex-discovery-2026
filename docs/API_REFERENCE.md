@@ -303,3 +303,5 @@ Observation records identify search provenance as `irsa_query`, `cached_demo`, o
 
 
 **Current comparison limitation:** `/api/frames/diff` and `/api/frames/stack` return HTTP 422 for otherwise eligible frames until per-pixel spectral compatibility can be validated. Blink remains available. The embedded WCS-WAVE lookup is approximate and intended for visualization; see the [IRSA explanatory supplement](https://irsa.ipac.caltech.edu/data/SPHEREx/docs/SPHEREx_Expsupp.pdf).
+
+Photometry is unavailable if the aperture is clipped, contains invalid or masked pixels, or has no valid source-free background annulus. No area-only correction is applied to missing point-source flux.

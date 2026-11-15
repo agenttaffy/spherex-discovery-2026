@@ -126,10 +126,14 @@ def compute_aperture_photometry(
             "valid_pixel_count": 0,
         }
 
-    # Theoretical full circular aperture area
-    r_int = int(np.ceil(aperture_radius))
-    dy_grid, dx_grid = np.ogrid[-r_int:r_int+1, -r_int:r_int+1]
-    n_geom = int(np.sum(dy_grid**2 + dx_grid**2 <= aperture_radius**2))
+    # Count the full discrete aperture at the actual subpixel center, including
+    # pixel centers outside the image. An area ratio cannot recover missing
+    # point-source flux when the aperture is clipped or masked.
+    full_y = np.arange(np.floor(center_y - aperture_radius), np.ceil(center_y + aperture_radius) + 1)
+    full_x = np.arange(np.floor(center_x - aperture_radius), np.ceil(center_x + aperture_radius) + 1)
+    n_geom = int(np.count_nonzero(
+        (full_y[:, None] - center_y) ** 2 + (full_x[None, :] - center_x) ** 2 <= aperture_radius ** 2
+    ))
 
     # Aperture mask on image pixels (directly slice image without fabricating fill values)
     geom_ap_mask = dist <= aperture_radius
@@ -138,21 +142,36 @@ def compute_aperture_photometry(
     n_ap = int(np.sum(ap_mask))
     coverage_fraction = float(n_ap / max(1, n_geom))
 
+    if n_ap < n_geom:
+        return {
+            "status": "unavailable", "valid": False,
+            "reason": "Aperture is clipped or contains invalid pixels; missing source flux cannot be recovered by area scaling",
+            "aperture_flux_sum": None, "aperture_mean": None,
+            "background_median": None, "background_std": None,
+            "net_flux": None, "flux_err": None, "peak_flux": None, "snr": None,
+            "coverage_fraction": round(coverage_fraction, 3),
+            "aperture_area_pixels": n_geom, "valid_pixel_count": n_ap,
+        }
+
     # Background annulus mask: exclude fatal mask and optionally exclude detected field sources
     ann_mask = (dist >= annulus_inner) & (dist <= annulus_outer) & valid_mask
     if source_mask is not None and source_mask.shape == image.shape:
-        pure_bg_mask = ann_mask & (~source_mask)
-        if np.any(pure_bg_mask):
-            ann_mask = pure_bg_mask
+        ann_mask &= ~source_mask
     ann_pixels = image[ann_mask]
     n_ann = int(np.sum(ann_mask))
 
-    if n_ann > 0:
-        bg_med = float(np.median(ann_pixels))
-        bg_std = float(np.std(ann_pixels))
-    else:
-        bg_med = float(np.median(image[valid_mask]))
-        bg_std = float(np.std(image[valid_mask]))
+    if n_ann == 0:
+        return {
+            "status": "unavailable", "valid": False,
+            "reason": "No valid source-free background annulus pixels",
+            "aperture_flux_sum": None, "aperture_mean": None,
+            "background_median": None, "background_std": None,
+            "net_flux": None, "flux_err": None, "peak_flux": None, "snr": None,
+            "coverage_fraction": round(coverage_fraction, 3),
+            "aperture_area_pixels": n_geom, "valid_pixel_count": n_ap,
+        }
+    bg_med = float(np.median(ann_pixels))
+    bg_std = float(np.std(ann_pixels))
 
     if bg_std < 1e-6:
         bg_std = 1.0
@@ -197,15 +216,8 @@ def compute_aperture_photometry(
         # Poisson + background uncertainty estimate
         raw_flux_err = float(np.sqrt(n_ap * (bg_std ** 2) + (n_ap ** 2 / max(1, n_ann)) * (bg_std ** 2)))
 
-    # Astronomical aperture boundary clipping correction:
-    # If the target is located near the frame border or has masked pixels within the aperture,
-    # scale the net flux and error by the aperture coverage fraction (1 / f_cov)
-    if coverage_fraction >= 0.15:
-        net_flux = float(raw_net_flux / coverage_fraction)
-        flux_err = float(raw_flux_err / coverage_fraction)
-    else:
-        net_flux = raw_net_flux
-        flux_err = raw_flux_err
+    net_flux = raw_net_flux
+    flux_err = raw_flux_err
 
     snr = float(net_flux / flux_err) if flux_err > 1e-6 else float((peak_val - bg_med) / bg_std)
 

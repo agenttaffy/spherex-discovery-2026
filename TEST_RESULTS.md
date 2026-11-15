@@ -290,3 +290,8 @@ Testing IRSA SIA connectivity to: https://irsa.ipac.caltech.edu/SIA?COLLECTION=s
 - Backend: 98 passed, 2 Astropy FITSFixedWarnings with normal local networking. Frontend build passed; the 41 source-based accessibility checks and 22 demo asset checks passed.
 - Endpoint tests now verify HTTP 422 for difference and co-addition until per-pixel spectral compatibility is established. Numerical difference and stack unit tests still exercise their internal algorithms; they do not validate science compatibility. WCS-WAVE checks reject missing mapping cards and positions outside the lookup grid.
 - Visual checks predate this safety notice; the updated notice and new unavailable state have not been manually inspected.
+
+
+## Aperture safety follow-up (2026-11-14)
+- Full backend: 99 passed, 2 Astropy FITSFixedWarnings with normal local networking. Tests cover subpixel full apertures, clipped/masked apertures and a source-masked annulus.
+- Some cached observations yield no usable background; their photometry and derived observed-band metrics are unavailable. Existing fixture tests no longer assume a target name guarantees a measurement or variability.

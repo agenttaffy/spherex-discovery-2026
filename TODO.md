@@ -91,7 +91,7 @@
 - [x] `P6-017` | COMPLETED | Spectrum and temperature fit truthfulness pass: neutral broadband continuum shapes (`continuum_shape`, `spectral_class` removed from API), strict temperature fitting requiring >= 3 distinct measured bands with valid propagated uncertainties (dof >= 1), and unavailable zero-observation summary metrics without synthetic measured peaks (93 pytest tests passing with 2 Astropy FITSFixedWarnings, 41 accessibility checks, clean build, commit `208aa15`)
 
 ## Open Work & Remaining Scientific Boundaries
-- **Aperture Edge and Mask Correction:** Current discrete coverage scaling is an approximation; validate its bias, subpixel behavior, uncertainty and scientific suitability before relying on clipped or masked apertures.
+- **Aperture Edge and Mask Correction:** Clipped or invalid/masked apertures and annuli with no source-free background pixels now return unavailable. Investigate validated PSF-aware alternatives and background estimation before restoring measurements in these cases.
 - **High-Concurrency Remote IRSA Proxy Resilience:** Upstream IRSA SIA2/IBE endpoints may encounter 502/503 timeouts during heavy traffic; protected by 3.5s timeout and local 22-asset demo cache.
 - **Full Survey Tile Ingestion:** Automated ingestion pipeline for full-size (~70 MB each) Level 2 tiles beyond the 22 pre-cached demonstration cutouts.
 - **External CDN Dependency for Aladin Lite v3:** Aladin Lite context tiles rely on external CDS servers; native CanvasViewer provides 100% offline fallback.
