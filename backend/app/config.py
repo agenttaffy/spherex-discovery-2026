@@ -31,4 +31,10 @@ IRSA_IBE_BASE_URL = os.getenv("IRSA_IBE_BASE_URL", "https://irsa.ipac.caltech.ed
 DEFAULT_FOV_DEG = float(os.getenv("DEFAULT_FOV_DEG", "0.05"))
 MAX_FOV_DEG = float(os.getenv("MAX_FOV_DEG", "0.3"))
 DEFAULT_COLLECTION = os.getenv("DEFAULT_COLLECTION", "spherex_dr1")
+# Explicit collection list for the multi-release search. Deployments can add
+# a new IRSA collection without turning the query into an all-archive search.
+SEARCH_COLLECTIONS = tuple(dict.fromkeys(
+    item.strip() for item in os.getenv("SPHEREX_SEARCH_COLLECTIONS", "spherex_dr1,spherex_qr3").split(",")
+    if item.strip() and item.strip().upper() != "ALL"
+)) or ("spherex_dr1", "spherex_qr3")
 DEFAULT_STRETCH = os.getenv("DEFAULT_STRETCH", "asinh")

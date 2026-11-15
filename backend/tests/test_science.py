@@ -84,6 +84,37 @@ def test_science_endpoints_do_not_silently_change_release(monkeypatch):
         assert query.await_count == 1
         assert query.await_args.kwargs["collection"] == "spherex_dr1"
 
+
+def test_all_release_search_queries_only_the_two_requested_collections(monkeypatch):
+    import asyncio
+    from app.services.irsa_client import IRSAClient
+    import app.services.irsa_client as irsa_module
+
+    seen = []
+
+    class Client:
+        def __init__(self, **kwargs): pass
+        async def __aenter__(self): return self
+        async def __aexit__(self, *args): pass
+        async def get(self, url, params):
+            collection = params["COLLECTION"]
+            seen.append(collection)
+            mjd = "60002" if collection == "spherex_dr1" else "60001"
+            body = ("obs_id,energy_bandpassname,access_url,t_min\n"
+                    f"{collection}-1,SPHEREx-D1,https://example.invalid/{collection}-1,{mjd}\n"
+                    f"{collection}-2,SPHEREx-D1,https://example.invalid/{collection}-2,{mjd}\n")
+            return type("Response", (), {"status_code": 200, "text": body})()
+
+    monkeypatch.setattr(irsa_module.httpx, "AsyncClient", Client)
+    records = asyncio.run(IRSAClient().query_observations(10, 20, collection="ALL", limit=2))
+    assert sorted(seen) == ["spherex_dr1", "spherex_qr3"]
+    assert [record.collection for record in records] == ["spherex_qr3", "spherex_dr1"]
+    seen.clear()
+    monkeypatch.setattr(irsa_module, "SEARCH_COLLECTIONS", ("spherex_dr1", "spherex_qr3", "spherex_future"))
+    records = asyncio.run(IRSAClient().query_observations(10, 20, collection=None, limit=3))
+    assert set(seen) == {"spherex_dr1", "spherex_qr3", "spherex_future"}
+    assert {record.collection for record in records} == set(seen)
+
 def test_aperture_photometry_gaussian_source():
     # Create 21x21 image with a Gaussian peak in center
     h, w = 21, 21

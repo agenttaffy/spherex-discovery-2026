@@ -30,8 +30,16 @@ def test_offline_observation_discovery_fallback():
         assert frame_resp.status_code == 200
         frame_data = frame_resp.json()
         assert frame_data["is_synthetic"] is False
+        assert frame_data["image_provenance"] == "cached_demo_cutout"
         assert frame_data["image_base64"].startswith("data:image/png;base64,")
         assert frame_data["pixel_stats"]["mean_mjy_sr"] != 0.0
+
+
+def test_offline_search_does_not_expand_requested_radius():
+    with patch("httpx.AsyncClient.get", side_effect=Exception("Offline")):
+        resp = client.get("/api/observations?ra=269.55208&dec=4.69339&fov=0.01&collection=spherex_dr1")
+    assert resp.status_code == 200
+    assert resp.json()["total_found"] == 0
 
 def test_diff_on_demo_epochs():
     # Get Barnard's Star demo records

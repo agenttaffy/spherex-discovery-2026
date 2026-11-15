@@ -179,14 +179,14 @@ export const SearchControls: React.FC<SearchControlsProps> = ({
               type="button"
               onClick={() => setCollection('ALL')}
               aria-pressed={collection === 'ALL'}
-              aria-label="All Surveys Multi-Epoch (DR1 and QR3)"
+              aria-label="Search configured releases for multiple epochs"
               className={`py-1.5 px-1.5 text-[11px] rounded-md border transition text-center focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${
                 collection === 'ALL'
                   ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300 font-semibold'
                   : 'bg-slate-950 border-slate-800 text-slate-300 hover:text-white'
               }`}
             >
-              All (Multi-Epoch)
+              Configured releases
             </button>
           </div>
         </div>

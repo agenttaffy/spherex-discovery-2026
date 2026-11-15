@@ -2,11 +2,12 @@ import csv
 import io
 import ssl
 import time
+import asyncio
 import certifi
 import httpx
 from typing import List, Dict, Any, Optional
 from astropy.time import Time
-from app.config import IRSA_SIA_BASE_URL
+from app.config import IRSA_SIA_BASE_URL, SEARCH_COLLECTIONS
 from app.models.schemas import ObservationRecord
 
 # In-memory registry of queried observations so /api/frames/{frame_id} can resolve them
@@ -40,13 +41,32 @@ class IRSAClient:
         Queries NASA IRSA SIA2 service for SPHEREx observations.
         Includes circuit breaker for remote outages and instant offline demo fallback.
         """
+        if collection is None or collection.upper() == "ALL":
+            # SIA without COLLECTION is not a SPHEREx-only search. Query each
+            # configured collection explicitly so release provenance is retained.
+            groups = await asyncio.gather(*(
+                self.query_observations(ra, dec, radius_deg, name, detector, limit)
+                for name in SEARCH_COLLECTIONS
+            ))
+            # Share the result limit between collections before sorting by time;
+            # otherwise older rows can hide later releases.
+            merged = []
+            for index in range(max((len(group) for group in groups), default=0)):
+                for group in groups:
+                    if index < len(group) and len(merged) < limit:
+                        merged.append(group[index])
+                if len(merged) >= limit:
+                    break
+            merged.sort(key=lambda record: (record.mjd is None, record.mjd or 0.0))
+            return merged
+
         now = time.time()
         if now < self._offline_until:
             from app.services.demo_service import demo_service
             fallback = demo_service.find_matching_observations(
                 ra=ra,
                 dec=dec,
-                radius_deg=max(radius_deg, 0.15),
+                radius_deg=radius_deg,
                 collection=collection,
                 detector=detector,
             )
@@ -122,7 +142,7 @@ class IRSAClient:
             fallback = demo_service.find_matching_observations(
                 ra=ra,
                 dec=dec,
-                radius_deg=max(radius_deg, 0.15),
+                radius_deg=radius_deg,
                 collection=collection,
                 detector=detector,
             )
