@@ -428,7 +428,15 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
 
           {/* Bottom Floating Telemetry & Zoom Dock */}
           <div className="shrink-0 z-20 flex flex-wrap items-center justify-between gap-2 px-3 py-2 border-t border-slate-800 bg-slate-950">
-            {showCatalog && <p className="w-full text-[11px] text-slate-300" role="status">{catalogError || 'Catalog positions are projected at their catalog epoch; proper motion is not applied and a marker does not confirm identity.'}</p>}
+            {showCatalog && <div className="w-full text-[11px] text-slate-300" role="status">
+              <p>{catalogError || 'Catalog coordinates are projected as provided; proper motion is not applied and a marker does not confirm identity.'}</p>
+              {catalogSources.length > 0 && (() => {
+                const nearest = catalogSources.reduce((a, b) => a.separation_arcsec <= b.separation_arcsec ? a : b);
+                const source = nearest.provenance || nearest.catalog_source || 'Unknown catalog source';
+                const demo = /demo|curated/i.test(source);
+                return <p className="mt-1">Nearest listed reference to the search position: {nearest.designation || nearest.source_id} · {nearest.separation_arcsec.toFixed(2)} arcsec · {source}. {demo ? 'Demo coordinates are not independent confirmation.' : 'Proximity alone does not confirm a match.'}</p>;
+              })()}
+            </div>}
             <div className="bg-slate-900/90 backdrop-blur-md border border-slate-800 px-3 py-1 rounded-md pointer-events-auto text-[11px] font-mono text-slate-300 flex items-center gap-3">
               <span>Scale: {(zoom * 100).toFixed(0)}%</span>
               {frame && (
@@ -477,7 +485,7 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
                 >
                   <Star className="w-3.5 h-3.5 text-cyan-400" />
                   <span>
-                    {catalogSources[0]?.provenance?.includes('Demo') ? 'Curated Demo Gaia' : (catalogSources[0]?.provenance?.includes('Live') ? 'Live Gaia TAP' : 'Gaia DR3')}{' '}
+                    {catalogSources[0]?.provenance?.includes('Demo') ? 'Demo catalog' : (catalogSources[0]?.provenance?.includes('Live') ? 'Live Gaia TAP' : 'Reference catalog')}{' '}
                     {catalogSources.length > 0 ? `(${catalogSources.length})` : ''}
                   </span>
                 </button>
