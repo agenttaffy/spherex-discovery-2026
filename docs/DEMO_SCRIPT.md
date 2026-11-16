@@ -1,6 +1,16 @@
 # SPHEREx Discovery judge walkthrough
 
-**Planet X and SPHEREx** asks for a public-facing web tool that helps people inspect how SPHEREx images of the sky change over time. This walkthrough uses the local build and verified NASA/IPAC archive data. [Challenge brief reproduced by NASA Space Apps Lucerne](https://www.spaceappschallenge.ch/) · [Regional challenge listing](https://www.spaceappsulaanbaatar.com/challenges)
+**Planet X and SPHEREx** asks for a public-facing web tool that helps people inspect how SPHEREx images of the sky change over time. The public app uses NASA/IPAC archive data. The prepared local demonstration below uses staged copies of those data. [Challenge brief reproduced by NASA Space Apps Lucerne](https://www.spaceappschallenge.ch/) · [Regional challenge listing](https://www.spaceappsulaanbaatar.com/challenges)
+
+## Public recording · about one minute
+
+Open these three tabs before recording and let them finish loading. The free backend may need a minute to wake. Keep the [public home page](https://spherex-discovery-2026.vercel.app/) and [source repository](https://github.com/agenttaffy/spherex-discovery-2026) in the submission.
+
+1. [Epsilon Indi Explorer](https://spherex-discovery-2026.vercel.app/?target=epsilon_indi_b&ra=331.09813086506205&dec=-56.801144263858404&fov=0.04). Identify the date, detector, and image source. Play for a few seconds, then pause. Optionally toggle **Gaia DR3** for reference stars. Explain that the timeline displays dated infrared observations and that the Gaia markers come from a reference catalog.
+2. [Epsilon Indi Difference & Stack](https://spherex-discovery-2026.vercel.app/?ra=331.09813086506205&dec=-56.801144263858404&fov=0.04&tab=diff). Click **Try checked Epsilon Indi D5 field pair**, then switch to **Co-add**. The tested 2.4′ pair retained 485 of 529 pixels in both modes. The checkerboard shows excluded pixels. The results describe the field and do not establish object motion.
+3. [M57 in 102 Bands](https://spherex-discovery-2026.vercel.app/?tab=cube&ra=283.39617&dec=33.02918). Point to the measured spectrum and channel map. The tested sky pixel had measurements in 100 of the 102 channel slots. The DR1 cube combines data across dates. The channel slider changes wavelength.
+
+If time allows, open **Aladin context** in Explorer and select **AllWISE color** for a comparison sky survey. If the archive badge reports failed search, use the preloaded field. Saved observation lists are partial, and the app shows their provenance separately from the cloud source of a displayed image.
 
 ## Before the timer
 
@@ -46,11 +56,11 @@ Switch to the prepared **Difference & Stack** tab. Briefly point to the WISE rej
 
 Switch to the two prepared **Spectral Cube** tabs. Point out the requested coordinate, the sampled HPX pixel, and the coverage line. Barnard’s Star’s preview coordinate has **8 measured, 90 without usable coverage, 2 flagged, and 2 blank**. R Draconis’s preview coordinate has **0 measured, 100 without usable coverage, and 2 blank**. Show channel **51 · Blank in DR1**. With the cache active, point to **Cached DR1 sky-pixel preview** and optionally open **Cache provenance**. If the archive answers, say **IRSA archive result** and show the counts it returns.
 
-> “These are 102 actual DR1 channel slots in a cube built by combining observations. The sample is surface brightness at one sky pixel, with no single observation date or confirmed source association. Available channels vary by position. Blank and flagged channels stay as gaps. The optional 102-point continuum in the dated analysis is a separate interpolated model.”
+> “These are 102 actual DR1 channel slots in a cube built by combining observations. The sample is surface brightness at one sky pixel, with no single observation date or confirmed source association. Available channels vary by position. Blank and flagged channels stay as gaps.”
 
 ### 3:05–3:30 · Context and close
 
-If the prepared context tab says **Sky image rendered from the selected context survey**, show the survey credit and cyan FITS footprint, then return to **Canvas**. If the service is slow or unavailable, show the cached demonstration field in **Canvas**.
+Once the prepared context tab shows the sky image, show the survey credit and cyan FITS footprint, then return to **Canvas**. If the service is slow or unavailable, show the cached demonstration field in **Canvas**.
 
 > “Context imagery helps orient the field. The dated FITS images and calibration checks are what let us compare the SPHEREx observations. This demo runs locally from verified archive samples.”
 

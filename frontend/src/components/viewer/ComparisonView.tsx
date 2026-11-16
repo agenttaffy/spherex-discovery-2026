@@ -12,7 +12,7 @@ interface ComparisonViewProps {
   demoCacheOnly?: boolean;
 }
 
-export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations: searchObservations, fov, namedTarget }) => {
+export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations: searchObservations, fov, namedTarget, demoCacheOnly }) => {
   const [index1, setIndex1] = useState(0);
   const [index2, setIndex2] = useState(1);
   const [opMode, setOpMode] = useState<'diff' | 'stack'>('diff');
@@ -196,7 +196,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations: se
   }, [obs1?.id, obs2?.id, observations, opMode, stackMethod, fov, namedTarget, curated, extraKey]);
 
   const calibration = opMode === 'diff' ? diffResult?.calibration : stackResult?.calibration;
-  const demoSelector = (
+  const demoSelector = (demoCacheOnly || demoPair) ? (
     <section className="glass-card mb-4 w-full p-3 text-left text-sm" aria-label="Local comparison pair">
       <button
         type="button"
@@ -237,7 +237,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations: se
         </div>
       )}
     </section>
-  );
+  ) : null;
 
   if (observations.length < 2) {
     return (
