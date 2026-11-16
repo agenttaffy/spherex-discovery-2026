@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+.comparison-mask {
+  background: conic-gradient(#182131 25%, #0d1320 0 50%, #182131 0 75%, #0d1320 0) 0 0 / 16px 16px;
+}
+
 @font-face {
   font-family: Geist;
   src: url('/fonts/geist.woff2') format('woff2');

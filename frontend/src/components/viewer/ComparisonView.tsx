@@ -511,7 +511,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations: se
                   )}
                   <span className="text-slate-400">RMS {diffResult.diff_stats.rms_diff_mjy_sr.toPrecision(4)}</span>
                 </div>
-                <div className="w-full aspect-square bg-black rounded-lg border border-slate-700 overflow-hidden flex items-center justify-center relative">
+                <div className="comparison-mask w-full aspect-square rounded-lg border border-slate-700 overflow-hidden flex items-center justify-center relative">
                   <img
                     src={diffColormap === 'coolwarm' && diffResult.colormapped_base64 ? diffResult.colormapped_base64 : diffResult.image_base64}
                     alt="Difference Frame"
@@ -520,7 +520,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations: se
                 </div>
                 <div className="w-full flex flex-col items-center gap-1 mt-2">
                   <span className="text-[10px] text-slate-400 font-mono">
-                    Mid-scale = 0 residual
+                    Mid-scale = 0 residual · Checkerboard = excluded pixels
                   </span>
                   {/* Diverging palette colorbar legend */}
                   <div className="w-full flex items-center justify-between text-[9px] font-mono text-slate-400 px-1 pt-1 border-t border-slate-800/60">
@@ -538,7 +538,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations: se
                     <span>Co-Add Stack ({stackResult.method.toUpperCase()})</span>
                   </span>
                 </div>
-                <div className="w-full aspect-square bg-black rounded-lg border border-slate-700 overflow-hidden flex items-center justify-center relative">
+                <div className="comparison-mask w-full aspect-square rounded-lg border border-slate-700 overflow-hidden flex items-center justify-center relative">
                   <img
                     src={stackResult.image_base64}
                     alt="Stacked Co-Add Frame"
@@ -548,6 +548,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations: se
                 <span className="text-[10px] text-cyan-400 font-mono mt-2">
                   N={stackResult.frame_count} Co-added frames • {stackResult.dimensions.join('×')} px
                 </span>
+                <span className="text-[10px] text-slate-400 font-mono mt-1">Checkerboard = excluded pixels</span>
               </div>
             ) : null}
           </div>

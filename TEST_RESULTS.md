@@ -480,3 +480,9 @@ Testing IRSA SIA connectivity to: https://irsa.ipac.caltech.edu/SIA?COLLECTION=s
 - A real Epsilon Indi D5 field pair returned 485 of 529 valid field pixels for difference, mean and sum at the checked position and field size. These are field comparisons, not a confirmed detection or motion measurement.
 - IRSA DataLink and cross-mirror checks established example calibration associations for D1, D2 and D4; reuse for other images with the same detector and UUID is an inference, as documented in the detector calibration audit. A checked RW Aurigae D1 field pair retained 218/529 pixels; the screenshot pair failed wavelength compatibility. A checked Epsilon Indi D2 field pair retained 486/529 pixels. Neither field test confirms a target detection or motion.
 - Live deep-field SIA searches timed out. Unknown calibration identifiers remain unavailable, and visual end-to-end testing of the newest controls is outstanding.
+
+## Browser verification (2026-11-15)
+
+- A local Chrome browser opened the Epsilon Indi coordinate link in embed mode, automatically loaded the cached DR1 spectrum with 102 channel slots, and displayed the wavelength scan control.
+- The RW Aurigae DR1/D1 search returned 38 records during this check. Choosing the checked pair in the browser produced the difference and a two-exposure co-add, each with 218/529 retained field pixels. The comparison view uses a labeled checkerboard for pixels excluded from either calculation.
+- Epsilon Indi time-lapse advanced from observation 1 to 2. Enabling the Gaia DR3 overlay returned 153 reference sources for that field.
