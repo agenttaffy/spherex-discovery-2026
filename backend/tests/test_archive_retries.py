@@ -76,6 +76,17 @@ def test_unexpected_success_html_is_not_mistaken_for_live_observations():
     assert client._offline_until > 0
 
 
+def test_archive_cooldown_does_not_requery_for_uncached_position():
+    import time
+    client = IRSAClient("https://archive.example/sia")
+    client._offline_until = time.time() + 60
+    with patch("app.services.irsa_client.DEMO_CACHE_ONLY", False), \
+         patch.object(client, "_offline_observations", return_value=[]), \
+         patch("httpx.AsyncClient.get", new=AsyncMock()) as get:
+        assert asyncio.run(client.query_observations(1, 2, collection="spherex_dr1")) == []
+    get.assert_not_awaited()
+
+
 def test_connectivity_probe_rejects_successful_maintenance_page():
     client = IRSAClient("https://archive.example/sia")
     responses = [httpx.Response(200, text="<html>maintenance</html>"),

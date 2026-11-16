@@ -110,9 +110,9 @@ class IRSAClient:
 
         now = time.time()
         if DEMO_CACHE_ONLY or now < self._offline_until:
-            fallback = self._offline_observations(ra, dec, radius_deg, collection, detector, limit)
-            if DEMO_CACHE_ONLY or fallback:
-                return fallback
+            # During the cooldown, don't keep retrying a failing archive just
+            # because this particular sky position has no saved results.
+            return self._offline_observations(ra, dec, radius_deg, collection, detector, limit)
 
         params = {
             "POS": f"circle {ra:.6f} {dec:.6f} {radius_deg:.4f}",
