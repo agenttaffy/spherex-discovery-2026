@@ -195,6 +195,23 @@ def load_calibrated_exposure(science: fits.HDUList, release: str):
         return exposure, artifact
 
 
+def load_cached_calibrated_exposure(science: fits.HDUList, release: str):
+    """Prepare an exposure only from a known, checksum-verified cached map.
+
+    Unlike the normal loader this never contacts TAP, S3 or IRSA.
+    """
+    plane_id = spectral_calibration_plane_id(science)
+    detector = str(science["IMAGE"].header.get("DETECTOR", "")).strip()
+    artifact = verified_artifact(release, detector, plane_id)
+    if artifact is None:
+        raise ValueError("No locally verified calibration mapping for this exposure")
+    data = verified_cached_bytes(artifact)
+    if data is None:
+        raise ValueError("Verified calibration is not present in the local cache")
+    return prepare_calibrated_exposure(science, data, plane_id=artifact.plane_id,
+                                       checksum=artifact.checksum), artifact
+
+
 def find_calibration_artifact(
     client: httpx.Client, science: fits.HDUList, release: str,
 ) -> CalibrationArtifact:

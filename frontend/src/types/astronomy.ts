@@ -15,6 +15,12 @@ export interface ObservationRecord {
   dec: number;
 }
 
+export interface CompatiblePartners {
+  checked: number;
+  unavailable: number;
+  matches: { frame_id: string; retained_pixels: number; reference_pixels: number; minimum_retained_overlap: number }[];
+}
+
 export interface PixelStats {
   min_mjy_sr: number;
   max_mjy_sr: number;

@@ -40,6 +40,7 @@ jobs:
           npm run build
           node scripts/test-band-navigation.mjs
           node scripts/test-blink-selection.mjs
+          node scripts/test-comparison-candidates.mjs
           node scripts/test-cube-csv.mjs
           node scripts/test-cube-share.mjs
           node scripts/test-frame-cache.mjs
