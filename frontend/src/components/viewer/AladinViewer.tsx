@@ -55,6 +55,7 @@ async function hasRenderedSky(instance: any): Promise<boolean> {
 
 export const AladinViewer: React.FC<AladinViewerProps> = ({ ra, dec, fov = 0.04, footprint }) => {
   const mountRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<HTMLDivElement | null>(null);
   const instanceRef = useRef<any>(null);
   const apiRef = useRef<any>(null);
   const overlayRef = useRef<any>(null);
@@ -66,6 +67,18 @@ export const AladinViewer: React.FC<AladinViewerProps> = ({ ra, dec, fov = 0.04,
   const [phase, setPhase] = useState<Phase>('library');
   const [message, setMessage] = useState('Loading Aladin Lite library…');
   const survey = SURVEYS.find(item => item.id === surveyId) || SURVEYS[0];
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    // Aladin cancels wheel scrolling on its canvas. Let the browser scroll
+    // the surrounding workspace unless the user explicitly asks to zoom.
+    const preserveScroll = (event: WheelEvent) => {
+      if (!event.shiftKey || event.ctrlKey) event.stopPropagation();
+    };
+    map.addEventListener('wheel', preserveScroll, { capture: true, passive: true });
+    return () => map.removeEventListener('wheel', preserveScroll, true);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -202,12 +215,13 @@ export const AladinViewer: React.FC<AladinViewerProps> = ({ ra, dec, fov = 0.04,
         </select>
         <span className="text-slate-300">Background imagery, not SPHEREx measurements</span>
         <div className="ml-auto flex items-center gap-1" role="toolbar" aria-label="Sky context navigation">
+          <span className="hidden sm:inline mr-1 text-slate-400">Shift + wheel to zoom</span>
           <button aria-label="Zoom in sky context" className="p-2 rounded hover:bg-slate-800" onClick={() => instanceRef.current?.increaseZoom()}><ZoomIn size={16} /></button>
           <button aria-label="Zoom out sky context" className="p-2 rounded hover:bg-slate-800" onClick={() => instanceRef.current?.decreaseZoom()}><ZoomOut size={16} /></button>
           <button aria-label="Recenter on selected coordinates" className="p-2 rounded hover:bg-slate-800" onClick={reset}><RotateCcw size={16} /></button>
         </div>
       </div>
-      <div className="relative flex-1 min-h-[220px] lg:min-h-0" aria-label="Aladin sky map">
+      <div ref={mapRef} className="relative flex-1 min-h-[220px]" aria-label="Aladin sky map">
         <div ref={mountRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} />
         {phase !== 'ready' && <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-950/90 p-5 text-center" role="status">
           <div className="max-w-md space-y-3">
