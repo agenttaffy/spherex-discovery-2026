@@ -1,8 +1,9 @@
 """Validated mapping of a matched spectral calibration onto an image cutout.
 
-IRSA's CWAVE and CBAND products are full-detector maps. The caller must obtain
-the plane ID and checksum from the archive's provenance metadata, not infer a
-calibration version from a filename or observing date.
+IRSA's CWAVE and CBAND products are full-detector maps. The caller must use a
+verified association between the science header's plane ID and the calibration
+artifact, with a documented expected digest; it must not infer a calibration
+version from a filename or observing date.
 """
 import hashlib
 import io
@@ -32,13 +33,16 @@ def map_calibration_to_cutout(
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Return CWAVE and CBAND for a cutout, refusing unverified inputs.
 
-    ``plane_id`` and ``checksum`` must be independently obtained from IRSA's
-    artifact/provenance catalog. Returned values are in microns. This maps
-    detector pixels only; it does not establish inter-epoch compatibility.
+    ``plane_id`` must match the science image's calibration provenance. The
+    caller supplies an expected MD5 from a documented association: either an
+    IRSA TAP checksum or a pinned locally computed cross-mirror digest. Any
+    additional pinned SHA-256 is verified by the caller before this function.
+    Returned values are in microns. This maps detector pixels only; it does not
+    establish inter-epoch compatibility.
     """
     expected = checksum.lower().removeprefix("md5:")
     if not re.fullmatch(r"[0-9a-f]{32}", expected):
-        raise ValueError("A valid IRSA MD5 checksum is required")
+        raise ValueError("A valid expected MD5 digest is required")
     if hashlib.md5(calibration_bytes).hexdigest() != expected:
         raise ValueError("Spectral calibration checksum mismatch")
 

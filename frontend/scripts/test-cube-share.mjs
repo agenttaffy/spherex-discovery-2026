@@ -4,7 +4,7 @@ import ts from 'typescript';
 
 const source = await readFile(new URL('../src/components/science/cubeShare.ts', import.meta.url), 'utf8');
 const js = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022 } }).outputText;
-const { displayedCubePosition, applyCubeSharePosition } = await import(`data:text/javascript;base64,${Buffer.from(js).toString('base64')}`);
+const { displayedCubePosition, applyCubeSharePosition, parseCubeDeepLink } = await import(`data:text/javascript;base64,${Buffer.from(js).toString('base64')}`);
 
 const oldData = { ra: 331.09813086506205, dec: -56.801144263858404,
   channels: [{ channel: 1 }, { channel: 2 }], channel_map: { channel: 1 } };
@@ -28,6 +28,12 @@ assert.equal(url.searchParams.get('obs'), null);
 assert.equal(url.searchParams.get('obs_detector'), null);
 assert.equal(url.searchParams.get('embed'), '1');
 assert.equal(url.searchParams.get('fov'), '0.04');
+assert.deepEqual(parseCubeDeepLink(url.searchParams), { ra: oldData.ra, dec: oldData.dec });
+assert.equal(parseCubeDeepLink(new URLSearchParams('tab=explorer&ra=1&dec=2')), null);
+assert.equal(parseCubeDeepLink(new URLSearchParams('tab=cube&ra=360&dec=2')), null);
+assert.equal(parseCubeDeepLink(new URLSearchParams('tab=cube&ra=1&dec=-91')), null);
+assert.equal(parseCubeDeepLink(new URLSearchParams('tab=cube&ra=&dec=2')), null);
+assert.equal(parseCubeDeepLink(new URLSearchParams('tab=cube&target=epsilon_indi_b')), null);
 const previous = url.toString();
 applyCubeSharePosition(url, null);
 assert.equal(url.toString(), previous);

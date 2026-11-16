@@ -101,9 +101,10 @@ _VERIFIED_ARTIFACTS = {
 def verified_artifact(release: str, detector: str, plane_id: str) -> CalibrationArtifact | None:
     artifact = _VERIFIED_ARTIFACTS.get((release, detector, plane_id))
     if artifact is None and release in {"dr1", "qr3"}:
-        # The image HISTORY contains a globally identifying plane UUID. When
-        # the other current release pins that exact UUID and detector from
-        # IRSA TAP, it is the same calibration artifact, not a version guess.
+        # The image HISTORY contains a globally identifying plane UUID. Reuse
+        # across current releases is an inference from the identical UUID and
+        # detector, based on the pinned artifact's documented association;
+        # the association may come from TAP or an example DataLink exposure.
         other = "qr3" if release == "dr1" else "dr1"
         artifact = _VERIFIED_ARTIFACTS.get((other, detector, plane_id))
     return artifact
@@ -124,10 +125,12 @@ def verified_cached_bytes(artifact: CalibrationArtifact) -> bytes | None:
 
 
 def download_verified_bytes(client: httpx.Client, artifact: CalibrationArtifact) -> bytes:
-    """Read the exact catalog-identified calibration from its public mirror or IRSA.
+    """Read the documented calibration artifact from its public mirror or IRSA.
 
     The cloud URL is derived only from a validated IRSA calibration path. Both
-    sources must satisfy the independently catalogued MD5 before use or caching.
+    Both sources must satisfy the expected MD5 before use or caching, plus the
+    expected SHA-256 when one is pinned. The digest source is recorded on the
+    artifact: IRSA TAP metadata or locally computed matching mirror digests.
     """
     if not artifact.url.startswith(IRSA_HOST + "/"):
         raise ValueError("Unsupported calibration source")

@@ -11,7 +11,8 @@ import { AboutPage } from './pages/AboutPage';
 import { GuidedTourModal } from './components/layout/GuidedTourModal';
 import { DiscoveryReportModal } from './components/science/DiscoveryReportModal';
 import { CubeView } from './components/science/CubeView';
-import { applyCubeSharePosition, type SkyPosition } from './components/science/cubeShare';
+import { applyCubeSharePosition, parseCubeDeepLink, type SkyPosition } from './components/science/cubeShare';
+import { findRequestedObservation, unavailableObservationMessage } from './services/observationSelection';
 import { OrbitalIntro } from './components/layout/OrbitalIntro';
 import {
   ObservationRecord,
@@ -36,13 +37,16 @@ import {
 } from './services/api';
 
 export const App: React.FC = () => {
+  const [initialCubeLink] = useState(() => parseCubeDeepLink(new URLSearchParams(window.location.search)));
+  const [autoLoadCube, setAutoLoadCube] = useState<SkyPosition | null>(initialCubeLink);
+  const consumeAutoLoadCube = useCallback(() => setAutoLoadCube(null), []);
   const [showIntro] = useState(() => {
     const { search, hash } = window.location;
     const params = new URLSearchParams(search);
     return params.get('embed') !== '1' && !['#observatory', '#main-workspace'].includes(hash)
       && !['ra', 'dec', 'target', 'obs', 'tab'].some((key) => params.has(key));
   });
-  const [activeTab, setActiveTab] = useState<MainView>('explorer');
+  const [activeTab, setActiveTab] = useState<MainView>(initialCubeLink ? 'cube' : 'explorer');
   const [mobilePanel, setMobilePanel] = useState<'canvas' | 'search' | 'telemetry'>('canvas');
   const [searchOpen, setSearchOpen] = useState(() => new URLSearchParams(window.location.search).get('embed') !== '1');
   const [analysisOpen, setAnalysisOpen] = useState(() => new URLSearchParams(window.location.search).get('embed') !== '1');
@@ -50,8 +54,8 @@ export const App: React.FC = () => {
   const [demoCacheOnly, setDemoCacheOnly] = useState(false);
 
   // Search parameters
-  const [ra, setRa] = useState('269.45208'); // Barnard's Star default
-  const [dec, setDec] = useState('4.69339');
+  const [ra, setRa] = useState(() => String(initialCubeLink?.ra ?? 269.45208)); // Barnard's Star default
+  const [dec, setDec] = useState(() => String(initialCubeLink?.dec ?? 4.69339));
   const [fov, setFov] = useState(0.04);
   const [collection, setCollection] = useState('ALL');
   const [detector, setDetector] = useState('ALL');
@@ -92,6 +96,7 @@ export const App: React.FC = () => {
   const [loadingFrame, setLoadingFrame] = useState(false);
   const [frameError, setFrameError] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [observationWarning, setObservationWarning] = useState<string | null>(null);
 
   // Presets
   const [presets, setPresets] = useState<DemoPreset[]>([]);
@@ -211,6 +216,7 @@ export const App: React.FC = () => {
       setLoadingSpectrum(false);
       setLoadingObs(true);
       setErrorMessage(null);
+      setObservationWarning(null);
       setFrameError(null);
       try {
         const res = await fetchObservations(searchRa, searchDec, searchFov, searchColl, searchDetector);
@@ -219,9 +225,10 @@ export const App: React.FC = () => {
         setSearchedQuery({ra: res.target.ra, dec: res.target.dec, fov: searchFov, collection: searchColl, detector: searchDetector});
         setObservations(res.observations);
         let startIdx = 0;
-        if (targetObsId && res.observations.length > 0) {
-          const matchIdx = res.observations.findIndex((o) => o.id === targetObsId || (o.obs_id === targetObsId && (!targetObsDetector || o.detector === targetObsDetector)));
+        if (targetObsId) {
+          const matchIdx = findRequestedObservation(res.observations, targetObsId, targetObsDetector);
           if (matchIdx >= 0) startIdx = matchIdx;
+          else setObservationWarning(unavailableObservationMessage(targetObsId, res.observations.length > 0));
         }
         setCurrentIndex(startIdx);
         if (res.observations.length > 0) {
@@ -294,6 +301,7 @@ export const App: React.FC = () => {
 
   // Handle timeline index selection
   const handleSelectIndex = (idx: number) => {
+    setObservationWarning(null);
     setCurrentIndex(idx);
     const obs = observations[idx];
     if (obs) {
@@ -472,7 +480,7 @@ export const App: React.FC = () => {
         ) : activeTab === 'diff' ? (
           <ComparisonView observations={observations} fov={searchedQuery?.fov ?? fov} namedTarget={!!selectedPresetId} demoCacheOnly={demoCacheOnly} />
         ) : activeTab === 'cube' ? (
-          <div className="observatory-panel flex-1 min-h-0 overflow-y-auto"><CubeView target={searchedTarget ?? cubeDraftPosition ?? presets.find(preset => preset.id === selectedPresetId) ?? null} onDisplayedPosition={setDisplayedCube} /></div>
+          <div className="observatory-panel flex-1 min-h-0 overflow-y-auto"><CubeView target={searchedTarget ?? cubeDraftPosition ?? presets.find(preset => preset.id === selectedPresetId) ?? null} onDisplayedPosition={setDisplayedCube} autoLoadPosition={autoLoadCube} onAutoLoadConsumed={consumeAutoLoadCube} /></div>
         ) : (
           <>
             {/* Mobile Panel Switcher & Observation Identity Strip (< lg) */}
@@ -549,6 +557,9 @@ export const App: React.FC = () => {
                     </button>
                   </div>
                 )}
+                {observationWarning && <div role="alert" className="bg-amber-950/70 border-b border-amber-800 text-amber-100 text-xs px-4 py-2 flex items-center justify-between gap-2">
+                  <span>{observationWarning}</span><button type="button" onClick={() => setObservationWarning(null)} aria-label="Dismiss observation warning">✕</button>
+                </div>}
                 {frameError && (
                   <div role="alert" className="bg-rose-950/70 border-b border-rose-800 text-rose-200 text-xs px-4 py-2 flex flex-wrap items-center justify-between gap-2">
                     <span>{frameError} Playback paused.</span>

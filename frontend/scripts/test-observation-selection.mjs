@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import ts from 'typescript';
+const source = await readFile(new URL('../src/services/observationSelection.ts', import.meta.url), 'utf8');
+const js = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022 } }).outputText;
+const { findRequestedObservation, unavailableObservationMessage } = await import(`data:text/javascript;base64,${Buffer.from(js).toString('base64')}`);
+const rows = [{ id: 'local', obs_id: 'exposure', detector: 'SPHEREx-D6' }];
+assert.equal(findRequestedObservation(rows, 'exposure', 'SPHEREx-D6'), 0);
+assert.equal(findRequestedObservation(rows, 'local', 'SPHEREx-D6'), 0);
+assert.equal(findRequestedObservation(rows, 'local', 'SPHEREx-D1'), -1);
+assert.equal(findRequestedObservation(rows, 'missing', null), -1);
+assert.equal(findRequestedObservation([], 'missing', null), -1);
+assert.match(unavailableObservationMessage('missing', true), /Showing the first available observation/);
+assert.match(unavailableObservationMessage('missing', false), /No observation is displayed/);
+console.log('PASS: linked observation requires identity and detector, with explicit unavailable notices');

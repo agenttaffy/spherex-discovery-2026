@@ -11,19 +11,27 @@ const channelStatuses: Record<string, string> = {
   missing_wavelength: 'Wavelength unavailable',
 };
 
-export function CubeView({ target, onDisplayedPosition }: {
+export function CubeView({ target, onDisplayedPosition, autoLoadPosition, onAutoLoadConsumed }: {
   target: { ra: number; dec: number } | null;
   onDisplayedPosition: (position: SkyPosition | null) => void;
+  autoLoadPosition: SkyPosition | null;
+  onAutoLoadConsumed: () => void;
 }) {
   const [editedRa, setRa] = useState<string | null>(null);
   const [editedDec, setDec] = useState<string | null>(null);
   const ra = editedRa ?? String(target?.ra ?? 269.45208);
   const dec = editedDec ?? String(target?.dec ?? 4.69339);
-  const [query, setQuery] = useState<{ ra: string; dec: string; channel: number; forceArchive?: boolean; pinnedCloud?: boolean } | null>(null);
+  const [query, setQuery] = useState<{ ra: string; dec: string; channel: number; forceArchive?: boolean; pinnedCloud?: boolean } | null>(
+    () => autoLoadPosition ? { ra: String(autoLoadPosition.ra), dec: String(autoLoadPosition.dec), channel: 1 } : null
+  );
   const [data, setData] = useState<CubeData | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [scanning, setScanning] = useState(false);
+
+  useEffect(() => {
+    if (autoLoadPosition) onAutoLoadConsumed();
+  }, [autoLoadPosition, onAutoLoadConsumed]);
 
   useEffect(() => {
     onDisplayedPosition(displayedCubePosition(data, query));
