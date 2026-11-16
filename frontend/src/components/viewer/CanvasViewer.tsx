@@ -49,6 +49,7 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
   const prediction = targetId ? frame?.target_predictions?.[targetId] : undefined;
   const photometry = targetId ? frame?.target_photometry?.[targetId] : undefined;
   const [viewerMode, setViewerMode] = useState<'canvas' | 'aladin'>('canvas');
+  const showingEmptyFieldPreview = !frame && !loading && !!emptyFieldPreview;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -283,11 +284,19 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
 
   const handleMouseUp = () => setIsDragging(false);
 
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    const factor = e.deltaY < 0 ? 1.15 : 0.85;
-    setZoom((prev) => Math.min(Math.max(prev * factor, 0.4), 8.0));
-  };
+  useEffect(() => {
+    const canvas = canvasRef.current?.parentElement;
+    if (!canvas) return;
+    const zoomWithWheel = (event: WheelEvent) => {
+      if (!event.shiftKey || event.ctrlKey || !event.deltaY || !event.cancelable) return;
+      event.preventDefault();
+      const delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? canvas.clientHeight : 1);
+      const factor = 1.15 ** Math.max(-3, Math.min(3, -delta / 100));
+      setZoom(previous => Math.min(8, Math.max(0.4, previous * factor)));
+    };
+    canvas.addEventListener('wheel', zoomWithWheel, { passive: false });
+    return () => canvas.removeEventListener('wheel', zoomWithWheel);
+  }, [viewerMode, showingEmptyFieldPreview]);
 
   return (
     <div className="instrument-viewer flex-1 min-h-[340px] sm:min-h-[340px] lg:min-h-0 flex flex-col bg-slate-950 relative overflow-hidden select-none" ref={containerRef}>
@@ -296,7 +305,7 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
         {announcement}
       </div>
       <div id="canvas-keyboard-help" className="sr-only">
-        Interactive astronomical canvas viewer. Use Arrow keys to pan image, Plus or Equal to zoom in, Minus to zoom out, and 0 to reset view.
+        Interactive astronomical canvas viewer. Use Arrow keys to pan, Plus or Minus to zoom, and 0 to reset. Shift plus mouse wheel also zooms.
       </div>
 
       {/* Observation identity and display controls */}
@@ -397,7 +406,7 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
         />
       ) : viewerMode === 'aladin' ? (
         <div className="flex-1 flex items-center justify-center p-6 text-sm text-slate-300" role="status">Search for coordinates to open sky context.</div>
-      ) : !frame && !loading && emptyFieldPreview ? (
+      ) : showingEmptyFieldPreview ? (
         emptyFieldPreview
       ) : (
         <>
@@ -408,12 +417,11 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
             aria-label="SPHEREx Astronomical Canvas Viewer. Use arrow keys to pan, plus or minus to zoom, and zero to reset view."
             aria-describedby="canvas-keyboard-help"
             onKeyDown={handleKeyDown}
-            className="flex-1 instrument-canvas min-h-[220px] w-full h-full cursor-grab active:cursor-grabbing relative flex items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-inset"
+            className="flex-1 instrument-canvas min-h-[220px] w-full cursor-grab active:cursor-grabbing relative flex items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-inset"
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
-            onWheel={handleWheel}
           >
             <canvas ref={canvasRef} className="absolute inset-0 w-full h-full block" />
 
@@ -509,7 +517,7 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
               <span className="hidden xl:inline-flex items-center gap-1.5 text-slate-400 border-l border-slate-700/80 pl-3">
                 <Keyboard className="w-3 h-3 text-cyan-400" />
                 <span>Pan: <kbd className="px-1 py-0.5 bg-slate-800 rounded border border-slate-700 text-slate-200">Arrows</kbd></span>
-                <span>Zoom: <kbd className="px-1 py-0.5 bg-slate-800 rounded border border-slate-700 text-slate-200">+/-</kbd></span>
+                <span>Zoom: <kbd className="px-1 py-0.5 bg-slate-800 rounded border border-slate-700 text-slate-200">+/-</kbd> or Shift + wheel</span>
                 <span>Reset: <kbd className="px-1 py-0.5 bg-slate-800 rounded border border-slate-700 text-slate-200">0</kbd></span>
               </span>
             </div>

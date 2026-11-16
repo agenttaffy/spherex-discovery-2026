@@ -493,3 +493,9 @@ Testing IRSA SIA connectivity to: https://irsa.ipac.caltech.edu/SIA?COLLECTION=s
 
 - Chrome submitted twelve RW Aurigae D1 candidates. Four could be checked, eight lacked usable cached inputs, and the verified partner `2026W10_1A_0445_2` retained 218 of 529 field pixels against `2025W36_1A_0606_2`. The scan used locally cached FITS and verified calibration bytes.
 - Full backend suite: 286 passed, 4 skipped. Focused frontend checks covered candidate selection, sampling limits and request cancellation.
+
+## Explorer scrolling verification (2026-11-15)
+
+- Reproduced a 44 px vertical clipping defect at 1323 × 854 CSS pixels. The old instrument panel hid part of the toolbar under the timeline.
+- Chrome verified that the full toolbar and timeline remain reachable with the Gaia pane and target details expanded at 1323 × 854 and 1323 × 700. Ordinary wheel input over the FITS canvas scrolled the workspace without changing zoom. Shift + wheel changed fit zoom from 100% to 115%. Ordinary wheel input also scrolled over a live Aladin map.
+- At 375 × 812 the canvas reset and timeline were reachable without horizontal page overflow. The frontend production build passed.

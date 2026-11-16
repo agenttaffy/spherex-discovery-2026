@@ -161,7 +161,7 @@ html, body {
   .explorer-layout > div:has(> .target-panel) { width: 252px; }
   .explorer-layout > div:has(> .inspector-panel) { width: 302px; }
   .sky-workspace { background: rgb(12 16 34 / 68%); }
-  .instrument-canvas { min-height: 360px; }
+  .instrument-canvas { min-height: clamp(220px, 34svh, 360px); }
 }
 @media (max-width: 1023px) {
   .sky-workspace { width: 100%; }
@@ -595,11 +595,13 @@ legend.observatory-field-heading { margin-bottom: 8px; }
 .observatory-context .observatory-action.hidden { display: none; }
 
 @media (min-width: 1024px) {
-  .observatory-shell { height: max(100svh, 1050px); min-height: 1050px; }
+  .observatory-shell { height: 100svh; }
   .observatory-rail { width: clamp(245px, 21vw, 308px); }
   .observatory-analysis { width: clamp(260px, 23vw, 328px); }
   .observatory-context .observatory-action.hidden { display: inline-flex; }
   .observatory-main { overflow: hidden; }
+  .observatory-panel.sky-workspace { overflow-y: auto; }
+  .sky-workspace > .instrument-viewer { flex: 1 0 auto; overflow: visible; }
 }
 
 @media (max-width: 1023px) {
