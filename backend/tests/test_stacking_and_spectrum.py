@@ -9,6 +9,43 @@ from app.services.demo_service import demo_service
 
 client = TestClient(app)
 
+
+@pytest.fixture
+def cached_stack_fixtures(monkeypatch):
+    """Two independent synthetic exposures, with all network access forbidden."""
+    import io
+    from unittest.mock import AsyncMock, Mock
+    from astropy.io import fits
+    from app.api import frames
+    from app.science.calibrated_comparison import CalibratedExposure
+    from app.services.cache_service import cache_service
+
+    wcs = WCS(naxis=2)
+    wcs.wcs.ctype = ["RA---TAN", "DEC--TAN"]
+    wcs.wcs.crval = [269.45208, 4.69339]
+    wcs.wcs.crpix = [3, 3]
+    wcs.wcs.cdelt = [-6.2 / 3600, 6.2 / 3600]
+    cutouts, exposures = {}, {}
+    ids = ["stack-fixture-a", "stack-fixture-b"]
+    for index, frame_id in enumerate(ids):
+        pixels = np.full((5, 5), 3.0 + 2 * index)
+        header = wcs.to_header()
+        header["OBSID"], header["DETECTOR"] = frame_id, 3
+        header["MJD-BEG"], header["MJD-END"] = 60000.0 + index, 60000.01 + index
+        out = io.BytesIO()
+        fits.HDUList([fits.PrimaryHDU(), fits.ImageHDU(pixels, header=header, name="IMAGE")]).writeto(out)
+        cutouts[frame_id] = out.getvalue()
+        exposures[frame_id] = CalibratedExposure(pixels, np.full_like(pixels, 4.0 + 4 * index),
+            np.zeros_like(pixels, dtype=bool), np.full_like(pixels, 1.7), np.full_like(pixels, .03), wcs)
+        monkeypatch.setitem(frames.OBSERVATION_REGISTRY, frame_id, {
+            "obs_id": frame_id, "detector": "SPHEREx-D3", "collection": "spherex_dr1",
+            "cached_cutout_url": frame_id,
+        })
+    monkeypatch.setattr(cache_service, "get", lambda key: cutouts.get(key))
+    monkeypatch.setattr("app.services.cutout_service.cloud_cutout", Mock(side_effect=AssertionError("unexpected cloud request")))
+    monkeypatch.setattr("httpx.AsyncClient.get", AsyncMock(side_effect=AssertionError("unexpected IRSA request")))
+    return ids, exposures
+
 def test_compute_coadd_stack_mean_median_sum():
     # 3 frames, base flux 10.0
     img1 = np.ones((16, 16), dtype=np.float32) * 10.0
@@ -112,18 +149,16 @@ def test_spectrum_endpoint_invalid_coords():
     resp = client.get("/api/science/spectrum?ra=100.0&dec=95.0")
     assert resp.status_code == 400
 
-def test_stack_frames_endpoint_on_demo_epochs():
-    barnard_recs = demo_service.find_matching_observations(269.45208, 4.69339, radius_deg=0.1)
-    d3_recs = [r for r in barnard_recs if "D3" in r.detector]
-    assert len(d3_recs) >= 2
-
+def test_stack_frames_endpoint_rejects_unverified_fixture_calibration(cached_stack_fixtures):
+    ids, _ = cached_stack_fixtures
     resp = client.post("/api/frames/stack", json={
-        "frame_ids": [d3_recs[0].id, d3_recs[1].id],
+        "frame_ids": ids,
         "method": "mean",
         "format": "png",
     })
     assert resp.status_code == 422
     assert "per-pixel wavelength compatibility" in resp.json()["detail"]
+    assert "Exactly one spectral calibration ID" in resp.json()["detail"]
 
 def test_stack_frames_endpoint_validation():
     # Empty list -> 400
@@ -144,18 +179,30 @@ def test_stack_frames_endpoint_validation():
     })
     assert resp.status_code == 404
 
-def test_stack_frames_endpoint_webp_and_median():
-    barnard_recs = demo_service.find_matching_observations(269.45208, 4.69339, radius_deg=0.1)
-    d3_recs = [r for r in barnard_recs if "D3" in r.detector]
-    assert len(d3_recs) >= 2
-
+def test_stack_frames_endpoint_webp_and_median(cached_stack_fixtures, monkeypatch):
+    import base64
+    import io
+    from PIL import Image
+    from app.api import frames
+    from app.services.spectral_calibration_service import CalibrationArtifact
+    ids, exposures = cached_stack_fixtures
+    artifact = CalibrationArtifact("fixture", "https://example.invalid/calibration.fits", "0" * 32)
+    monkeypatch.setattr(frames, "load_calibrated_exposure", lambda science, release: (
+        exposures[science["IMAGE"].header["OBSID"]], artifact,
+    ))
     resp = client.post("/api/frames/stack", json={
-        "frame_ids": [d3_recs[0].id, d3_recs[1].id],
+        "frame_ids": ids,
         "method": "median",
         "format": "webp",
     })
-    assert resp.status_code == 422
-    assert "spectral WCS" in resp.json()["detail"]
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["method"] == "median" and data["calibration"]["retained_pixels"] == 25
+    np.testing.assert_allclose(data["surface_brightness_mjy_sr"], np.full((5, 5), 4.0))
+    np.testing.assert_allclose(data["variance_mjy_sr_squared"], np.full((5, 5), 3.0))
+    raw = base64.b64decode(data["image_base64"].split(",", 1)[1], validate=True)
+    with Image.open(io.BytesIO(raw)) as image:
+        assert image.format == "WEBP" and image.size == (5, 5)
 
 def test_compute_coadd_stack_edge_cases():
     with pytest.raises(ValueError, match="Cannot stack an empty list"):

@@ -14,6 +14,8 @@ from app.models.schemas import ObservationRecord
 # In-memory registry of queried observations so /api/frames/{frame_id} can resolve them
 OBSERVATION_REGISTRY: Dict[str, Dict[str, Any]] = {}
 SIA_REQUIRED_FIELDS = {"obs_id", "energy_bandpassname", "access_url", "t_min"}
+# Deliberate opt-in; the default multi-release search remains the wide survey.
+DEEP_COLLECTIONS = ("spherex_dr1_deep", "spherex_qr3_deep")
 
 
 def _finite_number(value: Any) -> Optional[float]:
@@ -28,6 +30,7 @@ class IRSAClient:
     def __init__(self, sia_base_url: str = IRSA_SIA_BASE_URL):
         self.sia_base_url = sia_base_url
         self._offline_until = 0.0
+        self._offline_by_collection: Dict[str, float] = {}
 
     def _mjd_to_utc(self, mjd_str: Optional[str]) -> Optional[str]:
         if not mjd_str:
@@ -46,10 +49,13 @@ class IRSAClient:
         from app.services.saved_observation_search import saved_observations, cloud_header_observations
         demo = demo_service.find_matching_observations(ra=ra, dec=dec, radius_deg=radius_deg,
                                                        collection=collection, detector=detector)
+        demo = [record for record in demo if record.collection == collection]
         if DEMO_CACHE_ONLY:
             return demo[:limit]
         saved = saved_observations(ra, dec, radius_deg, collection, detector, limit)
         cloud = cloud_header_observations(ra, dec, collection, detector, limit)
+        saved = [record for record in saved if record.collection == collection]
+        cloud = [record for record in cloud if record.collection == collection]
         if not cloud:
             return saved or demo[:limit]
         # Preserve cached demo records when available: they carry verified file
@@ -89,12 +95,14 @@ class IRSAClient:
         Queries NASA IRSA SIA2 service for SPHEREx observations.
         Includes circuit breaker for remote outages and instant offline demo fallback.
         """
-        if collection is None or collection.upper() == "ALL":
+        if collection is None or collection.upper() in {"ALL", "DEEP"}:
             # SIA without COLLECTION is not a SPHEREx-only search. Query each
-            # configured collection explicitly so release provenance is retained.
+            # selected collection explicitly so release provenance is retained.
+            selected_collections = (DEEP_COLLECTIONS if collection and collection.upper() == "DEEP"
+                                    else SEARCH_COLLECTIONS)
             groups = await asyncio.gather(*(
                 self.query_observations(ra, dec, radius_deg, name, detector, limit)
-                for name in SEARCH_COLLECTIONS
+                for name in selected_collections
             ))
             # Share the result limit between collections before sorting by time;
             # otherwise older rows can hide later releases.
@@ -109,7 +117,7 @@ class IRSAClient:
             return merged
 
         now = time.time()
-        if DEMO_CACHE_ONLY or now < self._offline_until:
+        if DEMO_CACHE_ONLY or now < self._offline_until or now < self._offline_by_collection.get(collection, 0.0):
             # During the cooldown, don't keep retrying a failing archive just
             # because this particular sky position has no saved results.
             return self._offline_observations(ra, dec, radius_deg, collection, detector, limit)
@@ -190,11 +198,11 @@ class IRSAClient:
 
                 else:
                     search_failed = True
-                    self._offline_until = time.time() + 30.0
+                    self._offline_by_collection[collection] = time.time() + 30.0
                     print(f"[IRSAClient] IRSA SIA returned status {resp.status_code}")
         except Exception as e:
             search_failed = True
-            self._offline_until = time.time() + 30.0
+            self._offline_by_collection[collection] = time.time() + 30.0
             print(f"[IRSAClient] Error querying IRSA SIA: {e}")
 
         if search_failed:
@@ -212,6 +220,7 @@ class IRSAClient:
                 collection=collection,
                 detector=detector,
             )
+            fallback = [record for record in fallback if record.collection == collection]
             if fallback:
                 print(f"[IRSAClient] Using {len(fallback)} verified demonstration observations for ({ra:.4f}, {dec:.4f})")
                 return fallback[:limit]

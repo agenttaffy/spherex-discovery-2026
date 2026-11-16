@@ -73,7 +73,7 @@ def test_unexpected_success_html_is_not_mistaken_for_live_observations():
          patch("app.services.demo_service.demo_service.find_matching_observations", return_value=[]):
         rows = asyncio.run(client.query_observations(1, 2, collection="spherex_dr1"))
     assert rows == []
-    assert client._offline_until > 0
+    assert client._offline_by_collection["spherex_dr1"] > 0
 
 
 def test_archive_cooldown_does_not_requery_for_uncached_position():

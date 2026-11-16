@@ -45,7 +45,7 @@ Queries NASA IRSA SIA2 service (with automatic local manifest fallback) for SPHE
 - `ra` (string/float, required): Right Ascension in decimal degrees ($[0, 360)$) or sexagesimal (`17h57m48.5s`).
 - `dec` (string/float, required): Declination in decimal degrees ($[-90, +90]$) or sexagesimal (`+04d41m36s`).
 - `fov` (float, optional, default: `0.04`): Search cone radius in degrees (greater than 0 and at most 0.3).
-- `collection` (string, optional, default: `spherex_dr1`): Data release (`spherex_dr1` or `spherex_qr3`).
+- `collection` (string, optional, default: `spherex_dr1`): Use `spherex_dr1` or `spherex_qr3` for a single wide-survey release, or `ALL` for the configured wide releases. Opt in to the deep fields with `spherex_dr1_deep`, `spherex_qr3_deep`, or `DEEP` for both deep releases. Each returned observation retains its actual collection. Results are bounded by `limit`; combined deep counts are marked as lower bounds, and a failed/unavailable archive cannot establish that a position has no coverage. The packaged offline indices do not invent deep-field results. [IRSA SPHEREx collection documentation](https://irsa.ipac.caltech.edu/spherex-archive-documentation/spherex-data-access/)
 - `detector` (string, optional): Filter by detector array (e.g. `SPHEREx-D1` to `SPHEREx-D6`).
 - `limit` (int, optional, default: `50`): Max observations returned.
 

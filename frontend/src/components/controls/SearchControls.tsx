@@ -183,7 +183,7 @@ export const SearchControls: React.FC<SearchControlsProps> = ({
           <label className="text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5 block">
             Survey Release
           </label>
-          <p className="text-[11px] text-slate-300 mb-2">Configured releases searches this app’s release list (normally DR1 and QR3). More observations depend on archive access.</p>
+          <p className="text-[11px] text-slate-300 mb-2">Configured releases searches the wide survey (normally DR1 and QR3). More observations depend on archive access.</p>
           <div className="grid grid-cols-3 gap-1" role="group" aria-label="Survey release data version">
             <button
               type="button"
@@ -225,6 +225,21 @@ export const SearchControls: React.FC<SearchControlsProps> = ({
               Configured releases
             </button>
           </div>
+          <details className="mt-2 text-[11px] text-slate-300" open={collection === 'DEEP' || collection === 'spherex_dr1_deep' || collection === 'spherex_qr3_deep' || undefined}>
+            <summary className="cursor-pointer text-cyan-200">Deep-field searches</summary>
+            <p className="my-2">Deep fields cover special sky regions. Searches use IRSA, can take longer, and may be unavailable during an outage; an empty result does not prove no coverage.</p>
+            <div className="grid grid-cols-3 gap-1" role="group" aria-label="Deep-field survey releases">
+              {[
+                { value: 'spherex_dr1_deep', label: 'DR1 deep', description: 'Search DR1 deep fields' },
+                { value: 'spherex_qr3_deep', label: 'QR3 deep', description: 'Search QR3 deep fields' },
+                { value: 'DEEP', label: 'Both deep', description: 'Search DR1 and QR3 deep fields' },
+              ].map(option => <button key={option.value} type="button" onClick={() => setCollection(option.value)}
+                aria-pressed={collection === option.value} aria-label={option.description}
+                className={`py-1.5 px-1 rounded-md border transition focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${collection === option.value ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300 font-semibold' : 'bg-slate-950 border-slate-800 text-slate-300 hover:text-white'}`}>
+                {option.label}
+              </button>)}
+            </div>
+          </details>
         </div>
 
         <div>

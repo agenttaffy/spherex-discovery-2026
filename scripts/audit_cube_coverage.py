@@ -27,9 +27,6 @@ sys.path.insert(0, str(ROOT / "backend"))
 
 from app.main import app
 from app.services import cube_service
-from app.services.demo_service import OFFICIAL_PRESETS
-
-
 # Earlier DR1 exposure-midpoint comparison positions from docs/TARGET_VALIDATION.md.
 EXPOSURE_REFERENCE = {
     "barnards_star": (269.4463524, 4.7671159, 60902.86687298),
@@ -37,6 +34,15 @@ EXPOSURE_REFERENCE = {
     "wise_0855": (133.7612618, -7.2423054, 60800.70218691),
     "rw_aurigae": (76.9565859, 30.4012930, 60935.92409930),
     "r_draconis": (248.1672422, 66.7550228, 60811.95649533),
+}
+# Original configured centers at the time the four-convention audit was run.
+# Current search presets intentionally use newer audited positions.
+HISTORICAL_CONFIGURED = {
+    "barnards_star": (269.45208, 4.69339),
+    "epsilon_indi_b": (330.84000, -56.78600),
+    "wise_0855": (133.79513, -7.24515),
+    "rw_aurigae": (76.95420, 30.40140),
+    "r_draconis": (248.33750, 66.70420),
 }
 STATUSES = ("measured", "no_coverage", "flagged", "blank_channel", "missing_wavelength")
 
@@ -110,11 +116,11 @@ def main():
         key = preset["id"]
         if args.only and args.only != key:
             continue
-        original = next(row for row in OFFICIAL_PRESETS if row.id == key)
+        original = HISTORICAL_CONFIGURED[key]
         ra, dec, mjd = EXPOSURE_REFERENCE[key]
         for label, coordinates, epoch in (
             ("preview_preset", (preset["ra"], preset["dec"]), "Latest covered preview position"),
-            ("configured_default", (original.ra, original.dec), "Configured search coordinate"),
+            ("configured_default", original, "Historical configured search coordinate"),
             ("catalog_j2000", (reference[key]["ra"], reference[key]["dec"]), "ICRS J2000"),
             ("dr1_exposure_prediction", (ra, dec), f"Dated FITS MJD-AVG {mjd:.8f}"),
         ):

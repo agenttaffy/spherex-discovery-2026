@@ -7,6 +7,7 @@
 - Real public-cloud cube reads for Epsilon Indi, WISE 0855 and R Draconis matched all 102 channel records and a selected native map against verified packaged samples. The Epsilon sample returned 100 measured slots and two blanks. One cold sample transferred approximately 185 KB. A pinned DR1 fallback is labeled separately from SIA-discovered data.
 - Six real cloud image cutouts matched cached IRSA image, variance, flags and zodiacal planes. Two cloud D5 cutouts reproduced the independently checked 207/225-pixel difference and propagated variance. An 18′ cloud cutout transferred about 10.24 MB in the recorded local check.
 - Three independent R Draconis D6 exposures produced a real mean and sum co-add with 123/529 field pixels; an independent FITS/WCS/calibration calculation matched values and propagated variances. This does not establish an object detection or motion.
+- Using the running preview and partial cloud-header list, the Epsilon Indi D5 pair `2025W17_4B_0027_3` and `2026W17_2A_0308_3` at a 2.4′ shared field returned HTTP 200 for difference, mean and sum with 485/529 field pixels retained. The pair is offered as a shortcut when both records are present; each use reruns the compatibility checks. Detection and motion remain unconfirmed.
 - The running preview returned eight Epsilon Indi records (five unique exposure IDs on four calendar dates) and 60 WISE 0855 records (60 unique exposure IDs on 26 calendar dates) during an archive-search failure. Both lists include incomplete, dated cloud-header surveys and demo records; they are not proof of target identity or exhaustive archive coverage.
 - The complete backend suite passed 265 tests with three warnings from deliberately malformed FITS and WCS fixtures. The frontend production build and focused band, CSV, blink, spectrum, provenance and frame-cache checks passed. Browser end-to-end checks of the newest interactions are still needed; the build retains an Aladin bundle-size notice.
 
@@ -471,3 +472,10 @@ Testing IRSA SIA connectivity to: https://irsa.ipac.caltech.edu/SIA?COLLECTION=s
 ## Aperture safety follow-up (2026-11-14)
 - Full backend: 99 passed, 2 Astropy FITSFixedWarnings with normal local networking. Tests cover subpixel full apertures, clipped/masked apertures and a source-masked annulus.
 - Some cached observations yield no usable background; their photometry and derived observed-band metrics are unavailable. Existing fixture tests no longer assume a target name guarantees a measurement or variability.
+
+## Cloud and clean-checkout verification (2026-11-15)
+
+- Backend: 272 passed and 4 skipped on the working checkout; a clean checkout without downloaded FITS data passed 265 tests and skipped 11. Three expected Astropy warnings arose from malformed-data and WCS test fixtures.
+- Frontend production build and six focused navigation, blink, CSV, cache, provenance, and spectrum checks passed. The build reports a large Aladin bundle.
+- A real Epsilon Indi D5 field pair returned 485 of 529 valid field pixels for difference, mean and sum at the checked position and field size. These are field comparisons, not a confirmed detection or motion measurement.
+- Live deep-field SIA searches timed out. Some detector calibration associations remain unverified, and visual end-to-end testing of the newest controls is outstanding.

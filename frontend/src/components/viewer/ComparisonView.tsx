@@ -50,6 +50,8 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations: se
   const knownRdraFirst = searchObservations.findIndex(o => o.obs_id === '2026W01_1A_0257_4' && o.detector === 'SPHEREx-D6' && Math.abs(o.ra - 248.16722768733652) < 0.00015 && Math.abs(o.dec - 66.75502445923215) < 0.00015);
   const knownRdraSecond = searchObservations.findIndex(o => o.obs_id === '2026W20_1A_0101_1' && o.detector === 'SPHEREx-D6' && Math.abs(o.ra - 248.16722768733652) < 0.00015 && Math.abs(o.dec - 66.75502445923215) < 0.00015);
   const knownRdraThird = searchObservations.findIndex(o => o.obs_id === '2026W17_1B_0434_4' && o.detector === 'SPHEREx-D6' && Math.abs(o.ra - 248.16722768733652) < 0.00015 && Math.abs(o.dec - 66.75502445923215) < 0.00015);
+  const knownEpsilonFirst = searchObservations.findIndex(o => o.obs_id === '2025W17_4B_0027_3' && o.detector === 'SPHEREx-D5' && Math.abs(o.ra - 331.09813086506205) < 0.00015 && Math.abs(o.dec + 56.801144263858404) < 0.00015);
+  const knownEpsilonSecond = searchObservations.findIndex(o => o.obs_id === '2026W17_2A_0308_3' && o.detector === 'SPHEREx-D5' && Math.abs(o.ra - 331.09813086506205) < 0.00015 && Math.abs(o.dec + 56.801144263858404) < 0.00015);
   const extraIds = extraStackIds.filter(id => observations.some(o => o.id === id && o.detector === obs1?.detector) && id !== obs1?.id && id !== obs2?.id);
   const draftIds = draftExtraIds.filter(id => observations.some(o => o.id === id && o.detector === obs1?.detector) && id !== obs1?.id && id !== obs2?.id);
   const extraKey = extraIds.join('|');
@@ -166,14 +168,14 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations: se
           setUseDemoPair(!useDemoPair);
         }}
       >
-        Epsilon Indi B · SPHEREx D5 · DR1
+        {curated ? 'Using tested example · Epsilon Indi D5' : 'Try tested example · Epsilon Indi D5'}
       </button>
       {curated && <span className="ml-2 text-xs text-slate-300">Select again to return to search results.</span>}
       {demoError && <p role="status" className="mt-2 text-amber-200">{demoError}</p>}
       {!demoError && !demoPair && <p role="status" className="mt-2 text-slate-400">Checking the local D5 cache…</p>}
       {demoPair && (
         <div className="mt-2 space-y-1 text-xs text-slate-300">
-          <p>Cached IRSA Level 2 · fixed cutouts · {demoPair.map(row => row.utc_date?.slice(0, 10)).join(' and ')} UTC</p>
+          <p>Tested field comparison · cached IRSA Level 2 · fixed cutouts · {demoPair.map(row => row.utc_date?.slice(0, 10)).join(' and ')} UTC</p>
           {curated && <>
             <p>Calibrated field comparison near the epoch-propagated Epsilon Indi position. Epsilon Indi Ba/Bb are unresolved. No detection, motion, target flux, or variability is established.</p>
             {calibration && <details className="text-cyan-200">
@@ -351,6 +353,18 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations: se
               if (draftIds.length && stackMethod === 'median') setStackMethod('mean');
             }}>Apply {draftIds.length} additional exposure{draftIds.length === 1 ? '' : 's'}</button>
           </details>
+        )}
+        {!curated && Math.abs(fov - 0.04) < 0.000001 && knownEpsilonFirst >= 0 && knownEpsilonSecond >= 0 && (
+          <div className="mt-3">
+            <button type="button" className="rounded border border-cyan-700 px-3 py-1.5 text-xs text-cyan-200 hover:bg-cyan-950" onClick={() => {
+              setIndex1(knownEpsilonFirst);
+              setIndex2(knownEpsilonSecond);
+              setExtraStackIds([]);
+              setDraftExtraIds([]);
+              setOpMode('diff');
+            }}>Try checked Epsilon Indi D5 field pair</button>
+            <p className="mt-1 text-xs text-slate-300">A previous run retained 485 of 529 field pixels. Each run rechecks compatibility; target detection and motion are unconfirmed.</p>
+          </div>
         )}
         {!curated && Math.abs(fov - 0.04) < 0.000001 && knownRdraFirst >= 0 && knownRdraSecond >= 0 && (
           <button type="button" title="Checks this pair again; images must be in cache or available from IRSA." className="mt-3 rounded border border-cyan-700 px-3 py-1.5 text-xs text-cyan-200 hover:bg-cyan-950" onClick={() => {

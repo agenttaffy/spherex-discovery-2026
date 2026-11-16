@@ -203,13 +203,15 @@ def test_photometry_endpoint_demo():
     assert "total_points" in data
     assert "points" in data
 
-def test_motion_endpoint_on_demo_epochs():
-    barnard_recs = demo_service.find_matching_observations(269.45208, 4.69339, radius_deg=0.1)
-    d3_recs = [r for r in barnard_recs if "D3" in r.detector]
-    assert len(d3_recs) >= 2
+def test_motion_endpoint_on_demo_epochs(monkeypatch):
+    from app.services.irsa_client import OBSERVATION_REGISTRY
+    # Motion is intentionally guarded for any registered pair; it must not
+    # depend on a particular preset manifest or on local/network image files.
+    monkeypatch.setitem(OBSERVATION_REGISTRY, "motion-fixture-1", {})
+    monkeypatch.setitem(OBSERVATION_REGISTRY, "motion-fixture-2", {})
     resp = client.post("/api/science/motion", json={
-        "frame_id_1": d3_recs[0].id,
-        "frame_id_2": d3_recs[1].id,
+        "frame_id_1": "motion-fixture-1",
+        "frame_id_2": "motion-fixture-2",
     })
     assert resp.status_code == 422
     assert "source association" in resp.json()["detail"]
@@ -241,7 +243,19 @@ def test_discovery_report_endpoint():
     assert "## 1. Astronomical Target Information" in data["markdown_report"]
     assert "Barnard's Star" in data["markdown_report"]
 
-def test_photometry_preset_differentiation():
+def test_photometry_preset_differentiation(monkeypatch):
+    from app.services.cache_service import cache_service
+    from app.services.irsa_client import OBSERVATION_REGISTRY
+
+    # This integration test uses actual staged FITS, which are intentionally
+    # absent from a clean checkout. Do not silently fetch from the archive.
+    for ra, dec, detector in [(76.95420, 30.40140, None), (269.45208, 4.69339, "SPHEREx-D3")]:
+        records = demo_service.find_matching_observations(ra, dec, radius_deg=.05, detector=detector)
+        keys = [OBSERVATION_REGISTRY[r.id].get("cached_cutout_url") for r in records]
+        cached = [cache_service.get(key) for key in keys if key]
+        if sum(bool(data) for data in cached) < 2:
+            pytest.skip("At least two real FITS cutouts per target must be staged for this integration test")
+    monkeypatch.setattr("app.services.irsa_client.DEMO_CACHE_ONLY", True)
     # Exercise cached targets without assuming the data establish variability.
     resp_rw = client.get("/api/science/photometry?ra=76.95420&dec=30.40140")
     assert resp_rw.status_code == 200
