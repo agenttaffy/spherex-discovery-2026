@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import ts from 'typescript';
+const source = await readFile(new URL('../src/components/timeline/blinkSelection.ts', import.meta.url), 'utf8');
+const js = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022 } }).outputText;
+const { initialBlinkPair, nextBlinkIndex } = await import(`data:text/javascript;base64,${Buffer.from(js).toString('base64')}`);
+assert.deepEqual(initialBlinkPair(4, 10), [4, 5]);
+assert.deepEqual(initialBlinkPair(9, 10), [9, 8]);
+assert.deepEqual(initialBlinkPair(0, 1), [0, 0]);
+assert.equal(nextBlinkIndex(4, 4, 9), 9);
+assert.equal(nextBlinkIndex(9, 4, 9), 4);
+assert.equal(nextBlinkIndex(7, 4, 9), 4);
+console.log('PASS: blink uses a selectable pair of real observations');

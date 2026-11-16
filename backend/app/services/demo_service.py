@@ -3,12 +3,10 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 import numpy as np
 from astropy.time import Time
-from app.config import MANIFESTS_DIR
+from app.config import DEMO_DATASET_FILE, DEFAULT_COLLECTION
 from app.models.schemas import ObservationRecord, DemoPreset
 from app.services.cache_service import cache_service
 from app.services.irsa_client import OBSERVATION_REGISTRY
-
-DEMO_DATASET_FILE = MANIFESTS_DIR / "demo_dataset.json"
 
 OFFICIAL_PRESETS: List[DemoPreset] = [
     DemoPreset(
@@ -16,20 +14,20 @@ OFFICIAL_PRESETS: List[DemoPreset] = [
         name="Barnard's Star",
         ra=269.45208,
         dec=4.69339,
-        description="Highest proper motion star known (10.3 arcsec/yr). Visible 1.6-pixel displacement across 1-year baseline.",
+        description="Nearby star with high catalog proper motion. Check the epoch and footprint before measuring the source.",
         target_type="High Proper Motion Star",
-        default_collection="spherex_dr1",
-        notable_feature="Astrometric motion across DR1 (Aug 2025) and QR3 (Aug 2026)",
+        default_collection=DEFAULT_COLLECTION,
+        notable_feature="Epoch-dependent sky position",
     ),
     DemoPreset(
         id="wise_0855",
         name="WISE 0855",
         ra=133.79513,
         dec=-7.24515,
-        description="Coldest known brown dwarf (~250 K), 7.2 light-years distant. Emits almost purely in mid-infrared wavelengths.",
+        description="Nearby Y dwarf with high catalog proper motion and very faint optical emission.",
         target_type="Y-type Sub-stellar Brown Dwarf",
-        default_collection="spherex_dr1",
-        notable_feature="Strong infrared emission in D4/D5 bands; invisible in optical",
+        default_collection=DEFAULT_COLLECTION,
+        notable_feature="Infrared brown dwarf",
     ),
     DemoPreset(
         id="rw_aurigae",
@@ -38,18 +36,18 @@ OFFICIAL_PRESETS: List[DemoPreset] = [
         dec=30.40140,
         description="Classical T Tauri binary system with circumstellar disk disruption causing dramatic photometric dimming.",
         target_type="Young Stellar Object / Variable Star",
-        default_collection="spherex_dr1",
-        notable_feature="Multi-magnitude infrared brightness variations",
+        default_collection=DEFAULT_COLLECTION,
+        notable_feature="Variable young binary with unresolved components in SPHEREx",
     ),
     DemoPreset(
         id="r_draconis",
         name="R Draconis",
         ra=248.33750,
         dec=66.70420,
-        description="Mira-type pulsating red giant with a 245-day period and large infrared pulsation amplitude.",
+        description="Mira-type pulsating red giant. SPHEREx variability requires suitable comparable data.",
         target_type="Pulsating Asymptotic Giant Branch Star",
-        default_collection="spherex_dr1",
-        notable_feature="Periodic flux pulsation visible in Level 2 time series",
+        default_collection=DEFAULT_COLLECTION,
+        notable_feature="Pulsating variable",
     ),
     DemoPreset(
         id="epsilon_indi_b",
@@ -58,7 +56,7 @@ OFFICIAL_PRESETS: List[DemoPreset] = [
         dec=-56.78600,
         description="Nearby binary brown dwarf system with prominent orbital and proper motion (4.7 arcsec/yr).",
         target_type="Binary Brown Dwarf System",
-        default_collection="spherex_dr1",
+        default_collection=DEFAULT_COLLECTION,
         notable_feature="High proper motion and brown dwarf spectral signature",
     ),
 ]
@@ -91,6 +89,7 @@ class DemoService:
                 utc_date = entry.get("utc_date")
                 ra = float(entry.get("ra", 0.0))
                 dec = float(entry.get("dec", 0.0))
+                coverage = entry.get("catalog_coverage")
 
                 clean_band = detector.replace("-", "_").replace(" ", "_")
                 record_id = f"{collection}_{obs_id}_{clean_band}".replace("/", "_")
@@ -135,6 +134,7 @@ class DemoService:
                     ra=ra,
                     dec=dec,
                     search_provenance="cached_demo",
+                    catalog_coverage=coverage if coverage in ("inside", "outside") else None,
                 )
                 self.demo_records.append(rec)
 
@@ -177,6 +177,23 @@ class DemoService:
         return matches
 
     def get_presets(self) -> List[DemoPreset]:
-        return OFFICIAL_PRESETS
+        presets = []
+        for preset in OFFICIAL_PRESETS:
+            covered = [
+                entry for entry in self.raw_manifest
+                if entry.get("target_name") == preset.name
+                and entry.get("catalog_coverage") == "inside"
+                and entry.get("predicted_degrees") is not None
+            ]
+            if not covered:
+                presets.append(preset)
+                continue
+            latest = max(covered, key=lambda entry: entry["utc_date"])
+            collections = {entry["collection"] for entry in covered}
+            presets.append(preset.model_copy(update={
+                "ra": latest["predicted_degrees"][0], "dec": latest["predicted_degrees"][1],
+                "default_collection": latest["collection"] if len(collections) == 1 else "ALL",
+            }))
+        return presets
 
 demo_service = DemoService()

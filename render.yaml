@@ -1,7 +1,7 @@
 services:
   - type: web
     name: spherex-discovery-backend
-    env: python
+    runtime: python
     region: oregon
     plan: free
     buildCommand: "pip install -r backend/requirements.txt"
@@ -10,4 +10,4 @@ services:
       - key: PYTHON_VERSION
         value: 3.11.4
       - key: CORS_ORIGINS
-        value: "*"
+        value: ""

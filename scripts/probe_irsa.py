@@ -14,12 +14,14 @@ import io
 import json
 import os
 import sys
+from pathlib import Path
 from datetime import datetime
 from astropy.time import Time
 from astropy.coordinates import SkyCoord
 import astropy.units as u
 
-IRSA_SIA_URL = "https://irsa.ipac.caltech.edu/SIA"
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
+from app.config import IRSA_SIA_BASE_URL, SEARCH_COLLECTIONS
 
 TEST_TARGETS = [
     {
@@ -66,7 +68,7 @@ def query_sia(collection: str, ra: float, dec: float, radius_deg: float = 0.05, 
         "POS": f"circle {ra:.6f} {dec:.6f} {radius_deg:.4f}",
         "RESPONSEFORMAT": "CSV"
     }
-    url = f"{IRSA_SIA_URL}?{urllib.parse.urlencode(params)}"
+    url = f"{IRSA_SIA_BASE_URL}?{urllib.parse.urlencode(params)}"
     ctx = ssl.create_default_context(cafile=certifi.where())
     
     for attempt in range(max_retries):
@@ -106,7 +108,7 @@ def probe_all():
         
         target_results = {"ra": ra, "dec": dec, "collections": {}}
         
-        for coll in ["spherex_dr1", "spherex_qr3"]:
+        for coll in SEARCH_COLLECTIONS:
             rows, query_url = query_sia(coll, ra, dec, radius_deg=0.05)
             print(f"  -> Collection '{coll}': {len(rows)} observations found")
             

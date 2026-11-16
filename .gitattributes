@@ -1,0 +1,3 @@
+# Bootstrap verifies these manifest and provenance files byte for byte.
+data/manifests/demo_preview.json -text
+data/manifests/cube_preview_sources.json -text

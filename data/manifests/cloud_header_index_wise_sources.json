@@ -1,0 +1,8 @@
+{
+  "sha256": "5c385d69627d2dbb0ac844d625a5e23ddf109ec12aece741becd05389a31608e",
+  "evidence_sha256": "93cda5145c4639cd21dec5b7deb4d4642392feeaad77ac754506015b70bc5403",
+  "verified_at_utc": "2026-11-16T03:11:19.698013+00:00",
+  "records": 72,
+  "source": "NASA IRSA historical SIA results at an earlier coordinate; S3 parent FITS headers and WCS independently checked at the current WISE coordinate",
+  "note": "Partial targeted survey, not a complete search or proof of target identity. Parent-image WCS covers the indexed sky coordinate; cutout availability is separate."
+}

@@ -35,7 +35,7 @@ From live testing on IRSA cutouts:
 - `WCS-WAVE`: Ext 6, wavelength calibration table mapping detector coordinates to wavelength in microns.
 
 ## 4. Official Test Targets Verification
-Live queries via `probe_irsa.py` confirmed observations in both DR1 and QR3:
+The original archive probe returned the following field observation counts. The counts reflect that query and date. They establish archive coverage, while source association and measurements require separate evidence.
 1. **WISE 0855** (RA 133.79513°, Dec -7.24515°): 282 DR1 observations (May 2025). Coldest known sub-stellar brown dwarf (~250 K).
 2. **Barnard's Star** (RA 269.45208°, Dec 4.69339°): 255 DR1 observations (Aug 2025), 126 QR3 observations (Aug–Sep 2026). 1.0-year temporal baseline, high proper motion (~10.3″/yr).
 3. **Epsilon Indi B** (RA 330.84000°, Dec -56.78600°): 403 DR1 observations (Apr 2025), 122 QR3 observations (Sep 2026). ~1.4-year temporal baseline.
@@ -45,7 +45,7 @@ Live queries via `probe_irsa.py` confirmed observations in both DR1 and QR3:
 ## 5. Scientific Display & Comparison Caveats
 - Visual stretch: SPHEREx data spans orders of magnitude. Must provide `asinh` (arcsinh) and `ZScale` stretching to reveal faint point sources against zodiacal background without clipping.
 - Registration: Reprojection or WCS grid alignment is essential before differencing frames because pointing jitter and survey scans produce sub-pixel shifts and rotational variations.
-- Wavelength Matching: Images subtracted must be from the same detector band (or interpolated to the same effective wavelength) to prevent false-positive differencing artifacts caused by spectral slope differences.
+- Wavelength matching: The current comparison checks the overlap of the checksum-verified per-pixel spectral WCS passbands after native celestial WCS alignment. The approximate WCS-WAVE display wavelengths supply no comparison calibration.
 
 
 ## Interface and data references (2026-11-14)
@@ -54,4 +54,4 @@ Live queries via `probe_irsa.py` confirmed observations in both DR1 and QR3:
 - [CDS HiPS documentation](https://aladin.cds.unistra.fr/hips/): context surveys are separate progressive image layers, not SPHEREx science images.
 - These references support explicit provenance, wavelength and uncertainty labels. Automated source checks are not a substitute for keyboard, screen-reader and visual testing.
 
-- [IRSA SPHEREx Explanatory Supplement, v2.1](https://irsa.ipac.caltech.edu/data/SPHEREx/docs/SPHEREx_Expsupp.pdf): the embedded WCS-WAVE lookup is suitable for visualization; science analysis should use separate spectral WCS files. A shared detector does not verify per-pixel wavelength compatibility. Difference and stacking are guarded pending integration and validation.
+- The calibrated difference and pair co-add paths use the matching CWAVE and CBAND files. Per-pixel overlap is checked after celestial WCS alignment, and a shared detector match is only the first filter. [IRSA SPHEREx Explanatory Supplement](https://irsa.ipac.caltech.edu/data/SPHEREx/docs/SPHEREx_Expsupp.pdf)

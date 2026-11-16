@@ -1,5 +1,7 @@
 # SPHEREx Discovery — System Architecture & Data Flow
 
+The diagram records the original architecture and its separately prepared 22-frame cache. For the current ten-frame preview, see the [Windows bootstrap and launch instructions](../README.md#preview-a-refreshed-demo-cache). The compact cube fallback covers five preset positions and samples native co-added DR1 sky-pixel surface brightness.
+
 ```text
 +--------------------------------------------------------------------------------------------------+
 |                                    CLIENT (React 18 + TypeScript + Vite)                         |

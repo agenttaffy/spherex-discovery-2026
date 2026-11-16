@@ -13,7 +13,7 @@ client = TestClient(app)
 def test_uncertainty_provenance_prevents_estimated_error_temperature_fit():
     from app.science.spectrum import temperature_fit_inputs, fit_blackbody_continuum
 
-    image = np.ones((21, 21))
+    image = np.ones((21, 21)) + 0.1 * (np.indices((21, 21)).sum(axis=0) % 2)
     image[10, 10] = 20
     variance = np.ones_like(image)
     measured = compute_aperture_photometry(image, center_x=10, center_y=10, variance=variance)
@@ -46,6 +46,9 @@ def test_flag_summary_preserves_unknown_quality_state():
 
 def test_cutout_cache_does_not_reuse_a_different_demo_cutout(monkeypatch):
     import asyncio
+    import io
+    import numpy as np
+    from astropy.io import fits
     from app.services.cutout_service import CutoutService, cutout_cache_key
     from app.services.cache_service import cache_service
     import app.services.cutout_service as cutout_module
@@ -53,6 +56,11 @@ def test_cutout_cache_does_not_reuse_a_different_demo_cutout(monkeypatch):
     requested = "https://example.invalid/image.fits"
     old_key = f"{requested}?center=1.000000,2.000000&size=0.0400"
     entries = {old_key: b"untrusted-old-cache"}
+    buffer = io.BytesIO()
+    fits.HDUList([fits.PrimaryHDU(), fits.ImageHDU(np.ones((2, 2)), name="IMAGE"),
+                  fits.ImageHDU(np.zeros((2, 2), dtype=np.int32), name="FLAGS"),
+                  fits.ImageHDU(np.ones((2, 2)), name="VARIANCE")]).writeto(buffer)
+    fresh = buffer.getvalue()
     monkeypatch.setattr(cache_service, "get", entries.get)
     monkeypatch.setattr(cache_service, "set", lambda key, value: entries.update({key: value}))
 
@@ -62,12 +70,12 @@ def test_cutout_cache_does_not_reuse_a_different_demo_cutout(monkeypatch):
         async def __aexit__(self, *args): pass
         async def get(self, url, **kwargs):
             assert url == old_key
-            return type("Response", (), {"status_code": 200, "content": b"fresh"})()
+            return type("Response", (), {"status_code": 200, "content": fresh})()
 
     monkeypatch.setattr(cutout_module.httpx, "AsyncClient", Client)
     result = asyncio.run(CutoutService().fetch_cutout_fits(requested, 1, 2, 0.04))
-    assert result == b"fresh"
-    assert entries[cutout_cache_key(requested, 1, 2, 0.04)] == b"fresh"
+    assert result == fresh
+    assert entries[cutout_cache_key(requested, 1, 2, 0.04)] == fresh
     assert cutout_cache_key(requested, 1, 2, 0.04) != cutout_cache_key(requested, 1, 2, 0.08)
 
 
@@ -134,7 +142,7 @@ def test_lightcurve_variability_classification():
     frames = []
     flux_levels = [15.0, 85.0, 22.0]
     for i, flux in enumerate(flux_levels):
-        img = np.ones((15, 15), dtype=np.float32) * 2.0
+        img = np.ones((15, 15), dtype=np.float32) * 2.0 + 0.1 * (np.indices((15, 15)).sum(axis=0) % 2)
         img[7, 7] = flux
         frames.append({
             "frame_id": f"frame_{i}",
@@ -175,15 +183,17 @@ def test_astrometric_motion_measurement():
     assert motion["motion_class"] == "High Proper Motion Candidate"
     assert "position_angle_deg" in motion
 
-def test_catalog_endpoint_barnard():
+def test_catalog_endpoint_barnard(monkeypatch):
+    from unittest.mock import AsyncMock
+    from app.services.catalog_service import catalog_service
+    expected = {"source_id": "Gaia DR3 123", "designation": "Gaia DR3 123", "ra": 269.45, "dec": 4.69,
+                "provenance": "VizieR Gaia DR3 (J2016.0)", "pm_dec": None}
+    monkeypatch.setattr(catalog_service, "query_catalog", AsyncMock(return_value=[expected]))
     resp = client.get("/api/science/catalogs?ra=269.45208&dec=4.69339&radius=0.08")
     assert resp.status_code == 200
     data = resp.json()
     assert data["total_sources"] >= 1
-    names = [s["designation"] for s in data["sources"]]
-    assert any("Barnard" in n for n in names)
-    b_star = [s for s in data["sources"] if "Barnard" in s["designation"]][0]
-    assert b_star["pm_dec"] > 9000.0  # ~10,328 mas/yr
+    assert data["sources"] == [expected]
 
 def test_photometry_endpoint_demo():
     # Barnard's Star or RW Aurigae in demo dataset
@@ -201,13 +211,9 @@ def test_motion_endpoint_on_demo_epochs():
         "frame_id_1": d3_recs[0].id,
         "frame_id_2": d3_recs[1].id,
     })
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data["eligible"] is True
-    assert "motion" in data
-    assert "proper_motion_arcsec_yr" in data["motion"]
-    assert "centroid_1" in data["motion"]
-    assert "centroid_2" in data["motion"]
+    assert resp.status_code == 422
+    assert "source association" in resp.json()["detail"]
+
 
 def test_discovery_report_endpoint():
     req = {
@@ -255,7 +261,7 @@ def test_photometry_preset_differentiation():
 def test_photometry_rejects_clipped_and_masked_apertures_without_biasing_subpixel_centers():
     image = np.ones((21, 21))
     image[10, 10] = 20
-    full = compute_aperture_photometry(image, center_x=10.4, center_y=10.3)
+    full = compute_aperture_photometry(image, center_x=10.4, center_y=10.3, variance=np.ones_like(image))
     assert full["valid"] is True
     assert full["coverage_fraction"] == 1.0
     mask = np.zeros_like(image, dtype=bool)

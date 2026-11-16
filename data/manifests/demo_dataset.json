@@ -85,6 +85,7 @@
   },
   {
     "target_name": "WISE 0855",
+    "catalog_coverage": "outside",
     "ra": 133.795129,
     "dec": -7.245147,
     "collection": "spherex_dr1",
@@ -106,6 +107,7 @@
   },
   {
     "target_name": "WISE 0855",
+    "catalog_coverage": "outside",
     "ra": 133.795129,
     "dec": -7.245147,
     "collection": "spherex_dr1",
@@ -127,6 +129,7 @@
   },
   {
     "target_name": "Barnard's Star",
+    "catalog_coverage": "outside",
     "ra": 269.45208,
     "dec": 4.69339,
     "collection": "spherex_dr1",
@@ -148,6 +151,7 @@
   },
   {
     "target_name": "Barnard's Star",
+    "catalog_coverage": "outside",
     "ra": 269.45208,
     "dec": 4.69339,
     "collection": "spherex_dr1",
@@ -169,6 +173,7 @@
   },
   {
     "target_name": "Barnard's Star",
+    "catalog_coverage": "outside",
     "ra": 269.45208,
     "dec": 4.69339,
     "collection": "spherex_qr3",
@@ -190,6 +195,7 @@
   },
   {
     "target_name": "Barnard's Star",
+    "catalog_coverage": "outside",
     "ra": 269.45208,
     "dec": 4.69339,
     "collection": "spherex_qr3",
@@ -211,6 +217,7 @@
   },
   {
     "target_name": "Epsilon Indi B",
+    "catalog_coverage": "outside",
     "ra": 330.84,
     "dec": -56.786,
     "collection": "spherex_dr1",
@@ -232,6 +239,7 @@
   },
   {
     "target_name": "Epsilon Indi B",
+    "catalog_coverage": "outside",
     "ra": 330.84,
     "dec": -56.786,
     "collection": "spherex_dr1",
@@ -253,6 +261,7 @@
   },
   {
     "target_name": "Epsilon Indi B",
+    "catalog_coverage": "outside",
     "ra": 330.84,
     "dec": -56.786,
     "collection": "spherex_qr3",
@@ -274,6 +283,7 @@
   },
   {
     "target_name": "Epsilon Indi B",
+    "catalog_coverage": "outside",
     "ra": 330.84,
     "dec": -56.786,
     "collection": "spherex_qr3",
@@ -295,6 +305,7 @@
   },
   {
     "target_name": "RW Aurigae",
+    "catalog_coverage": "inside",
     "ra": 76.9542,
     "dec": 30.4014,
     "collection": "spherex_dr1",
@@ -316,6 +327,7 @@
   },
   {
     "target_name": "RW Aurigae",
+    "catalog_coverage": "inside",
     "ra": 76.9542,
     "dec": 30.4014,
     "collection": "spherex_dr1",
@@ -337,6 +349,7 @@
   },
   {
     "target_name": "RW Aurigae",
+    "catalog_coverage": "inside",
     "ra": 76.9542,
     "dec": 30.4014,
     "collection": "spherex_qr3",
@@ -358,6 +371,7 @@
   },
   {
     "target_name": "RW Aurigae",
+    "catalog_coverage": "inside",
     "ra": 76.9542,
     "dec": 30.4014,
     "collection": "spherex_qr3",
@@ -379,6 +393,7 @@
   },
   {
     "target_name": "R Draconis",
+    "catalog_coverage": "outside",
     "ra": 248.3375,
     "dec": 66.7042,
     "collection": "spherex_dr1",
@@ -400,6 +415,7 @@
   },
   {
     "target_name": "R Draconis",
+    "catalog_coverage": "outside",
     "ra": 248.3375,
     "dec": 66.7042,
     "collection": "spherex_dr1",
@@ -421,6 +437,7 @@
   },
   {
     "target_name": "R Draconis",
+    "catalog_coverage": "outside",
     "ra": 248.3375,
     "dec": 66.7042,
     "collection": "spherex_qr3",
@@ -442,6 +459,7 @@
   },
   {
     "target_name": "R Draconis",
+    "catalog_coverage": "outside",
     "ra": 248.3375,
     "dec": 66.7042,
     "collection": "spherex_qr3",

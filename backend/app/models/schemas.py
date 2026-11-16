@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Literal
 
 class ObservationRecord(BaseModel):
     id: str
@@ -14,11 +14,14 @@ class ObservationRecord(BaseModel):
     ra: float
     dec: float
     search_provenance: str = "unknown"
+    search_snapshot_saved: Optional[str] = None
+    catalog_coverage: Optional[Literal["inside", "outside"]] = None
 
 class ObservationQueryResponse(BaseModel):
     target: Dict[str, Any]
     collection: str
     total_found: int
+    total_found_is_lower_bound: bool = False
     returned_count: int
     observations: List[ObservationRecord]
 
@@ -45,6 +48,30 @@ class WCSInfo(BaseModel):
     ctype1: Optional[str] = None
     ctype2: Optional[str] = None
 
+class FootprintPixel(BaseModel):
+    x: float
+    y: float
+    inside: bool
+
+
+class TargetPrediction(BaseModel):
+    ra: float
+    dec: float
+    mjd: float
+    pixel: FootprintPixel | None
+    reference_url: str
+
+
+class PhotometryEvidence(BaseModel):
+    status: Literal["unavailable"] = "unavailable"
+    aperture_status: Literal["not_checked", "unavailable", "field_sample_only"] = "not_checked"
+    reason: str
+    epsf_present: bool
+    core_pixels: int | None = None
+    usable_core_pixels: int | None = None
+    background_pixels: int | None = None
+
+
 class FrameResponse(BaseModel):
     frame_id: str
     obs_id: str
@@ -61,12 +88,15 @@ class FrameResponse(BaseModel):
     provenance_url: str
     is_synthetic: bool = False
     image_provenance: str = "unknown"
+    target_predictions: Dict[str, TargetPrediction] = Field(default_factory=dict)
+    target_photometry: Dict[str, PhotometryEvidence] = Field(default_factory=dict)
 
 class HealthResponse(BaseModel):
     status: str
     timestamp: str
     version: str
     irsa_connected: bool
+    demo_cache_only: bool = False
     cached_frames: int
 
 class DemoPreset(BaseModel):

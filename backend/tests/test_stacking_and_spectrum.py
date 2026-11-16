@@ -69,37 +69,24 @@ def test_compute_coadd_stack_wcs_reproject():
     assert stats["alignment_method"] == "wcs_reproject"
     assert stats["frame_count"] == 2
 
-def test_spectrum_generation_102_channels():
-    # Test SED builder directly with synthetic observation
-    ra, dec = 269.45208, 4.69339
-    recs = demo_service.find_matching_observations(ra, dec, radius_deg=0.1)
-    res = generate_spectrum_for_target(ra, dec, recs, None)
-    
-    assert res["target"]["ra"] == pytest.approx(ra, rel=1e-4)
-    assert len(res["bands"]) == 6
-    assert len(res["channels_102"]) == 102
-    assert len(res["continuum_curve"]) > 10
-    
-    # Check that channel indices are 1 through 102 sequentially
-    indices = [ch["channel_index"] for ch in res["channels_102"]]
-    assert indices == list(range(1, 103))
-
-    # Check that each detector has 17 channels
-    from collections import Counter
-    det_counts = Counter(ch["detector"] for ch in res["channels_102"])
-    for cfg in SPHEREX_DETECTOR_CONFIG:
-        assert det_counts[cfg["detector"]] == 17
+def test_spectrum_without_measurements_has_no_synthetic_values():
+    res = generate_spectrum_for_target(269.45208, 4.69339, [], None)
+    assert res["total_observed_bands"] == 0
+    assert res["bands"] == []
+    assert res["channels_102"] == []
+    assert res["continuum_curve"] == []
+    assert res["summary"]["integrated_flux_mjy_sr_um"] is None
 
 def test_spectrum_endpoint_barnard():
     resp = client.get("/api/science/spectrum?ra=269.45208&dec=4.69339&fov=0.04")
     assert resp.status_code == 200
     data = resp.json()
     assert "target" in data
-    assert len(data["bands"]) == 6
-    assert len(data["channels_102"]) == 102
+    assert len(data["bands"]) == data["total_observed_bands"]
+    assert data["channels_102"] == []
     assert "continuum_shape" in data["summary"]
     assert "spectral_class" not in data["summary"]
-    assert data["summary"]["total_channels"] == 102
+    assert data["summary"]["total_channels"] == 0
     assert data["total_observed_bands"] == len(data["observed_detector_bands"])
     if data["total_observed_bands"] == 0:
         assert data["summary"]["peak_wavelength_um"] is None
@@ -108,8 +95,8 @@ def test_spectrum_endpoint_wise0855_brown_dwarf():
     resp = client.get("/api/science/spectrum?ra=133.79513&dec=-7.24515&fov=0.04")
     assert resp.status_code == 200
     data = resp.json()
-    assert len(data["bands"]) == 6
-    assert len(data["channels_102"]) == 102
+    assert len(data["bands"]) == data["total_observed_bands"]
+    assert data["channels_102"] == []
     # A target name cannot guarantee a measurement or spectral classification.
     if data["total_observed_bands"] == 0:
         assert data["summary"]["peak_wavelength_um"] is None

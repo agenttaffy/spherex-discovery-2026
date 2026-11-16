@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { gunzipSync } from 'node:zlib';
+import ts from 'typescript';
+
+const source = await readFile(new URL('../src/components/science/quickSpectrumModel.ts', import.meta.url), 'utf8');
+const js = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022 } }).outputText;
+const { measuredSkyPixels } = await import(`data:text/javascript;base64,${Buffer.from(js).toString('base64')}`);
+const preview = JSON.parse(gunzipSync(await readFile(new URL('../../data/manifests/cube_preview.json.gz', import.meta.url))));
+const epsilon = preview.samples.epsilon_indi_b.channels;
+const rdra = preview.samples.r_draconis.channels;
+assert.equal(epsilon.length, 102);
+assert.equal(measuredSkyPixels(epsilon).length, 100);
+assert.equal(measuredSkyPixels(rdra).length, 0);
+const flagged = { ...epsilon[0], status: 'flagged', surface_brightness_mjy_sr: 1234 };
+const noHits = { ...epsilon[0], hits: 0 };
+const invalid = { ...epsilon[0], wavelength_um: NaN };
+assert.equal(measuredSkyPixels([flagged, noHits, invalid]).length, 0);
+assert.equal(measuredSkyPixels([epsilon[0]])[0].surface_brightness_mjy_sr, epsilon[0].surface_brightness_mjy_sr);
+console.log('PASS: quick spectrum shows real accepted sky pixels and leaves unavailable data blank');

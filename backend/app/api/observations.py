@@ -46,6 +46,9 @@ async def get_observations(
         target={"ra": ra_deg, "dec": dec_deg, "fov": fov},
         collection=collection,
         total_found=len(records),
+        total_found_is_lower_bound=(len(records) >= limit or any(
+            record.search_provenance in {"saved_irsa_search", "cached_demo", "cloud_header_survey"} for record in records
+        )),
         returned_count=len(records),
         observations=records,
     )

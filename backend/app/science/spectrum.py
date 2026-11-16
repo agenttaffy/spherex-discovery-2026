@@ -373,8 +373,7 @@ def generate_spectrum_for_target(
 ) -> Dict[str, Any]:
     """
     Computes calibrated Spectral Energy Distribution (SED: Flux vs. Wavelength) across
-    up to six SPHEREx detector bands and an illustrative 102-point continuum.
-    Measured detector bands are kept distinct from illustrative estimated continuum models.
+    up to six SPHEREx detector measurements. Missing measurements are not synthesized.
     Physical claims are derived strictly from documented blackbody fits with explicit uncertainties
     and limitations, never from preset target identities or hardcoded names.
     """
@@ -408,12 +407,15 @@ def generate_spectrum_for_target(
             reg_item = OBSERVATION_REGISTRY.get(obs_id)
             if reg_item and "cached_cutout_url" in reg_item:
                 from app.services.cache_service import cache_service
-                b = cache_service.get(reg_item["cached_cutout_url"])
+                checksum = reg_item.get("cached_cutout_sha256")
+                b = (cache_service.get_verified(reg_item["cached_cutout_url"], checksum)
+                     if checksum else cache_service.get(reg_item["cached_cutout_url"]))
 
         if not b and obs_access:
             from app.services.cache_service import cache_service
             from app.services.cutout_service import cutout_cache_key
-            b = cache_service.get(cutout_cache_key(obs_access, obs_ra, obs_dec, fov_deg))
+            key = cutout_cache_key(obs_access, obs_ra, obs_dec, fov_deg)
+            b = cache_service.get(key) or cache_service.get(f"cloud-{key}")
 
         if b:
             try:
@@ -467,8 +469,12 @@ def generate_spectrum_for_target(
 
     # 2. Documented physical fit from observed detector bands (no preset coordinates or identity matching)
     obs_list = list(measured_by_detector.values())
-    fit_inputs = temperature_fit_inputs(obs_list)
-    bb_fit = fit_blackbody_continuum(fit_inputs)
+    # These aperture sums can sample different epochs and passbands and have
+    # not been converted into comparable source flux densities. Fitting a
+    # blackbody to them would give a scientifically unsupported temperature.
+    bb_fit = fit_blackbody_continuum([])
+    bb_fit["reason"] = "Comparable calibrated source flux densities are unavailable"
+    bb_fit["limitations"] = "Field aperture sums may contain different sources and epochs and are not calibrated source flux densities."
 
     # 3. Build output for all 6 detector bands
     bands_output: List[Dict[str, Any]] = []
@@ -496,30 +502,7 @@ def generate_spectrum_for_target(
             model_lbl = "Measured SPHEREx Detector Band"
             meas_status = "measured"
         else:
-            # Illustrative estimated flux evaluated from documented blackbody fit or median observed scaling
-            if bb_fit["status"] == "converged" and bb_fit.get("temperature_k") and bb_fit.get("amplitude"):
-                b_val = planck_b_nu(wave_eff, float(bb_fit["temperature_k"]))
-                flux = float(bb_fit["amplitude"]) * b_val
-                model_lbl = "Estimated Continuum Model (Interpolated from Single-T Fit) - Illustrative Continuum, Never Observed Resolution"
-                meas_status = "unobserved_estimated"
-            elif obs_list:
-                med_obs = float(np.median([m["flux_mjy_sr"] for m in obs_list]))
-                flux = med_obs
-                model_lbl = "Estimated Continuum Model (Interpolated from Observed Bands) - Illustrative Continuum, Never Observed Resolution"
-                meas_status = "unobserved_estimated"
-            else:
-                flux = 0.05
-                model_lbl = "Illustrative Placeholder Model (No Observed Archive Bands) - Never Observed Resolution"
-                meas_status = "unobserved_placeholder"
-
-            flux = max(0.01, float(flux))
-            peak = flux * 1.3
-            err = max(0.05, flux * 0.15)
-            snr = round(flux / err, 1)
-            is_obs = False
-            obs_id_val = None
-
-        flux_density_mjy = flux * 0.9035
+            continue
 
         bands_output.append({
             "detector": det_name,
@@ -530,137 +513,49 @@ def generate_spectrum_for_target(
             "bandwidth_um": bandwidth_val,
             "calibration_source": cal_source,
             "color": cfg["color"],
-            "flux_mjy_sr": round(flux, 4),
-            "flux_density_mjy": round(flux_density_mjy, 4),
-            "peak_flux_mjy_sr": round(peak, 4),
-            "flux_err_mjy_sr": round(err, 4),
+            "flux_mjy_sr": flux,
+            # A surface-brightness pixel sum is not a source flux density.
+            # The FITS WCS pixel solid angle and aperture correction are needed.
+            "flux_density_mjy": None,
+            "peak_flux_mjy_sr": peak,
+            "flux_err_mjy_sr": err,
             "uncertainty_source": meas.get("uncertainty_source", "unknown") if is_obs else "illustrative",
-            "snr": round(snr, 1),
+            "snr": snr,
             "is_observed": is_obs,
             "obs_id": obs_id_val,
             "measurement_status": meas_status,
             "model_label": model_lbl,
         })
 
-    # 4. Illustrative 102 individual spectral channels across the 6 arrays
+    # The actual 102-band cube is served separately. Detector-level samples do
+    # do not justify fabricating a value for each channel.
     channels_102: List[Dict[str, Any]] = []
-    channel_global_idx = 1
-
-    band_waves = np.array([b["wavelength_um"] for b in bands_output])
-    band_fluxes = np.array([b["flux_mjy_sr"] for b in bands_output])
-    log_band_w = np.log(band_waves)
-    log_band_f = np.log(np.maximum(1e-4, band_fluxes))
-
-    try:
-        from scipy.interpolate import PchipInterpolator
-        interp_model = PchipInterpolator(log_band_w, log_band_f, extrapolate=True)
-        eval_flux = lambda lw: float(np.exp(interp_model(lw)))
-    except Exception:
-        eval_flux = lambda lw: float(np.exp(np.interp(lw, log_band_w, log_band_f)))
-
-    for cfg in SPHEREX_DETECTOR_CONFIG:
-        w_min = cfg["wave_min"]
-        w_max = cfg["wave_max"]
-        n_chan = cfg["channel_count"]  # 17
-        waves = np.linspace(w_min, w_max, n_chan)
-        det_obs = cfg["detector"] in measured_by_detector
-
-        for w in waves:
-            log_w = np.log(w)
-            ch_flux = max(0.005, eval_flux(log_w))
-
-            channels_102.append({
-                "channel_index": channel_global_idx,
-                "detector": cfg["detector"],
-                "color": cfg["color"],
-                "wavelength_um": round(float(w), 4),
-                "flux_mjy_sr": round(ch_flux, 4),
-                "flux_density_mjy": round(ch_flux * 0.9035, 4),
-                "is_observed_band": det_obs,
-                "is_observed": False,
-                "is_interpolated": True,
-                "model_label": "Estimated Continuum Model (Interpolated) - Illustrative Continuum, Never Observed Resolution",
-            })
-            channel_global_idx += 1
-
-    # 5. Smooth continuum curve for SVG rendering
-    continuum_eval_waves = np.linspace(0.75, 5.00, 60)
     continuum_curve: List[Dict[str, float]] = []
-
-    for w in continuum_eval_waves:
-        cf = max(0.005, eval_flux(np.log(w)))
-        continuum_curve.append({
-            "wavelength_um": round(float(w), 3),
-            "flux_mjy_sr": round(cf, 4),
-        })
 
     # 6. SED Summary and Empirical Physical Characterization
     observed_channels = [b for b in bands_output if b.get("is_observed")]
 
-    # Neutral measured-shape descriptions only; unobserved synthetic peaks are NEVER called measured peaks
-    if len(observed_channels) >= 2:
-        obs_sorted = sorted(observed_channels, key=lambda b: b["wavelength_um"])
-        f_first = obs_sorted[0]["flux_mjy_sr"]
-        f_last = obs_sorted[-1]["flux_mjy_sr"]
-        peak_band = max(observed_channels, key=lambda b: b["flux_mjy_sr"])
-        w_peak = peak_band["wavelength_um"]
-        det_peak = peak_band["detector"]
-
-        if peak_band == obs_sorted[-1] and f_last > 1.2 * f_first:
-            shape_desc = "flux rises toward longer measured bands"
-        elif peak_band == obs_sorted[0] and f_first > 1.2 * f_last:
-            shape_desc = "flux falls toward longer measured bands"
-        elif peak_band != obs_sorted[0] and peak_band != obs_sorted[-1]:
-            shape_desc = f"peak among measured detector bands ({w_peak:.2f} µm in {det_peak})"
-        elif f_last > 1.2 * f_first:
-            shape_desc = "flux rises toward longer measured bands"
-        elif f_first > 1.2 * f_last:
-            shape_desc = "flux falls toward longer measured bands"
-        else:
-            shape_desc = "broadband continuum without monotonic trend across measured bands"
-
-        peak_wave_val: Optional[float] = round(peak_band["wavelength_um"], 4)
-        peak_det_val: Optional[str] = peak_band["detector"]
-        peak_flux_val: Optional[float] = round(peak_band["flux_mjy_sr"], 4)
-        peak_is_measured = True
-    elif len(observed_channels) == 1:
-        peak_band = observed_channels[0]
-        shape_desc = "insufficient observed coverage (single measured detector band; continuum slope unconstrained)"
-        peak_wave_val = round(peak_band["wavelength_um"], 4)
-        peak_det_val = peak_band["detector"]
-        peak_flux_val = round(peak_band["flux_mjy_sr"], 4)
-        peak_is_measured = True
+    # Detector aperture sums can differ in epoch, PSF and passband, so their
+    # relative heights do not establish a source spectrum or measured peak.
+    if observed_channels:
+        shape_desc = "source continuum shape unavailable from field aperture sums"
     else:
-        # Zero observed archive bands: make observed-data summary metrics unavailable!
         shape_desc = "insufficient observed coverage (no observed archive bands)"
-        peak_wave_val = None
-        peak_det_val = None
-        peak_flux_val = None
-        peak_is_measured = False
+    peak_wave_val = None
+    peak_det_val = None
+    peak_flux_val = None
+    peak_is_measured = False
 
-    if len(observed_channels) > 0:
-        trapz_fn = getattr(np, "trapezoid", getattr(np, "trapz", None))
-        if trapz_fn:
-            total_flux_integral = float(trapz_fn(
-                [c["flux_mjy_sr"] for c in channels_102],
-                [c["wavelength_um"] for c in channels_102]
-            ))
-        else:
-            ch_y = [c["flux_mjy_sr"] for c in channels_102]
-            ch_x = [c["wavelength_um"] for c in channels_102]
-            total_flux_integral = float(sum(0.5 * (ch_y[i] + ch_y[i+1]) * (ch_x[i+1] - ch_x[i]) for i in range(len(ch_x)-1)))
-        total_flux_integral = round(total_flux_integral, 3)
-    else:
-        total_flux_integral = None
+    total_flux_integral = None  # No resolved continuum is available to integrate.
 
     estimated_temp = int(round(bb_fit["temperature_k"])) if bb_fit.get("temperature_k") is not None else None
 
     continuum_classification = {
         "continuum_shape": shape_desc,
         "classification_type": "broadband_continuum_shape",
-        "method": "Empirical broad-band continuum shape across measured SPHEREx detector bands",
+        "method": "Unavailable: field samples are not comparable calibrated source fluxes",
         "observed_bands_count": len(observed_channels),
-        "statement": "Broadband continuum shape only; not an astrophysical classification.",
+        "statement": "A source continuum shape or classification cannot be determined from these field samples.",
         "inputs": [
             {
                 "detector": b.get("detector"),
@@ -682,7 +577,7 @@ def generate_spectrum_for_target(
         "channels_102": channels_102,
         "estimated_channels_102": channels_102,
         "continuum_curve": continuum_curve,
-        "continuum_model_label": "Estimated Continuum Model (Interpolated) - Illustrative Continuum, Never Observed Resolution",
+        "continuum_model_label": "Unavailable: detector samples do not provide a resolved continuum",
         "temperature_fit": bb_fit,
         "continuum_classification": continuum_classification,
         "summary": {
@@ -697,7 +592,7 @@ def generate_spectrum_for_target(
             "integrated_flux_mjy_sr_um": total_flux_integral,
             "total_channels": len(channels_102),
             "estimated_channels_count": len(channels_102),
-            "continuum_model_label": "Estimated Continuum Model (Interpolated) - Illustrative Continuum, Never Observed Resolution",
+            "continuum_model_label": "Unavailable: detector samples do not provide a resolved continuum",
             "observed_channels_count": len(observed_channels),
             "observed_bands_count": len(observed_channels),
         },

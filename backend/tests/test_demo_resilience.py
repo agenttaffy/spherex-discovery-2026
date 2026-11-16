@@ -41,6 +41,22 @@ def test_offline_search_does_not_expand_requested_radius():
     assert resp.status_code == 200
     assert resp.json()["total_found"] == 0
 
+def test_cache_only_demo_never_queries_live_observations_or_health():
+    with (
+        patch("app.services.irsa_client.DEMO_CACHE_ONLY", True),
+        patch("app.api.health.DEMO_CACHE_ONLY", True),
+        patch("httpx.AsyncClient.get") as archive_get,
+    ):
+        health = client.get("/api/health").json()
+        covered = client.get("/api/observations?ra=269.45208&dec=4.69339&fov=0.05&collection=ALL").json()
+        empty = client.get("/api/observations?ra=0&dec=0&fov=0.01&collection=ALL").json()
+    archive_get.assert_not_called()
+    assert health["demo_cache_only"] is True
+    assert health["irsa_connected"] is False
+    assert covered["observations"]
+    assert all(record["search_provenance"] == "cached_demo" for record in covered["observations"])
+    assert empty["total_found"] == 0
+
 def test_diff_on_demo_epochs():
     # Get Barnard's Star demo records
     barnard_recs = demo_service.find_matching_observations(269.45208, 4.69339, radius_deg=0.1)

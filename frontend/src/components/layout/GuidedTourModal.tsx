@@ -33,7 +33,7 @@ export const GuidedTourModal: React.FC<GuidedTourModalProps> = ({
               Unlike traditional telescopes with discrete broadband glass filters, SPHEREx detectors (D1 to D6) use <strong className="text-slate-100">Linear Variable Filters</strong> glued directly atop the detector arrays. The observed wavelength shifts continuously across each pixel column.
             </p>
             <p className="text-amber-300/90 font-mono text-[11px]">
-              ⚠️ Scientific Rule: Pixel-by-pixel temporal subtraction (I₂ − I₁) is ONLY valid between identical detector bands and aligned celestial pointings. Subtraction across differing detectors creates spurious chromatic artifacts.
+              Temporal subtraction uses aligned pixels with compatible calibrated passbands. Two exposures from the same detector can sample different wavelengths.
             </p>
           </div>
         </div>
@@ -53,7 +53,7 @@ export const GuidedTourModal: React.FC<GuidedTourModalProps> = ({
                 Moving Objects (Dipole)
               </span>
               <p className="text-[11px] text-slate-400">
-                A moving body leaves a characteristic <strong className="text-slate-200">dipole signature</strong>: a dark negative hole at Epoch 1 coordinates and a bright positive peak at Epoch 2 coordinates. The astrometric vector engine measures the proper motion in arcsec/year.
+                Motion can leave a negative residual at the first position and a positive residual at the second. Registration errors can produce a similar pattern. Confirm source identity and the time baseline before interpreting a candidate offset.
               </p>
             </div>
             <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
@@ -61,7 +61,7 @@ export const GuidedTourModal: React.FC<GuidedTourModalProps> = ({
                 Variable Stars (Monopole)
               </span>
               <p className="text-[11px] text-slate-400">
-                Pulsating red giants and young stars remain stationary in pixel space ($\Delta x = 0$). Their difference image is a centered positive or negative monopole, and their fluctuations are tracked in the multi-epoch Light Curve dock.
+                A brightness change can leave a centered positive or negative residual. Background, instrument response, and unresolved nearby sources can also affect field aperture samples.
               </p>
             </div>
           </div>
@@ -74,63 +74,63 @@ export const GuidedTourModal: React.FC<GuidedTourModalProps> = ({
       content: (
         <div className="space-y-2 text-xs leading-relaxed text-slate-300">
           <p className="mb-2">
-            The challenge provides 5 official target fields. Click any target to immediately explore its verified real SPHEREx observations:
+            Select a challenge field to inspect its coordinates and available SPHEREx observations.
           </p>
           <div className="space-y-1.5 font-mono text-[11px]">
-            <div
+            <button type="button"
               onClick={() => { onSelectPreset?.('barnards_star'); onClose(); }}
-              className="p-2.5 rounded-lg bg-slate-950 hover:bg-cyan-950/40 border border-slate-800 hover:border-cyan-800/80 cursor-pointer flex justify-between items-center transition"
+              className="w-full text-left p-2.5 rounded-lg bg-slate-950 hover:bg-cyan-950/40 border border-slate-800 hover:border-cyan-800/80 cursor-pointer flex justify-between items-center transition"
             >
               <div>
-                <span className="font-bold text-cyan-300 block">1. Barnard's Star (Gl 699)</span>
-                <span className="text-[10px] text-slate-400 font-sans">Fastest proper motion star known (10.3″/yr) • Visible 1.6-pixel displacement</span>
+                <span className="font-bold text-cyan-300 block">Barnard's Star (Gl 699)</span>
+                <span className="text-[10px] text-slate-400 font-sans">High catalog proper motion. Check the observation epoch.</span>
               </div>
               <ChevronRight className="w-4 h-4 text-cyan-400 shrink-0" />
-            </div>
+            </button>
 
-            <div
+            <button type="button"
               onClick={() => { onSelectPreset?.('wise_0855'); onClose(); }}
-              className="p-2.5 rounded-lg bg-slate-950 hover:bg-cyan-950/40 border border-slate-800 hover:border-cyan-800/80 cursor-pointer flex justify-between items-center transition"
+              className="w-full text-left p-2.5 rounded-lg bg-slate-950 hover:bg-cyan-950/40 border border-slate-800 hover:border-cyan-800/80 cursor-pointer flex justify-between items-center transition"
             >
               <div>
-                <span className="font-bold text-amber-300 block">2. WISE 0855-0714</span>
-                <span className="text-[10px] text-slate-400 font-sans">Coldest sub-stellar brown dwarf (~250 K) • Strong D4/D5 infrared detection</span>
+                <span className="font-bold text-amber-300 block">WISE 0855-0714</span>
+                <span className="text-[10px] text-slate-400 font-sans">Faint Y dwarf with high catalog proper motion</span>
               </div>
               <ChevronRight className="w-4 h-4 text-cyan-400 shrink-0" />
-            </div>
+            </button>
 
-            <div
+            <button type="button"
               onClick={() => { onSelectPreset?.('rw_aurigae'); onClose(); }}
-              className="p-2.5 rounded-lg bg-slate-950 hover:bg-cyan-950/40 border border-slate-800 hover:border-cyan-800/80 cursor-pointer flex justify-between items-center transition"
+              className="w-full text-left p-2.5 rounded-lg bg-slate-950 hover:bg-cyan-950/40 border border-slate-800 hover:border-cyan-800/80 cursor-pointer flex justify-between items-center transition"
             >
               <div>
-                <span className="font-bold text-rose-300 block">3. RW Aurigae</span>
-                <span className="text-[10px] text-slate-400 font-sans">Violent T Tauri disk disruption • Dramatic multi-magnitude photometric variability</span>
+                <span className="font-bold text-rose-300 block">RW Aurigae</span>
+                <span className="text-[10px] text-slate-400 font-sans">Variable young binary</span>
               </div>
               <ChevronRight className="w-4 h-4 text-cyan-400 shrink-0" />
-            </div>
+            </button>
 
-            <div
+            <button type="button"
               onClick={() => { onSelectPreset?.('r_draconis'); onClose(); }}
-              className="p-2.5 rounded-lg bg-slate-950 hover:bg-cyan-950/40 border border-slate-800 hover:border-cyan-800/80 cursor-pointer flex justify-between items-center transition"
+              className="w-full text-left p-2.5 rounded-lg bg-slate-950 hover:bg-cyan-950/40 border border-slate-800 hover:border-cyan-800/80 cursor-pointer flex justify-between items-center transition"
             >
               <div>
-                <span className="font-bold text-purple-300 block">4. R Draconis</span>
-                <span className="text-[10px] text-slate-400 font-sans">Mira-type pulsating red giant (245-day period) • Large flux amplitude</span>
+                <span className="font-bold text-purple-300 block">R Draconis</span>
+                <span className="text-[10px] text-slate-400 font-sans">Mira-type pulsating red giant</span>
               </div>
               <ChevronRight className="w-4 h-4 text-cyan-400 shrink-0" />
-            </div>
+            </button>
 
-            <div
+            <button type="button"
               onClick={() => { onSelectPreset?.('epsilon_indi_b'); onClose(); }}
-              className="p-2.5 rounded-lg bg-slate-950 hover:bg-cyan-950/40 border border-slate-800 hover:border-cyan-800/80 cursor-pointer flex justify-between items-center transition"
+              className="w-full text-left p-2.5 rounded-lg bg-slate-950 hover:bg-cyan-950/40 border border-slate-800 hover:border-cyan-800/80 cursor-pointer flex justify-between items-center transition"
             >
               <div>
-                <span className="font-bold text-teal-300 block">5. Epsilon Indi B</span>
-                <span className="text-[10px] text-slate-400 font-sans">Binary brown dwarf system • Significant proper motion (4.7″/yr) & brown dwarf spectra</span>
+                <span className="font-bold text-teal-300 block">Epsilon Indi B</span>
+                <span className="text-[10px] text-slate-400 font-sans">Nearby brown dwarf binary</span>
               </div>
               <ChevronRight className="w-4 h-4 text-cyan-400 shrink-0" />
-            </div>
+            </button>
           </div>
         </div>
       ),

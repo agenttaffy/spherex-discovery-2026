@@ -82,6 +82,9 @@ assert(comparisonView.includes('role="tablist"'), 'ComparisonView operation mode
 assert(comparisonView.includes('role="tab"'), 'ComparisonView operation mode buttons use role="tab"');
 assert(comparisonView.includes('View Accessible Comparison Metrics Table'), 'ComparisonView includes accessible metrics table disclosure');
 assert(comparisonView.includes('diffColormap'), 'ComparisonView supports diverging colormap toggle for difference frames');
+assert(comparisonView.includes('Verified CWAVE/CBAND') && comparisonView.includes('comparison unavailable') &&
+  spectrumChart.includes('Estimated λ (µm)') && spectrumChart.includes('unavailable in this spectrum'),
+  'Detector views distinguish verified calibration, estimated wavelengths, and unavailable coverage');
 
 // 9. Check GuidedTourModal and DiscoveryReportModal for Dialog accessibility
 const tourModal = fs.readFileSync(path.join(FRONTEND_SRC, 'components', 'layout', 'GuidedTourModal.tsx'), 'utf-8');
@@ -99,6 +102,25 @@ assert(canvasViewer.includes('Maximum zoom limit reached'), 'CanvasViewer announ
 
 // 12. Check App.tsx for URL observation deep linking synchronization
 assert(app.includes("url.searchParams.set('obs', obs.id)"), 'App synchronizes active observation with URL search params on timeline navigation');
+
+const cubeView = fs.readFileSync(path.join(FRONTEND_SRC, 'components', 'science', 'CubeView.tsx'), 'utf-8');
+assert(app.includes('Search coordinate') && canvasViewer.includes('Catalog prediction at exposure') &&
+  canvasViewer.includes('Source identity unconfirmed'), 'Viewer distinguishes search, catalog prediction, and source identity');
+assert(canvasViewer.includes('The blue crosshair marks the cutout center') &&
+  canvasViewer.includes('Synthetic image · archive cutout unavailable') &&
+  canvasViewer.includes("targetId && frame && !frame.is_synthetic && frame.image_provenance !== 'local_fixture'"),
+  'Viewer explains the center marker and excludes fixtures from target evidence');
+assert(app.includes('new Set(observations.map(obs => obs.obs_id)).size === 1') &&
+  app.includes('A temporal comparison needs an independent epoch'), 'One exposure remains one epoch across detector records');
+assert(app.includes("isBlinkActive || activeTab === 'blink'") &&
+  app.includes('A motion measurement requires the same confirmed source in both epochs and comparable passbands'),
+  'Preset blink explains the source association and passband limits');
+assert(cubeView.includes('counts.flagged') && cubeView.includes('counts.blank_channel') &&
+  cubeView.includes('point.surface_brightness_mjy_sr !== null'), 'Cube summarizes channel coverage and excludes unavailable samples from the plot');
+assert(cubeView.includes('Cached DR1 sky-pixel preview') && cubeView.includes('IRSA archive result') &&
+  cubeView.includes('Cache provenance'), 'Cube distinguishes cached and archive data and discloses provenance');
+assert(cubeView.includes('No usable spectrum at this pixel.') && cubeView.includes('No usable pixels in this channel map') &&
+  cubeView.includes('map.pixels.length - 1 - y'), 'Cube preserves empty channel states and native display orientation');
 
 console.log('\n============================================================');
 console.log(`Results: ${passCount} passed, ${failCount} failed`);

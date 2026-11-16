@@ -1,0 +1,8 @@
+{
+  "sha256": "c1d4eb1fe3609ee298d59c147e1c0537acd9523265d31bbaa530be170ef67542",
+  "evidence_sha256": "0cd353e473e9df8b89b6bc8f8ec93ea169a6376c680530692beec7bbaf40813d",
+  "verified_at_utc": "2026-11-16T03:05:17.221934+00:00",
+  "records": 6,
+  "source": "NASA IRSA public SPHEREx S3 object listings and FITS headers",
+  "note": "Partial targeted survey, not a complete search or proof of target identity. Parent-image WCS covers the indexed sky coordinate; cutout availability is separate."
+}

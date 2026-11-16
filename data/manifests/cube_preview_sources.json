@@ -1,0 +1,112 @@
+[
+  {
+    "id": "barnards_star",
+    "name": "Barnard's Star",
+    "tile": 7945,
+    "ra": 269.4461286205729,
+    "dec": 4.769998359667445,
+    "pixel": {
+      "x": 98,
+      "y": 103,
+      "ra": 269.4451904296875,
+      "dec": 4.768494403556643
+    },
+    "source": {
+      "fits_url": "https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/hips5_cube/hips_20261026/Norder5/Dir0/Npix7945_cube.fits",
+      "etag_md5": "07d1a4fdc7ff3e74f12af115609a3814",
+      "sha256": "00e6e83df65d7e85eabb7029fc99d924e9e8c631037572bc2e7453935f9cc5b7",
+      "bytes": 320909760,
+      "date_beg": "2025-08-12T12:50:54.415",
+      "date_end": "2026-05-08T14:44:11.296"
+    },
+    "channels_sha256": "c268e62bb4f2d1019dd5bce6e00c71039dd8f1e2333962265de191d78e3b886b"
+  },
+  {
+    "id": "wise_0855",
+    "name": "WISE 0855",
+    "tile": 10226,
+    "ra": 133.75896227492004,
+    "dec": -7.242116064321349,
+    "pixel": {
+      "x": 212,
+      "y": 238,
+      "ra": 133.76129150390625,
+      "dec": -7.241854732116594
+    },
+    "source": {
+      "fits_url": "https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/hips5_cube/hips_20261026/Norder5/Dir10000/Npix10226_cube.fits",
+      "etag_md5": "a305cebfa72857a79e9107d6b9a635c9",
+      "sha256": null,
+      "bytes": 320909760,
+      "date_beg": "2025-05-05T16:48:02.459",
+      "date_end": "2026-05-14T08:19:32.849"
+    },
+    "channels_sha256": "b6e910285b07bfc46d9c1edcc296562b069b14729430103aed1466a1b966773e"
+  },
+  {
+    "id": "rw_aurigae",
+    "name": "RW Aurigae",
+    "tile": 277,
+    "ra": 76.95658820303035,
+    "dec": 30.401287398865755,
+    "pixel": {
+      "x": 400,
+      "y": 252,
+      "ra": 76.95648193359375,
+      "dec": 30.399227521745352
+    },
+    "source": {
+      "fits_url": "https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/hips5_cube/hips_20261026/Norder5/Dir0/Npix277_cube.fits",
+      "etag_md5": "23f9465c65ea4e59065901536048fbc3",
+      "sha256": null,
+      "bytes": 320909760,
+      "date_beg": "2025-09-01T10:04:17.466",
+      "date_end": "2026-03-12T00:04:55.433"
+    },
+    "channels_sha256": "673dc86805f01e704be25d7644dfa7e3704c1dab0f71cd6ebe684214dcdb64bc"
+  },
+  {
+    "id": "r_draconis",
+    "name": "R Draconis",
+    "tile": 2928,
+    "ra": 248.16722768733652,
+    "dec": 66.75502445923215,
+    "pixel": {
+      "x": 20,
+      "y": 425,
+      "ra": 248.16512059369202,
+      "dec": 66.75553944294727
+    },
+    "source": {
+      "fits_url": "https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/hips5_cube/hips_20261026/Norder5/Dir0/Npix2928_cube.fits",
+      "etag_md5": "a6002491c53f331ba86e1f436b933ee9",
+      "sha256": null,
+      "bytes": 320909760,
+      "date_beg": "2025-04-26T10:31:24.912",
+      "date_end": "2026-05-13T15:42:44.285"
+    },
+    "channels_sha256": "4cd2eac81f29e86e9861f9dda11ab53d8a6850bda47c105dd7509ad7c525c67e"
+  },
+  {
+    "id": "epsilon_indi_b",
+    "name": "Epsilon Indi B",
+    "tile": 11391,
+    "ra": 331.09813086506205,
+    "dec": -56.801144263858404,
+    "pixel": {
+      "x": 97,
+      "y": 408,
+      "ra": 331.1003052769298,
+      "dec": -56.80110613704929
+    },
+    "source": {
+      "fits_url": "https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/hips5_cube/hips_20261026/Norder5/Dir10000/Npix11391_cube.fits",
+      "etag_md5": "bedf4691831b683d699f7138c1b24812",
+      "sha256": null,
+      "bytes": 320909760,
+      "date_beg": "2025-04-24T20:31:57.081",
+      "date_end": "2026-05-12T21:11:17.884"
+    },
+    "channels_sha256": "560483cfd716e672dc4aad69642ce5cbebfe6335eb3b0dafe5ad473824377530"
+  }
+]

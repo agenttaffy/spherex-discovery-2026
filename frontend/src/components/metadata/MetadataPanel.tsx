@@ -1,45 +1,117 @@
 import React, { useState } from 'react';
 import { ExternalLink, Info, Activity, ShieldCheck, Tag, FileText, Download, Layers } from 'lucide-react';
-import { FrameResponse, LightCurveSeries, SpectrumResponse } from '../../types/astronomy';
+import { CatalogSource, FrameResponse, LightCurveSeries, SpectrumResponse } from '../../types/astronomy';
 import { LightCurveChart } from '../science/LightCurveChart';
 import { SpectrumChart } from '../science/SpectrumChart';
+import { QuickSkySpectrum } from '../science/QuickSkySpectrum';
+import { imageProvenanceLabel } from '../../services/imageProvenance';
 
 interface MetadataPanelProps {
+  namedTarget?: boolean;
   frame: FrameResponse | null;
+  catalogSources: CatalogSource[];
+  catalogEnabled: boolean;
+  loadingCatalog: boolean;
+  catalogQueryError: boolean;
   lightCurve?: LightCurveSeries | null;
   loadingPhotometry?: boolean;
   spectrum?: SpectrumResponse | null;
   loadingSpectrum?: boolean;
+  onRefreshAnalysis?: () => void;
   onSelectObsId?: (obsId: string) => void;
   onOpenDiscoveryReport?: () => void;
+  samplePosition: { ra: number; dec: number } | null;
+  analysisEnabled: boolean;
+  onOpenCube: () => void;
 }
 
 export const MetadataPanel: React.FC<MetadataPanelProps> = ({
+  namedTarget,
   frame,
+  catalogSources,
+  catalogEnabled,
+  loadingCatalog,
+  catalogQueryError,
   lightCurve = null,
   loadingPhotometry = false,
   spectrum = null,
   loadingSpectrum = false,
+  onRefreshAnalysis,
   onSelectObsId,
   onOpenDiscoveryReport,
+  samplePosition,
+  analysisEnabled,
+  onOpenCube,
 }) => {
-  const [telemetryTab, setTelemetryTab] = useState<'lightcurve' | 'spectrum'>('spectrum');
+  const [telemetryTab, setTelemetryTab] = useState<'cube' | 'lightcurve' | 'spectrum'>('cube');
+
+  const nearest = catalogEnabled && !loadingCatalog && !catalogQueryError
+    ? catalogSources.reduce<CatalogSource | undefined>((best, source) =>
+        !best || source.separation_arcsec < best.separation_arcsec ? source : best, undefined)
+    : undefined;
+  const provenance = nearest?.provenance || nearest?.catalog_source || 'Unknown catalog source';
 
   return (
     <aside
       aria-label="Scientific telemetry and observation metadata"
-      className="w-full lg:w-80 lg:shrink-0 bg-slate-900/60 border-t lg:border-t-0 lg:border-l border-slate-800 p-4 flex flex-col gap-4 overflow-y-auto text-xs"
+      className="inspector-panel w-full lg:w-80 lg:shrink-0 bg-slate-900/60 border-t lg:border-t-0 lg:border-l border-slate-800 p-4 flex flex-col gap-4 overflow-y-auto text-xs"
     >
-      {/* Telemetry Mode Tabs Switcher */}
+      <h2 className="text-base font-semibold">Observation inspector</h2>
+      {telemetryTab !== 'cube' && <div className="text-slate-300 space-y-1">
+        <p>Analysis uses cached cutouts among up to 60 search results. Open observations, then refresh; missing images are not downloaded automatically.</p>
+        <button type="button" onClick={onRefreshAnalysis} disabled={loadingPhotometry || loadingSpectrum} className="text-cyan-200 underline disabled:opacity-50">Refresh field analysis</button>
+      </div>}
+      <details className="border-b border-slate-800 pb-3">
+        <summary className="cursor-pointer py-1 text-sm font-medium">Reference catalog</summary>
+        <div className="mt-2 space-y-2 text-slate-300">
+          <p>Gaia DR3 positions start at J2016.0. Image markers use approximate proper-motion shifts when motion and exposure time are available; parallax and radial motion are not modeled.</p>
+          <p>The search adds a 3′ margin for motion and returns up to 200 of the brightest sources. Fast-moving or fainter sources may still be omitted.</p>
+          <div role="status">
+            {!catalogEnabled && <p>Enable the reference catalog in the image toolbar to load sources.</p>}
+            {catalogEnabled && loadingCatalog && <p>Loading reference sources…</p>}
+            {catalogEnabled && catalogQueryError && <p>Reference sources could not load. Toggle the overlay to retry.</p>}
+            {catalogEnabled && !loadingCatalog && !catalogQueryError && !nearest && <p>No reference sources are available for this position.</p>}
+          </div>
+          {nearest && (
+            <>
+              <p className="text-slate-400">Nearest listed J2016.0 position to the search coordinate</p>
+              <p className="break-words font-medium text-slate-100">{nearest.designation || nearest.source_id}</p>
+              <p className="tabular-nums">{nearest.separation_arcsec.toFixed(2)} arcsec · {provenance}</p>
+              <p>{/demo|curated/i.test(provenance)
+                ? 'Demo coordinates do not independently confirm identity.'
+                : 'Proximity alone does not confirm a match.'}</p>
+            </>
+          )}
+          {catalogEnabled && !loadingCatalog && !catalogQueryError && catalogSources.length > 0 && (
+            <details className="pt-1">
+              <summary className="cursor-pointer text-cyan-200">View {catalogSources.length} returned Gaia sources</summary>
+              <p className="mt-2 text-slate-400">The search region extends beyond the image, so some listed sources are off-frame. Separations use the catalog positions at J2016.0.</p>
+              <ol className="mt-2 max-h-48 space-y-2 overflow-y-auto pr-1">
+                {catalogSources.map(source => (
+                  <li key={source.source_id} className="border-b border-slate-800 pb-1">
+                    <span className="block break-all text-slate-100">{source.designation || source.source_id}</span>
+                    <span className="tabular-nums">{source.separation_arcsec.toFixed(2)}″ from search center{source.g_mag != null ? ` · G ${source.g_mag.toFixed(2)}` : ''}</span>
+                  </li>
+                ))}
+              </ol>
+            </details>
+          )}
+        </div>
+      </details>
       <div
         role="tablist"
         aria-label="Science telemetry view switcher"
-        className="flex bg-slate-950/90 p-1 rounded-lg border border-slate-800 gap-1 text-[11px] font-mono"
+        className="grid grid-cols-3 bg-slate-950/90 p-1 rounded-lg border border-slate-800 gap-1 text-[11px] font-mono"
       >
+        <button role="tab" aria-selected={telemetryTab === 'cube'} aria-label="Show cached sky-pixel spectrum"
+          onClick={() => setTelemetryTab('cube')}
+          className={`py-1.5 px-1 rounded transition focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${telemetryTab === 'cube' ? 'bg-indigo-600/30 text-indigo-200 border border-indigo-500/40 font-semibold' : 'text-slate-300 hover:text-white'}`}>
+          Sky spectrum
+        </button>
         <button
           role="tab"
           aria-selected={telemetryTab === 'spectrum'}
-          aria-label="Show infrared SED spectrum and estimated continuum"
+          aria-label="Show detector field samples"
           onClick={() => setTelemetryTab('spectrum')}
           className={`flex-1 py-1.5 px-2 rounded flex items-center justify-center gap-1.5 transition focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${
             telemetryTab === 'spectrum'
@@ -48,7 +120,7 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({
           }`}
         >
           <Layers className="w-3.5 h-3.5 text-indigo-400" />
-          <span>Infrared SED</span>
+          <span>Detector</span>
         </button>
         <button
           role="tab"
@@ -62,12 +134,13 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({
           }`}
         >
           <Activity className="w-3.5 h-3.5 text-cyan-400" />
-          <span>Light Curve</span>
+          <span>Light curve</span>
         </button>
       </div>
 
       {/* Switchable Science Telemetry Chart */}
-      {telemetryTab === 'spectrum' ? (
+      {namedTarget && telemetryTab !== 'cube' && <p className="text-xs text-amber-200">Aperture results describe the search field. Target association and variability are unconfirmed.</p>}
+      {telemetryTab === 'cube' ? <QuickSkySpectrum position={samplePosition} enabled={analysisEnabled} onOpenCube={onOpenCube} /> : telemetryTab === 'spectrum' ? (
         <SpectrumChart spectrum={spectrum} loading={loadingSpectrum} />
       ) : (
         <LightCurveChart
@@ -88,7 +161,11 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({
                   <Tag className="w-3.5 h-3.5 text-cyan-400" />
                   Observation Metadata
                 </label>
-                <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-3 space-y-2 font-mono">
+                <div className="border-t border-slate-800 pt-2 space-y-2 font-mono">
+                  <div>
+                    <span className="block text-slate-400">Image source</span>
+                    <span className="text-slate-200 break-words">{imageProvenanceLabel(frame.image_provenance)}</span>
+                  </div>
                   <div className="flex justify-between items-center text-[11px]">
                     <span className="text-slate-400">Obs ID:</span>
                     <span className="text-cyan-300 font-semibold">{frame.obs_id}</span>
@@ -118,7 +195,7 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({
                   <Activity className="w-3.5 h-3.5 text-cyan-400" />
                   Surface Brightness (MJy/sr)
                 </label>
-                <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-3 grid grid-cols-2 gap-2 font-mono">
+                <div className="border-t border-slate-800 pt-2 grid grid-cols-2 gap-2 font-mono">
                   <div>
                     <span className="text-[10px] text-slate-400 block">Peak Max</span>
                     <span className="text-amber-300 font-semibold">{pixel_stats.max_mjy_sr.toFixed(3)}</span>
@@ -144,10 +221,10 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({
                   <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
                   Data Quality Flags
                 </label>
-                <p className="text-[11px] text-slate-300 mb-2">Flags mark pixels that may be affected by detector or observation issues; they do not by themselves identify an object.</p>
-                <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-3 space-y-1.5">
+                <p className="text-[11px] text-slate-300 mb-2">The exclusion count uses the app’s quality mask. Other flags, including source detection, are shown separately; counts can overlap and do not identify an object.</p>
+                <div className="border-t border-slate-800 pt-2 space-y-1.5">
                   {flag_summary.quality_state === 'documented_metadata' ? <div className="flex justify-between items-center text-[11px]">
-                    <span className="text-slate-400">Flagged Pixels:</span>
+                    <span className="text-slate-400">Pixels with exclusion flags:</span>
                     <span className={flag_summary.flagged_pixels === 0 ? 'text-emerald-400 font-semibold' : 'text-amber-300 font-semibold'}>
                       {flag_summary.flagged_pixels} / {flag_summary.total_pixels}
                     </span>
@@ -155,7 +232,7 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({
                   {flag_summary.quality_state === 'documented_metadata' && Object.entries(flag_summary.flag_breakdown).map(([key, val]) => (
                     val > 0 && (
                       <div key={key} className="flex justify-between items-center text-[10px] text-slate-300 pl-2">
-                        <span className="capitalize">{key.replace('_', ' ')}:</span>
+                        <span className="capitalize">{key.replace(/_/g, ' ')}:</span>
                         <span className="text-amber-200 font-mono">{val}</span>
                       </div>
                     )
@@ -170,7 +247,7 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({
                     <FileText className="w-3.5 h-3.5 text-cyan-400" />
                     Celestial WCS
                   </label>
-                  <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-3 font-mono space-y-1 text-[11px]">
+                  <div className="border-t border-slate-800 pt-2 font-mono space-y-1 text-[11px]">
                     <div className="flex justify-between">
                       <span className="text-slate-400">WCS reference RA:</span>
                       <span className="text-slate-200">{wcs.crval1.toFixed(5)}°</span>

@@ -517,6 +517,7 @@ def render_image_to_base64(
     uint8_image: np.ndarray,
     colormap: Optional[str] = None,
     format: Literal["png", "webp"] = "png",
+    valid_mask: Optional[np.ndarray] = None,
 ) -> str:
     """
     Encodes uint8 2D array to Base64 data URI string (PNG or WebP).
@@ -535,6 +536,10 @@ def render_image_to_base64(
         pil_img = Image.fromarray(rgb, mode="RGB")
     else:
         pil_img = Image.fromarray(flipped, mode="L")
+
+    if valid_mask is not None:
+        alpha = np.where(np.flipud(valid_mask), 255, 0).astype(np.uint8)
+        pil_img.putalpha(Image.fromarray(alpha))
 
     buffer = io.BytesIO()
     fmt_str = (format or "png").lower()
