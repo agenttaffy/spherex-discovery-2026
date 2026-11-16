@@ -505,3 +505,13 @@ Testing IRSA SIA connectivity to: https://irsa.ipac.caltech.edu/SIA?COLLECTION=s
 - [Vercel production](https://spherex-discovery-2026.vercel.app/) served the app anonymously from the `frontend` directory. Its API proxy returned healthy readiness JSON and all five preset records from the free Render service.
 - Through the public API, the Epsilon Indi field returned eight records while the archive search was unavailable. The D5 exposure `2025W17_4B_0027_3` returned a live public-cloud 23 × 23 WebP cutout. Signed-out Chrome opened M57 via its coordinate link and displayed 100 measured DR1 cube channels.
 - A second anonymous Chrome session loaded an Epsilon Indi dated image, returned 153 Gaia DR3 references and advanced playback from observation 1 to 3. Public subtraction and mean co-add of the checked Epsilon Indi D5 pair both returned 485 of 529 field pixels. The local fixed-cutout example is only shown on a live deployment when its staged data are actually present.
+
+## Observation search refresh verification (2026-11-16 UTC)
+
+- Full backend suite: 298 passed, 4 skipped and 3 Astropy fixture warnings. Capture and import tests exercise DR1 and QR3 collection handling, a deep-field capture through the saved-search reader, UTC acquisition dates, and restoration of the previous package if the provenance write fails.
+- Bounded live DR1 requests for Epsilon Indi B and R Draconis both timed out. Neither wrote a capture. The checked-in package still uses the previous saved search records. Successful live refresh remains unverified.
+
+## Public service recheck (2026-11-16 UTC)
+
+- At 04:52–04:53 UTC, the saved Epsilon Indi D5 searches accepted both 2.4′ and 3.6′ fields. The 2.4′ image loaded at 23 × 23 pixels. The 3.6′ image and both calibrated comparison requests returned HTTP 502 through the Vercel proxy. Direct Render readiness returned HTTP 200 afterward. The 502 root cause is unconfirmed; the earlier successful 485/529 comparison remains evidence for the pair, and availability is intermittent.
+- Anonymous Chrome loaded the M57 spectrum at its coordinate URL with 100 measured channels and two blank slots. The AllWISE context view loaded survey imagery and identified it as a background survey.

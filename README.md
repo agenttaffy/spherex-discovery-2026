@@ -11,7 +11,7 @@ The app explores dated infrared observations from NASA’s SPHEREx mission. Use 
 
 > [!NOTE]
 > **Spectral measurements and scope:**
-> The inspector displays only available detector field aperture sums. These are not calibrated source flux densities; source association, continuum shape and temperature remain unconfirmed. The former synthetic continuum is no longer produced. The separate 102-slot DR1 cube provides co-added sky-pixel surface brightness, with blank and unavailable channels identified; it does not establish a source spectrum or variability.
+> The inspector shows the DR1 sky-pixel spectrum where available, along with separate detector field aperture sums. DR1 cube brightness combines observations from multiple dates. Blank and unavailable channels are marked, and source identity, source flux and variability remain unconfirmed.
 
 ---
 
@@ -21,7 +21,16 @@ For newly opened spectral images the app first reads bounded ranges from the pub
 
 The DR1 spectral cube uses bounded cloud byte ranges instead of downloading a whole 321 MB tile. When SIA cannot identify the current tile, the app can try the explicitly labeled `hips_20261026` DR1 release at the requested coordinate; it checks the FITS WCS, but this dated fallback is not a guarantee of the newest available release. After verifying a new DR1 layout in IRSA documentation, set `SPHEREX_DR1_CUBE_VERSION` to its `hips_YYYYMMDD` directory and restart the backend to update this fallback. Cached previews remain available for five preset positions. Cloud requests can still fail, and an available image does not prove the observation search was complete.
 
-During an archive outage, a small packaged snapshot can show historical search records for the positions it covers. The snapshot was saved locally on November 14, 2026; the original query timestamps were not independently recorded. Its records are not the image files and may be incomplete or outdated. Image retrieval and coverage are checked separately. To refresh it after obtaining a new attributed IRSA search in the same job/request/rows JSON format, run `python scripts/refresh_search_snapshot.py PATH_TO_SEARCH.json --saved-date YYYY-MM-DD` and review the provenance record. The app verifies the packaged snapshot hash before serving it.
+During an archive outage, a small, checksum-verified snapshot can show saved search records for the positions it covers. The original snapshot was saved locally on November 14, 2026, and its query timestamps were unavailable. Image retrieval and coverage are checked separately.
+
+To refresh the outage fallback when IRSA SIA is responding, install the backend dependencies and run a limited query for one field and release. The capture stages a new JSON file containing the exact query and UTC acquisition time. It creates no file on an empty or failed query. Review the result before appending it to the manifests.
+
+```powershell
+python scripts/capture_irsa_search.py .\fresh-epsilon.json --preset epsilon_indi_b --collection spherex_dr1
+python scripts/refresh_search_snapshot.py .\fresh-epsilon.json --append
+```
+
+Use a different output path for each capture. Specify decimal-degree `--ra` and `--dec` instead of `--preset` for a custom field. The command supports the `spherex_dr1`, `spherex_qr3`, `spherex_dr1_deep` and `spherex_qr3_deep` collections. `--radius-deg` defaults to 0.001°, and `--maxrec` defaults to 1,000. Follow-up queries are manual to limit archive load. The capture and import preserve timestamps, and the saved list may still be incomplete. Review both changed manifest files together before committing and redeploying them.
 
 An IRSA SIA CSV can also be added when you have its **original request URL**, including the collection and circle coordinates. The CSV must contain `obs_id`, `energy_bandpassname`, `t_min`, and `access_url` columns; not every IRSA interface export necessarily has this format. For example, in PowerShell:
 
@@ -29,7 +38,7 @@ An IRSA SIA CSV can also be added when you have its **original request URL**, in
 python scripts/refresh_search_snapshot.py .\search.csv --saved-date 2026-11-15 --csv-request 'https://irsa.ipac.caltech.edu/SIA?COLLECTION=spherex_dr1&POS=circle+248.16723+66.75502+0.001&RESPONSEFORMAT=CSV' --append
 ```
 
-Use the actual date, original request, and file for your search. `--append` checks and keeps the existing package, preserves each search's saved date, and records source checksums; omitting it replaces the existing package. Invalid requests or files with no usable rows are rejected before replacement; individual unusable rows are skipped and counted. This imports search metadata, not image pixels, and cannot establish that a search was complete or that its images are still available. The CSV must actually come from the stated request; the tool cannot independently verify that attribution.
+For legacy JSON and CSV, supply the actual save date. `--append` checks and keeps the existing package, preserves each search's saved date, and records source checksums. Omitting it replaces the package. Invalid requests or files with no usable rows are rejected before replacement. Individual unusable import rows are skipped and counted. Manual CSV imports rely on your attribution of the original request.
 
 ## Share or embed a sky position
 

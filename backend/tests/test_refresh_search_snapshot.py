@@ -58,3 +58,58 @@ def test_invalid_csv_does_not_change_existing_snapshot(tmp_path, monkeypatch, ba
     with pytest.raises(ValueError):
         refresh.main()
     assert snapshot.read_bytes() == b"keep this"
+
+
+def test_capture_timestamp_is_preserved_and_used_as_search_date(tmp_path, monkeypatch):
+    timestamp = "2026-11-16T04:43:09+00:00"
+    captured = refresh.csv_search(CSV.encode(), REQUEST.replace("spherex_dr1", "spherex_dr1_deep"))
+    captured[0]["acquired_utc"] = timestamp
+    source = tmp_path / "capture.json"
+    source.write_text(json.dumps(captured), encoding="utf-8")
+    monkeypatch.setattr(refresh, "DEST", tmp_path)
+    monkeypatch.setattr(sys, "argv", ["refresh", str(source)])
+    refresh.main()
+
+    snapshot = tmp_path / "observation_search_snapshot.json.gz"
+    metadata = tmp_path / "observation_search_snapshot_sources.json"
+    records = json.loads(gzip.decompress(snapshot.read_bytes()))
+    assert records[0]["acquired_utc"] == timestamp
+    assert records[0]["saved_date_local"] == "2026-11-16"
+    assert json.loads(metadata.read_text())["date_basis"].startswith("UTC acquisition date")
+    monkeypatch.setattr(saved, "SNAPSHOT", snapshot)
+    monkeypatch.setattr(saved, "SNAPSHOT_SOURCES", metadata)
+    assert not saved.saved_observations(248.16723, 66.75502, .04, "spherex_dr1", None, 10)
+    result = saved.saved_observations(248.16723, 66.75502, .04, "spherex_dr1_deep", None, 10)
+    assert [(row.obs_id, row.search_snapshot_saved) for row in result] == [("new", "2026-11-16")]
+    OBSERVATION_REGISTRY.pop(result[0].id, None)
+
+
+def test_invalid_capture_timestamp_does_not_change_snapshot(tmp_path, monkeypatch):
+    captured = refresh.csv_search(CSV.encode(), REQUEST)
+    captured[0]["acquired_utc"] = "2026-11-16T04:43:09-05:00"
+    source = tmp_path / "capture.json"
+    source.write_text(json.dumps(captured), encoding="utf-8")
+    snapshot = tmp_path / "observation_search_snapshot.json.gz"
+    snapshot.write_bytes(b"untouched")
+    monkeypatch.setattr(refresh, "DEST", tmp_path)
+    monkeypatch.setattr(sys, "argv", ["refresh", str(source)])
+    with pytest.raises(ValueError, match="ISO 8601 UTC"):
+        refresh.main()
+    assert snapshot.read_bytes() == b"untouched"
+
+
+def test_failed_provenance_replace_restores_prior_snapshot(tmp_path, monkeypatch):
+    monkeypatch.setattr(refresh, "DEST", tmp_path)
+    refresh.publish_snapshot(b"previous", {"snapshot_sha256": "previous"})
+    previous = {p.name: p.read_bytes() for p in tmp_path.iterdir()}
+    replace = refresh.os.replace
+
+    def fail_provenance(source, dest):
+        if dest.name == "observation_search_snapshot_sources.json":
+            raise PermissionError("provenance file is locked")
+        replace(source, dest)
+
+    monkeypatch.setattr(refresh.os, "replace", fail_provenance)
+    with pytest.raises(PermissionError):
+        refresh.publish_snapshot(b"replacement", {"snapshot_sha256": "replacement"})
+    assert {p.name: p.read_bytes() for p in tmp_path.iterdir()} == previous

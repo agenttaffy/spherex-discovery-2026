@@ -9,6 +9,8 @@ Chrome verification covered direct 102 Bands links, timeline playback, the Gaia 
 
 Explorer distinguishes IRSA search outages from a valid empty result. When no dated images are available, Explorer can show a labeled DR1 channel map from the public cloud at the requested coordinates. The timeline and calibrated comparisons still require dated observations.
 
+The observation snapshot maintenance commands can stage and import one DR1 or QR3 search, including deep collections, with its original query and UTC acquisition time. The import path is tested. A successful live capture still depends on IRSA availability. [Refresh instructions](README.md#cloud-access-and-archive-availability)
+
 Difference & Stack can check up to twelve listed same-detector partners for the selected exposure using cached FITS cutouts and verified calibration bytes. The check reports unavailable inputs separately and reuses the calibrated comparison rules without issuing archive requests.
 
 The main frontend now shares the orbital candidate’s blue-violet glass surfaces, local Geist and Instrument Serif fonts, and coral action accents. The Explorer frames the full FITS image at fit zoom with nearest-neighbor rendering. The existing research views and data sources remain in the same navigation. [Browser and science checks](TEST_RESULTS.md#glass-observatory-integration)
