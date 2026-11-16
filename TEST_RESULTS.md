@@ -499,3 +499,8 @@ Testing IRSA SIA connectivity to: https://irsa.ipac.caltech.edu/SIA?COLLECTION=s
 - Reproduced a 44 px vertical clipping defect at 1323 × 854 CSS pixels. The old instrument panel hid part of the toolbar under the timeline.
 - Chrome verified that the full toolbar and timeline remain reachable with the Gaia pane and target details expanded at 1323 × 854 and 1323 × 700. Ordinary wheel input over the FITS canvas scrolled the workspace without changing zoom. Shift + wheel changed fit zoom from 100% to 115%. Ordinary wheel input also scrolled over a live Aladin map.
 - At 375 × 812 the canvas reset and timeline were reachable without horizontal page overflow. The frontend production build passed.
+
+## Public deployment verification (2026-11-15)
+
+- [Vercel production](https://spherex-discovery-2026.vercel.app/) served the app anonymously from the `frontend` directory. Its API proxy returned healthy readiness JSON and all five preset records from the free Render service.
+- Through the public API, the Epsilon Indi field returned eight records while the archive search was unavailable. The D5 exposure `2025W17_4B_0027_3` returned a live public-cloud 23 × 23 WebP cutout. Signed-out Chrome opened M57 via its coordinate link and displayed 100 measured DR1 cube channels.
