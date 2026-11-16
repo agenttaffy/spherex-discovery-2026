@@ -1,16 +1,25 @@
 # SPHEREx Discovery — Project State
 
-**Last Updated:** 2026-11-14T23:27:00Z  
-**Current Implementation Stage:** Phase 8 Scientific Truthfulness Pass (Neutral Broadband Continuum Shape Descriptions Without Astrobiological/Stellar Class Inferences, Strict Temperature Fit Constraints Requiring >= 3 Distinct Bands with Propagated Uncertainties, Unavailable Zero-Observation Summary Metrics Without Synthetic Peak Claims, Explicit Unavailable Photometry State on Projection Failure, Missing Quality Mask State Without Guessing Bits, Uncensored SNR Improvement Estimator in Stacking, Preserved NaN/Inf Masks Without Fabricated Fill Values, Diverging Difference Palettes, 102-Channel Accessible Spectrophotometric Continuum Tables, 93 Passing Pytest Tests, 41 Passing Accessibility Checks, Clean Production Build).
+> **Current availability baseline.** Dated observation search, FITS viewing, timeline/blink, Gaia and WISE sky context have verification evidence. IRSA search remains intermittent. Newly requested image cutouts use the public cloud first and fall back to IRSA; the DR1 cube reads bounded cloud ranges and can use an explicitly dated release if search is unavailable. Candidate motion and target photometry still need independent source validation. Difference and co-add validate matched per-pixel calibrations; real two-image and three-image field comparisons have independent numerical checks. The former synthetic continuum and temperature estimate were removed. The inspector and 102 Bands view show a co-added sky-pixel sample, not a confirmed target spectrum. Historical milestones below describe earlier implementations and tests. See [the current traceability matrix](docs/CHALLENGE_REQUIREMENTS.md).
+
+
+**Current documentation baseline:** 2026-11-15
+
+Chrome verification covered direct 102 Bands links, timeline playback, the Gaia DR3 search, and the checked RW Aurigae difference and co-add. The comparison cards identify excluded pixels with a checkerboard. [Browser verification](TEST_RESULTS.md#browser-verification-2026-11-15)
+
+Explorer distinguishes IRSA search outages from a valid empty result. When no dated images are available, Explorer can show a labeled DR1 channel map from the public cloud at the requested coordinates. The timeline and calibrated comparisons still require dated observations.
+
+The main frontend now shares the orbital candidate’s blue-violet glass surfaces, local Geist and Instrument Serif fonts, and coral action accents. The Explorer frames the full FITS image at fit zoom with nearest-neighbor rendering. The existing research views and data sources remain in the same navigation. [Browser and science checks](TEST_RESULTS.md#glass-observatory-integration)
+**Earlier implementation milestone:** Phase 8 Scientific Truthfulness Pass (Neutral Broadband Continuum Shape Descriptions Without Astrobiological/Stellar Class Inferences, Strict Temperature Fit Constraints Requiring >= 3 Distinct Bands with Propagated Uncertainties, Unavailable Zero-Observation Summary Metrics Without Synthetic Peak Claims, Explicit Unavailable Photometry State on Projection Failure, Missing Quality Mask State Without Guessing Bits, Uncensored SNR Improvement Estimator in Stacking, Preserved NaN/Inf Masks Without Fabricated Fill Values, Diverging Difference Palettes, 102-Channel Accessible Spectrophotometric Continuum Tables, 93 Passing Pytest Tests, 41 Passing Accessibility Checks, Clean Production Build).
 
 ---
 
 > **Current verification note:** Claims below describe implemented features and historical results, not independently validated scientific performance or WCAG conformance. See HANDOFF.md and TEST_RESULTS.md for current evidence and limitations.
 
-> **Comparison safety:** Difference and co-add endpoints are temporarily guarded until per-pixel wavelength compatibility is validated using separate spectral WCS products. Blink remains available. Statements below about arithmetic are historical implementation descriptions.
+> **Comparison safety:** Difference and two-frame co-add require a checksum-verified calibration for each exposure and aligned, usable pixels with sufficient nominal passband overlap. Incompatible pairs return HTTP 422. The D5 field example retained 207 of 225 pixels, and the staged WISE pair was rejected. Blink remains available for visual inspection. [Calibration coverage and remaining gaps](docs/DETECTOR_CALIBRATION.md)
 
 ## 1. Implemented Features
-- **NASA Data Visualization & WCAG 2.2 AA Accessibility (`SpectrumChart.tsx`, `LightCurveChart.tsx`, `CanvasViewer.tsx`, `ComparisonView.tsx`, `index.css`):**
+- **Scientific Visualization & Accessibility Features (`SpectrumChart.tsx`, `LightCurveChart.tsx`, `CanvasViewer.tsx`, `ComparisonView.tsx`, `index.css`):**
   - **Diverging Colormap for Difference Imagery (`fits_processing.py`, `ComparisonView.tsx`):** Implemented `apply_diverging_colormap` (Cool-Warm: Blue -> Light Neutral -> Crimson Red) centered strictly at 128 (zero net flux residual) per NASA Data Visualization guidelines, complete with palette toggle and colorbar legend.
   - **102-Channel Spectrophotometric Continuum Accessible Table (`SpectrumChart.tsx`):** Added accessible dataset switcher tablist (`Observed Bands` vs `102-Channel Continuum Model`), enabling screen-reader and keyboard users to inspect all 102 synthesized spectrophotometric channels with channel index, detector, wavelength, and flux.
   - **HTML/ARIA Table Semantics (`LightCurveChart.tsx`):** Removed invalid `role="button"` from table rows (`<tr>`); encapsulated interactive selection in semantic `<button type="button">` inside `<td className="...">` with visible focus rings.
@@ -39,15 +48,8 @@
   - Tracks requested celestial target `(RA, Dec)` across epochs via WCS, locating subpixel centroids in a local window around expected position rather than locking onto unrelated brighter field stars.
   - Converts subpixel centroid shifts $(\Delta x, \Delta y)$ to celestial equatorial shifts $(\Delta\alpha \cos\delta, \Delta\delta)$ via WCS `pixel_to_world`.
   - Computes annual proper motion $\mu$ using true epoch baseline in years $\Delta t = |t_2 - t_1|$.
-- **LVF Passband Compatibility & Mask-Preserving Differencing (`comparison.py`, `frames.py`):**
-  - Enforces Linear Variable Filter wavelength overlap checks (`em_min`, `em_max`).
-  - Preserves data quality masks (setting masked and non-overlapping pixels to mid-gray 128).
-  - Returns clear descriptive errors when reprojection fails or celestial coverage does not overlap.
-- **Compatible Stacking & Variance Propagation (`stacking.py`, `frames.py`):**
-  - Rejects stacking of incompatible detector arrays or non-overlapping wavelengths.
-  - Propagates variance: $\text{Var}_{\text{stack}} = \frac{1}{N^2} \sum \text{Var}_i$ for mean co-addition.
-  - Propagates bitwise OR of fatal quality masks.
-  - Accurately reports empirical background noise suppression and measured SNR gain.
+- **Calibrated pair differencing** (`frames.py`, `calibrated_comparison.py`): Uses exact checksum-verified spectral WCS maps and native celestial WCS. Accepted pairs must have aligned, usable pixels with at least 90% nominal passband overlap. The response preserves the valid-pixel mask and supplies calibration provenance.
+- **Compatible pair co-addition:** The same native-grid and passband checks gate two-exposure co-addition. The app propagates input variance under an independent-noise assumption.
 - **Reference Catalog Provenance Disambiguation (`catalogs.py`, `catalog_service.py`, `CanvasViewer.tsx`):**
   - Explicitly labels fallback catalog sources as "Curated Reference Catalog (Demo)" vs "Live ESA Gaia TAP".
   - Shows provenance distinction in CanvasViewer overlay labels and toggle buttons.
@@ -60,31 +62,16 @@
   - Constrained single-temperature blackbody continuum fit ($B_\nu(T)$): Requires $\ge 3$ distinct measured detector bands with valid propagated photometric uncertainties to guarantee positive residual degrees of freedom ($\text{dof} \ge 1$). Unsupported 10% error substitutions are disallowed. The temperature is strictly an optional single-temperature continuum fit, not an object's known physical temperature.
   - When zero archive bands exist, peak wavelength, peak detector, peak flux, estimated temperature, and integrated flux are set to `None` (`unavailable`), with `peak_is_measured: False`.
   - Telemetry dock tab switcher in `MetadataPanel.tsx` toggling between "Observed Bands · Continuum (Interpolated)" and "Light Curve".
-- **Astronomical Image Co-Addition & Stacking (`/api/frames/stack`, `stacking.py`, `ComparisonView.tsx`):**
-  - Multi-frame image stacking across observation epochs or detector arrays on a shared celestial grid.
-  - Supports `mean` (maximum SNR), `median` (outlier & cosmic ray rejection), and `sum` (total flux integration) stacking methods.
-  - Aligns frames using `reproject_interp` celestial WCS reprojection with sub-pixel 2D FFT shift fallback.
-  - Automatically calculates single-frame vs stacked background noise ($\sigma_{ref}$, $\sigma_{stack}$), empirical SNR improvement factor, and theoretical $\sim\sqrt{N}$ SNR gain badge (+41.4% for 2 frames).
-  - Operation mode switcher in `ComparisonView.tsx`: "Difference ($I_2 - I_1$)" (reveals moving sources, dipoles, and transients) vs "Co-Add Stack ($I_1 + I_2$)" (reveals faint static infrared sources, brown dwarfs, and deep background galaxies).
-- **Aladin Lite v3 Sky Context Integration (`AladinViewer.tsx` & `CanvasViewer.tsx`):**
-  - Seamless pill tab toggle between "SPHEREx Analysis Canvas" and "Aladin Lite Sky Context".
-  - Embedded Aladin Lite v3 (HiPS WebGL) with dynamic CDN loading and official CDS API compatibility.
-  - Automatic synchronization of pointing coordinates (RA, Dec) and FOV.
-  - Dynamic overlay polygon footprint representing the exact SPHEREx observation coverage bounding box.
-  - Multi-survey switcher: 2MASS Color (Near-IR JHK: 1.25–2.17 µm), AllWISE Color (Mid-IR W1-W4: 3.4–22 µm), DSS2 Color (Optical), Pan-STARRS DR1.
-  - High-fidelity offline SVG celestial radar fallback if external CDNs or WebGL are unavailable.
-- **Scientific WCS Reprojection (`reproject_interp`, `backend/app/science/comparison.py`):**
-  - Automatic celestial grid reprojection between differing observation epochs using `reproject.reproject_interp`.
-  - Aligns epochs with differing pixel scales, geometries, and orientations prior to difference image computation.
-  - Graceful fallback to 2D Fourier phase cross-correlation (FFT shift) if celestial WCS is absent.
-  - Differential alignment telemetry reporting (`wcs_reproject`, `fft_shift`, `direct`).
+- **Comparison View** (`/api/frames/stack`, `ComparisonView.tsx`): Offers mean and sum for a selected calibrated pair. Larger stacks are unsupported. Empirical SNR gain is unavailable for the current comparison response.
+- **Aladin Lite v3 Sky Context:** The bundled viewer initializes on demand and centers on the selected coordinates. Remote 2MASS and DSS2 HiPS tiles provide contextual imagery. The viewer overlays a cutout footprint when valid celestial WCS is available. The prepared native SPHEREx canvas remains available when the context service fails.
+- **Historical reprojection tools:** Reprojection and FFT alignment code remain in the science modules. The current calibrated difference and co-add endpoints use neighboring native samples within the celestial WCS alignment gate.
 - **WebP Image Output Engine (`backend/app/science/fits_processing.py`):**
   - Added `render_image_to_base64` supporting `format: Literal["png", "webp"] = "png"`.
   - Smaller payload footprints for rapid multi-epoch timeline scrubbing and Blink comparator playback.
   - Query parameter support (`/api/frames/{id}?format=webp`) and diff body formatting (`format: "webp"`).
 - **NASA/IPAC IRSA SIA2 Client & Resilient Offline Demo Architecture:**
   - Live programmatic queries against `spherex_dr1` and `spherex_qr3` collections.
-  - 22 verified demonstration cutouts cached locally in `data/cache/` covering all 5 official competition targets across DR1 and QR3.
+  - The default manifest lists 22 files. Only its four RW Aurigae cutouts cover a preset’s exposure-epoch prediction. The optional ten-file stage covers all five presets at two epochs. See the [target validation report](docs/TARGET_VALIDATION.md).
   - Automatic circuit breaker fallback on remote archive latency or HTTP 502/503.
 - **Display-Only Contrast Scaling:** `asinh` (arcsinh), `zscale`, and `linear` stretching engines with grayscale and `inferno` colormaps.
 - **Differential Image Engine:**
@@ -108,7 +95,7 @@
   - Formatted J2000 sexagesimal target reports with astrometric vectors, light curve stats, and verified IRSA DOI 10.26131/IRSA678 citations.
 - **Guided Educational Tour Modal (`GuidedTourModal.tsx`):**
   - 4-step interactive walkthrough explaining SPHEREx LVF optics, dipole vs monopole signatures, official targets, and judging criteria alignment.
-- **Comprehensive Automated Test Suite:** 93 passing pytest tests (with 2 Astropy FITSFixedWarnings) covering unit, science, 3D WCS reprojection, rotated WCS alignment, WebP, robust background co-addition/stacking, 102-channel SED, offline resilience, and scientific regression flows.
+- **Historical automated verification:** 93 passing pytest tests (with 2 Astropy FITSFixedWarnings) covering unit, science, 3D WCS reprojection, rotated WCS alignment, WebP, robust background co-addition/stacking, 102-channel SED, offline resilience, and scientific regression flows.
 
 ---
 
@@ -119,15 +106,19 @@
 - **Viewers:**
   - Canvas Viewer (sub-pixel photometric & astrometric inspection).
   - Aladin Lite v3 (HiPS full-sky context).
-  - Comparison View (Difference $I_2 - I_1$ vs Co-Add Stack $I_1 + I_2$ with Selected Pair and All Epochs scopes).
+  - Comparison View (calibrated difference and two-exposure co-add).
 - **Data:** Direct NASA IRSA SIA2/IBE protocols with disk-backed cache in `data/cache/` and manifest in `data/manifests/`.
 
 ---
 
-## 3. Verified Build & Test Status
+After dependency installation and the one-time IRSA bootstrap, the Windows demo launcher verifies the local FITS stage, pins observation search to that cache, and manages both server processes. See [launch and stop commands](README.md#preview-a-refreshed-demo-cache).
+
+## 3. Historical Build & Test Snapshot
+
+See [TEST_RESULTS.md](TEST_RESULTS.md) for the latest suite and browser verification.
 - **Backend pytest:** 93 passed, 2 Astropy FITSFixedWarnings in 10.11s (0 failures).
 - **Frontend build:** `npm run build` succeeded in 2.55s (1,497 modules transformed, 0 type errors, 0 warnings).
 - **Accessibility & Responsive:** 41 checks passed in `node scripts/verify_accessibility_and_responsive.mjs` (0 failures).
 - **Demonstration dataset:** 22/22 assets verified valid in `python scripts/verify_demo.py`.
 - **Environment & Network:** `python scripts/verify_environment.py` passed outside restricted network: NASA/IPAC IRSA SIA reachable with HTTP 200.
-- **Manual Verification Status:** Automated test suites verified; no manual physical visual inspection or physical screen-reader audio checks were performed.
+- **Manual Verification Status at this milestone:** Physical screen-reader audio checks were not performed.

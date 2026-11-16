@@ -173,9 +173,6 @@ def compute_aperture_photometry(
     bg_med = float(np.median(ann_pixels))
     bg_std = float(np.std(ann_pixels))
 
-    if bg_std < 1e-6:
-        bg_std = 1.0
-
     if n_ap == 0:
         return {
             "status": "unavailable",
@@ -218,22 +215,31 @@ def compute_aperture_photometry(
 
     net_flux = raw_net_flux
     flux_err = raw_flux_err
-
-    snr = float(net_flux / flux_err) if flux_err > 1e-6 else float((peak_val - bg_med) / bg_std)
+    if not np.isfinite(flux_err) or flux_err <= 0:
+        return {
+            "status": "unavailable", "valid": False,
+            "reason": "A usable uncertainty could not be determined from variance or background scatter",
+            "aperture_flux_sum": None, "aperture_mean": None,
+            "background_median": round(bg_med, 4), "background_std": round(bg_std, 4),
+            "net_flux": None, "flux_err": None, "peak_flux": None, "snr": None,
+            "coverage_fraction": round(coverage_fraction, 3),
+            "aperture_area_pixels": n_geom, "valid_pixel_count": n_ap,
+        }
+    snr = float(net_flux / flux_err)
 
     return {
         "status": "measured",
         "valid": True,
         "reason": None,
-        "aperture_flux_sum": round(ap_sum, 4),
-        "aperture_mean": round(ap_mean, 4),
-        "background_median": round(bg_med, 4),
-        "background_std": round(bg_std, 4),
-        "net_flux": round(net_flux, 4),
-        "flux_err": round(flux_err, 4),
+        "aperture_flux_sum": ap_sum,
+        "aperture_mean": ap_mean,
+        "background_median": bg_med,
+        "background_std": bg_std,
+        "net_flux": net_flux,
+        "flux_err": flux_err,
         "uncertainty_source": "variance_propagated" if variance_propagated else "background_estimate",
-        "peak_flux": round(peak_val, 4),
-        "snr": round(max(0.0, snr), 2),
+        "peak_flux": peak_val,
+        "snr": snr,
         "coverage_fraction": round(coverage_fraction, 3),
         "aperture_area_pixels": n_geom,
         "valid_pixel_count": n_ap,

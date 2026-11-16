@@ -11,6 +11,7 @@ interface AladinViewerProps {
 type Phase = 'library' | 'webgl' | 'tiles' | 'ready' | 'error';
 const SURVEYS = [
   { id: '2mass', name: '2MASS color', url: 'https://irsa.ipac.caltech.edu/data/hips/CDS/2MASS/Color', credit: 'University of Massachusetts & IPAC/Caltech; HiPS by CDS, served by IRSA', terms: 'https://www.ipac.caltech.edu/2mass/releases/second/faq.html' },
+  { id: 'allwise', name: 'AllWISE color', url: 'https://irsa.ipac.caltech.edu/data/hips/CDS/AllWISE/RGB-W4-W2-W1', credit: 'NASA/IPAC AllWISE; color HiPS by CDS, served by IRSA', terms: 'https://irsa.ipac.caltech.edu/data/WISE/docs/release/allwise/' },
   { id: 'dss', name: 'DSS2 color', url: 'https://irsa.ipac.caltech.edu/data/hips/CDS/DSS2/color', credit: 'STScI/NASA; color HiPS by CDS, served by IRSA. DSS data: CC BY-NC-SA 4.0', terms: 'https://archive.stsci.edu/publishing/data-use' },
 ] as const;
 
@@ -124,7 +125,7 @@ export const AladinViewer: React.FC<AladinViewerProps> = ({ ra, dec, fov = 0.04,
         if (cancelled) return;
         if (!rendered) throw new Error('Survey tiles are reachable, but the sky image could not be confirmed in this view.');
         setPhase('ready');
-        setMessage('Sky image rendered from the selected context survey.');
+        setMessage('Survey connected; image tiles may still be loading.');
       } catch (error) {
         if (cancelled) return;
         setPhase('error');

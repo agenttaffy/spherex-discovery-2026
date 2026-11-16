@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Search, Compass, Layers, Filter, Sparkles, Loader2 } from 'lucide-react';
-import { DemoPreset } from '../../types/astronomy';
+import { DemoPreset, ObservationRecord } from '../../types/astronomy';
 
 interface SearchControlsProps {
   ra: string;
@@ -18,6 +18,9 @@ interface SearchControlsProps {
   presets: DemoPreset[];
   onSelectPreset: (preset: DemoPreset) => void;
   selectedPresetId?: string;
+  observations: ObservationRecord[];
+  currentIndex: number;
+  onSelectObservation: (index: number) => void;
 }
 
 export const SearchControls: React.FC<SearchControlsProps> = ({
@@ -36,11 +39,19 @@ export const SearchControls: React.FC<SearchControlsProps> = ({
   presets,
   onSelectPreset,
   selectedPresetId,
+  observations,
+  currentIndex,
+  onSelectObservation,
 }) => {
+  const [filter, setFilter] = useState('');
+  const [customFov, setCustomFov] = useState(() => String(Number((fov * 60).toFixed(3))));
+  useEffect(() => setCustomFov(String(Number((fov * 60).toFixed(3)))), [fov]);
+  const matchingPresets = presets.filter(preset => preset.name.toLowerCase().includes(filter.trim().toLowerCase()));
+
   return (
     <aside
       aria-label="Target search and coordinate parameters"
-      className="w-full lg:w-80 lg:shrink-0 bg-slate-950 border-b lg:border-b-0 lg:border-r border-slate-800 p-4 flex flex-col gap-4 overflow-y-auto"
+      className="target-panel w-full lg:w-80 lg:shrink-0 bg-slate-950 border-b lg:border-b-0 lg:border-r border-slate-800 p-4 flex flex-col gap-4 overflow-y-auto"
     >
       {/* Official Challenge Presets */}
       <div>
@@ -51,13 +62,16 @@ export const SearchControls: React.FC<SearchControlsProps> = ({
           </label>
         </div>
         <p className="text-xs text-slate-400 mb-2">Starting coordinates for the challenge; a position alone does not identify a source.</p>
+        <input type="search" value={filter} onChange={event => setFilter(event.target.value)}
+          aria-label="Filter targets" placeholder="Filter targets" className="instrument-input mb-3 w-full" />
+        {presets.length > 0 && matchingPresets.length === 0 && <p className="text-sm text-slate-400">No matching targets.</p>}
         <div className="grid grid-cols-1 gap-0.5" role="group" aria-label="Official Challenge Presets">
-          {presets.map((p) => (
+          {matchingPresets.map((p) => (
             <button
               key={p.id}
               onClick={() => onSelectPreset(p)}
               aria-pressed={selectedPresetId === p.id}
-              className={`w-full text-left px-2 py-2 rounded text-xs transition focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${
+              className={`target-row w-full text-left px-3 py-2 rounded text-xs transition focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${
                 selectedPresetId === p.id
                   ? 'bg-cyan-950/70 text-cyan-100 ring-1 ring-inset ring-cyan-500/60'
                   : 'text-slate-200 hover:bg-slate-900'
@@ -77,7 +91,7 @@ export const SearchControls: React.FC<SearchControlsProps> = ({
       <div className="border-t border-slate-800/80 pt-3">
         <label className="text-xs font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-1.5 mb-2.5">
           <Compass className="w-3.5 h-3.5 text-cyan-400" />
-          Coordinates (J2000)
+          Coordinates (ICRS)
         </label>
         <p className="text-xs text-slate-400 mb-2">Enter sky coordinates in degrees or sexagesimal format.</p>
 
@@ -116,8 +130,23 @@ export const SearchControls: React.FC<SearchControlsProps> = ({
         </div>
       </div>
 
+      {observations.length > 0 && (
+        <div className="border-t border-slate-800 pt-3">
+          <label htmlFor="target-observation" className="block mb-2 text-sm font-medium">Observation</label>
+          <select id="target-observation" className="instrument-input w-full"
+            value={currentIndex} onChange={event => onSelectObservation(Number(event.target.value))}>
+            {observations.map((observation, index) => (
+              <option key={observation.id} value={index}>
+                {index + 1}. {observation.utc_date?.split('T')[0] || 'Date unavailable'} · {observation.detector} · {observation.obs_id}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {/* Query Parameters */}
       <div className="border-t border-slate-800/80 pt-3 space-y-3">
+        <p className="text-[11px] text-slate-300">Changes to field of view, release, or detector apply when you select Discover Observations.</p>
         <div>
           <label className="text-xs font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-1.5 mb-1.5">
             <Layers className="w-3.5 h-3.5 text-cyan-400" />
@@ -142,12 +171,20 @@ export const SearchControls: React.FC<SearchControlsProps> = ({
               </button>
             ))}
           </div>
+          <label htmlFor="custom-fov" className="block mt-2 text-xs text-slate-300">Custom width (arcminutes, 0.06–18)</label>
+          <input id="custom-fov" className="instrument-input mt-1 w-full" type="number" min="0.06" max="18" step="0.06"
+            value={customFov} onChange={event => setCustomFov(event.target.value)} onBlur={() => {
+              const value = Number(customFov);
+              if (value >= 0.06 && value <= 18) setFov(value / 60);
+              else setCustomFov(String(Number((fov * 60).toFixed(3))));
+            }} />
         </div>
 
         <div>
           <label className="text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5 block">
             Survey Release
           </label>
+          <p className="text-[11px] text-slate-300 mb-2">Configured releases searches the wide survey (normally DR1 and QR3). More observations depend on archive access.</p>
           <div className="grid grid-cols-3 gap-1" role="group" aria-label="Survey release data version">
             <button
               type="button"
@@ -189,6 +226,21 @@ export const SearchControls: React.FC<SearchControlsProps> = ({
               Configured releases
             </button>
           </div>
+          <details className="mt-2 text-[11px] text-slate-300" open={collection === 'DEEP' || collection === 'spherex_dr1_deep' || collection === 'spherex_qr3_deep' || undefined}>
+            <summary className="cursor-pointer text-cyan-200">Deep-field searches</summary>
+            <p className="my-2">Deep fields cover special sky regions. Searches use IRSA, can take longer, and may be unavailable during an outage; an empty result does not prove no coverage.</p>
+            <div className="grid grid-cols-3 gap-1" role="group" aria-label="Deep-field survey releases">
+              {[
+                { value: 'spherex_dr1_deep', label: 'DR1 deep', description: 'Search DR1 deep fields' },
+                { value: 'spherex_qr3_deep', label: 'QR3 deep', description: 'Search QR3 deep fields' },
+                { value: 'DEEP', label: 'Both deep', description: 'Search DR1 and QR3 deep fields' },
+              ].map(option => <button key={option.value} type="button" onClick={() => setCollection(option.value)}
+                aria-pressed={collection === option.value} aria-label={option.description}
+                className={`py-1.5 px-1 rounded-md border transition focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none ${collection === option.value ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300 font-semibold' : 'bg-slate-950 border-slate-800 text-slate-300 hover:text-white'}`}>
+                {option.label}
+              </button>)}
+            </div>
+          </details>
         </div>
 
         <div>
@@ -220,7 +272,7 @@ export const SearchControls: React.FC<SearchControlsProps> = ({
           onClick={onSearch}
           disabled={loading}
           aria-label="Discover Observations from NASA IRSA"
-          className="w-full py-2.5 px-4 bg-gradient-to-r from-cyan-700 to-indigo-700 hover:from-cyan-800 hover:to-indigo-800 text-white rounded-lg font-semibold text-xs transition flex items-center justify-center gap-2 shadow-lg shadow-cyan-950/50 disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none"
+          className="search-submit w-full py-2.5 px-4 rounded-lg font-semibold text-xs transition flex items-center justify-center gap-2 disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-cyan-400 outline-none"
         >
           {loading ? (
             <>

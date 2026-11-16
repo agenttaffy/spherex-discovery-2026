@@ -21,7 +21,7 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
     return (
       <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-4 flex flex-col items-center justify-center h-52 text-slate-300">
         <Sparkles className="w-6 h-6 animate-pulse text-indigo-400 mb-2" />
-        <span className="text-xs font-mono">Extracting on-the-fly SED across 6 detectors...</span>
+        <span className="text-xs font-mono">Checking cached detector samples…</span>
       </div>
     );
   }
@@ -30,7 +30,7 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
     return (
       <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-4 flex flex-col items-center justify-center h-48 text-slate-400 text-xs text-center">
         <Layers className="w-6 h-6 opacity-40 mb-2 text-indigo-400" />
-        <p>No multi-band spectral coverage available for this coordinate pointing.</p>
+        <p>No detector measurements are available for this field. Open 102 Bands to inspect available cube data.</p>
       </div>
     );
   }
@@ -62,7 +62,8 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
   const allFluxes = bands.map((b) => b.flux_mjy_sr);
   const maxFlux = Math.max(...allFluxes, 1.0);
   const minFlux = Math.min(0.0, Math.min(...allFluxes));
-  const yRange = Math.max(1e-4, maxFlux * 1.15 - minFlux);
+  const yAxisMax = maxFlux * 1.15;
+  const yRange = Math.max(1e-4, yAxisMax - minFlux);
 
   const getY = (f: number) => {
     const norm = (f - minFlux) / yRange;
@@ -92,14 +93,14 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
           <Layers className="w-3.5 h-3.5 text-indigo-400" />
           <div>
             <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-200 block">
-              Infrared SED (Flux vs. λ)
+              Detector field samples vs. λ
             </span>
             <span className="text-[9px] font-mono text-slate-400">
-              Observed Bands ({total_observed_bands}) · Continuum (Interpolated)
+              Observed detector samples ({total_observed_bands})
             </span>
           </div>
         </div>
-        <button
+        {channels_102.length > 0 && <button
           onClick={() => setShowChannels102(!showChannels102)}
           aria-pressed={showChannels102}
           aria-label="Toggle display of Estimated Continuum Model (102 Interpolated Channels)"
@@ -112,10 +113,10 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
         >
           <Eye className="w-3 h-3 text-indigo-400" />
           <span>{showChannels102 ? 'Estimated (102 Ch)' : 'Observed Bands'}</span>
-        </button>
+        </button>}
       </div>
 
-      <p className="text-[10px] text-slate-300">Wavelengths from the image lookup are approximate. Scientific calibration requires separate spectral WCS products.</p>
+      <p className="text-[10px] text-slate-300">Points are background-subtracted aperture sums of surface-brightness pixels, not calibrated source flux densities. Wavelengths use WCS-WAVE or a nominal detector value. Observations can be from different times; source identity is unconfirmed.</p>
 
       {/* Detector Array Quick Filter Pills */}
       <div className="flex items-center justify-between gap-1 text-[9px] font-mono" role="group" aria-label="Filter spectrum by detector">
@@ -204,10 +205,10 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
 
           {/* Y Axis Labels (MJy/sr) */}
           <text x={padLeft - 4} y={padTop + 4} fill="#94a3b8" fontSize="7.5" textAnchor="end" fontFamily="monospace">
-            {maxFlux.toFixed(1)}
+            {yAxisMax.toFixed(1)}
           </text>
           <text x={padLeft - 4} y={padTop + plotH} fill="#94a3b8" fontSize="7.5" textAnchor="end" fontFamily="monospace">
-            0.0
+            {minFlux.toFixed(1)}
           </text>
 
           {/* Smooth Modeled Continuum Curve */}
@@ -264,8 +265,8 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
           {bands.map((b) => {
             const cx = getX(b.wavelength_um);
             const cy = getY(b.flux_mjy_sr);
-            const cyErrTop = getY(Math.min(maxFlux * 1.15, b.flux_mjy_sr + b.flux_err_mjy_sr));
-            const cyErrBot = getY(Math.max(0, b.flux_mjy_sr - b.flux_err_mjy_sr));
+            const cyErrTop = getY(Math.min(yAxisMax, b.flux_mjy_sr + b.flux_err_mjy_sr));
+            const cyErrBot = getY(Math.max(minFlux, b.flux_mjy_sr - b.flux_err_mjy_sr));
             const isHovered = hoveredBand?.detector === b.detector;
             const isDimmed = selectedDetector && b.detector !== selectedDetector;
 
@@ -364,7 +365,7 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
               ) : null}
             </div>
             <div>
-              <span className="text-slate-400">Flux:</span> {hoveredBand.flux_mjy_sr.toFixed(2)} MJy/sr ({hoveredBand.flux_density_mjy.toFixed(2)} mJy)
+              <span className="text-slate-400">Aperture sum:</span> {hoveredBand.flux_mjy_sr.toFixed(2)} (MJy/sr)·pixels
             </div>
             <div>
               <span className="text-slate-400">SNR:</span> {hoveredBand.snr}σ (±{hoveredBand.flux_err_mjy_sr.toFixed(2)})
@@ -453,8 +454,8 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
               <thead>
                 <tr className="border-b border-slate-800 text-slate-400 text-[9px] uppercase tracking-wider">
                   <th scope="col" className="py-1 px-1.5 font-semibold">Detector</th>
-                  <th scope="col" className="py-1 px-1.5 font-semibold text-right">λ (µm)</th>
-                  <th scope="col" className="py-1 px-1.5 font-semibold text-right">Flux (MJy/sr)</th>
+                  <th scope="col" className="py-1 px-1.5 font-semibold text-right">Estimated λ (µm)</th>
+                  <th scope="col" className="py-1 px-1.5 font-semibold text-right">Aperture sum ((MJy/sr)·pixels)</th>
                   <th scope="col" className="py-1 px-1.5 font-semibold text-right">± Err</th>
                   <th scope="col" className="py-1 px-1.5 font-semibold">Uncertainty source</th>
                   <th scope="col" className="py-1 px-1.5 font-semibold text-right">SNR</th>
@@ -465,7 +466,10 @@ export const SpectrumChart: React.FC<SpectrumChartProps> = ({
                 {bands.filter((b) => b.is_observed).map((b) => (
                   <tr key={b.detector} className="hover:bg-slate-900/60 transition">
                     <td className="py-1 px-1.5 font-semibold" style={{ color: b.color }}>{b.detector}</td>
-                    <td className="py-1 px-1.5 text-right font-mono">{b.wavelength_um.toFixed(3)}</td>
+                    <td className="py-1 px-1.5 text-right font-mono">
+                      {b.wavelength_um.toFixed(3)}
+                      <span className="block text-slate-400">{b.calibration_source ?? 'Source unavailable'}</span>
+                    </td>
                     <td className="py-1 px-1.5 text-right font-mono font-medium text-slate-100">{b.flux_mjy_sr.toFixed(2)}</td>
                     <td className="py-1 px-1.5 text-right font-mono text-slate-400">±{b.flux_err_mjy_sr.toFixed(2)}</td>
                     <td className="py-1 px-1.5">{b.uncertainty_source?.replace(/_/g, ' ') ?? 'unknown'}</td>

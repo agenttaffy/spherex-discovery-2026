@@ -1,51 +1,77 @@
-# SPHEREx Discovery — 3-Minute Live Judging Demonstration Script
+# SPHEREx Discovery judge walkthrough
 
-This script is structured for a 180-second live presentation to NASA Space Apps judges.
+**Planet X and SPHEREx** asks for a public-facing web tool that helps people inspect how SPHEREx images of the sky change over time. This walkthrough uses the local build and verified NASA/IPAC archive data. [Challenge brief reproduced by NASA Space Apps Lucerne](https://www.spaceappschallenge.ch/) · [Regional challenge listing](https://www.spaceappsulaanbaatar.com/challenges)
 
----
+## Before the timer
 
-### [0:00 – 0:30] Introduction & The Scientific Problem
-- **Speaker:**
-  > "Judges, NASA's SPHEREx mission is mapping the entire sky every 6 months across 102 infrared bands from 0.75 to 5 microns. But discovering moving brown dwarfs or variable stars across millions of multi-extension FITS images is notoriously difficult due to SPHEREx's unique Linear Variable Filters.
-  > Today, we present **SPHEREx Discovery** — an interactive astronomical discovery platform that makes exploring multi-epoch SPHEREx data fast, scientifically rigorous, and accessible."
-- **Action:** Open application landing page with live NASA/IPAC IRSA status badge glowing green.
+Use a checkout containing the portable preview. Follow the [Windows prerequisites and dependency setup](../README.md#preview-a-refreshed-demo-cache), then run `python scripts/bootstrap_demo_data.py --with-comparisons` with internet access. It downloads 114,042,240 bytes of FITS for the ten observations, D5 pair, and D5/D6 maps. Verify a prepared cache without network access using `python scripts/bootstrap_demo_data.py --check-only --with-comparisons`.
 
----
+Then start the preview.
 
-### [0:30 – 1:15] Target 1: Barnard's Star & Astrometric Motion
-- **Speaker:**
-  > "Let's begin with **Barnard's Star**, the highest proper motion star in the sky, moving at over 10 arcseconds per year.
-  > In our central Canvas viewer, rendered at 60 FPS with nearest-neighbor interpolation, we see the raw calibrated Level 2 FITS image in physical units of MJy/sr. We can toggle between Asinh and ZScale contrast stretches.
-  > Notice the timeline at the bottom: as we drag across epochs from DR1 in 2025 to QR3 in 2026, adjacent frames are prefetched with zero latency.
-  > Let's switch to the **Difference Engine**: our backend performs sub-pixel 2D Fourier phase registration and subtracts Epoch 1 from Epoch 2.
-  > Look at that signature: a clear **astrometric dipole**! Our automated vector engine measures an angular displacement of 10.3 arcseconds, a proper motion of 10.31 arcsec/year, and plots the proper motion vector pointing North."
-- **Action:** Select "Barnard's Star", drag timeline, switch to "Difference Engine", show dipole vector and motion card.
+~~~powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/start-demo.ps1 -Dataset Preview -ApiPort 18100 -AppPort 15173 -NoBrowser
+~~~
 
----
+Open [the local app](http://127.0.0.1:15173/) and confirm **Cached demo** in the header. The [manifest response](http://127.0.0.1:15173/api/demo/manifest) should show 10 cutouts and five presets. Open the four core tabs below and leave WISE Blink in front. Load both cube samples before presenting so a slow archive response stays outside the timed segment.
 
-### [1:15 – 2:00] Target 2: RW Aurigae & Photometric Light Curve
-- **Speaker:**
-  > "Now, let's explore **RW Aurigae**, a young T Tauri variable star where protoplanetary disk disruptions cause violent brightness dips.
-  > Notice that when we differencing RW Aurigae, there is NO dipole vector — because the star is stationary in space ($\Delta x \approx 0$). Instead, it leaves a pure flux monopole.
-  > On the right telemetry dock, our automated circular aperture photometry engine has extracted the calibrated light curve across all epochs: we see a massive flux range of over 16 MJy/sr and an automated 'CONFIRMED VARIABLE' badge. Clicking any point instantly navigates to that observation epoch."
-- **Action:** Click "RW Aurigae" preset, show Light Curve chart, hover points, click to jump to peak flux epoch.
+| Tab | Open before presenting |
+|---|---|
+| WISE 0855 blink | [Blink](http://127.0.0.1:15173/?target=wise_0855&tab=blink) |
+| Calibrated comparison | [Difference & Stack](http://127.0.0.1:15173/?target=wise_0855&tab=diff) |
+| Barnard’s Star cube | [Spectral Cube](http://127.0.0.1:15173/?target=barnards_star&tab=cube), then **Load spectrum** |
+| R Draconis cube | [Spectral Cube](http://127.0.0.1:15173/?target=r_draconis&tab=cube), then **Load spectrum** and choose **51 · Blank in DR1** |
+| Optional sky context | [WISE 0855 Explorer](http://127.0.0.1:15173/?target=wise_0855), then **Aladin context** or **Sky Context** |
 
----
+## Timed walkthrough · 3:30
 
-### [2:00 – 2:30] Target 3: Gaia DR3 Catalog Overlay & Discovery Export
-- **Speaker:**
-  > "Next, let's toggle the **Gaia DR3 Catalog Overlay**: reference stars and proper motion vectors are projected directly onto our celestial canvas using Astropy celestial WCS.
-  > When a discovery is confirmed, clicking **Export Discovery Report** generates a complete, publication-ready report formatted with J2000 sexagesimal coordinates, astrometric vectors, light curve metrics, and official NASA IRSA DOI citations (10.26131/IRSA678), ready for download in Markdown or JSON."
-- **Action:** Toggle Gaia DR3 overlay on canvas, click "Export Discovery Report", show modal, preview Markdown, download JSON.
+### 0:00–0:20 · Introduce the app
 
----
+Show the **Cached demo** header and the WISE 0855 field. On a narrow screen, scroll below the image to reach the observation selector and playback controls.
 
-### [2:30 – 3:00] Architecture, Reliability & Closing
-- **Speaker:**
-  > "Under the hood:
-  > - Python 3.11 FastAPI backend backed by Astropy, NumPy, and SciPy with 43 passing automated tests.
-  > - React 18 & TypeScript frontend with zero compilation errors.
-  > - 100% presentation uptime: in addition to live NASA IRSA SIA2 integration, 22 verified real FITS cutouts are cached locally.
-  > - One-click Docker containerization and cloud deploy ready on Render and Vercel.
-  > Thank you, and we welcome your questions!"
-- **Action:** Show About page and Guided Tour modal.
+> “For Planet X and SPHEREx, we built a tool that lets you flip between dated infrared images of the same sky field. This local preview has two archived epochs for each of the five challenge fields.”
+
+### 0:20–1:10 · Blink two dated WISE 0855 fields
+
+In **Blink**, use **Jump to observation by date and detector** to show **2025-05-05 · SPHEREx-D6** and **2026-05-09 · SPHEREx-D6**. Point to the date and detector above the image and **Catalog prediction at exposure** below it. The amber square marks the catalog position propagated to that exposure. The blue crosshair marks the cutout center. Use **Play time-lapse**, then **Pause time-lapse** after a few flips. Open **Target photometry unavailable**.
+
+> “The amber square comes from a catalog prediction for that date. Its position inside the image tells us where to look. The source identity remains unconfirmed, and blinking these two fields does not establish motion or variability.”
+
+### 1:10–2:10 · Show the comparison guard and an accepted D5 pair
+
+Switch to the prepared **Difference & Stack** tab. Briefly point to the WISE rejection that says no aligned, unmasked pixel pairs meet the passband overlap requirement. Select **Epsilon Indi B · SPHEREx D5 · DR1**. The fixed cutouts are dated **2025-04-24** and **2026-04-24** UTC. Expand **IRSA spectral WCS · 207/225 pixels matched** to show the archive links, plane UUID, and MD5. Select **Co-add** with **Mean** and confirm the same matched count.
+
+> “A matching detector name alone can’t tell us whether the same wavelengths were measured at each pixel. The app rejected the WISE pair. This D5 field pair passed for 207 of 225 pixels. We can subtract or combine those pixels. Epsilon Indi Ba and Bb remain unresolved, so this establishes no detection, target flux, motion, or variability.”
+
+### 2:10–3:05 · Compare two co-added sky-pixel samples
+
+Switch to the two prepared **Spectral Cube** tabs. Point out the requested coordinate, the sampled HPX pixel, and the coverage line. Barnard’s Star’s preview coordinate has **8 measured, 90 without usable coverage, 2 flagged, and 2 blank**. R Draconis’s preview coordinate has **0 measured, 100 without usable coverage, and 2 blank**. Show channel **51 · Blank in DR1**. With the cache active, point to **Cached DR1 sky-pixel preview** and optionally open **Cache provenance**. If the archive answers, say **IRSA archive result** and show the counts it returns.
+
+> “These are 102 actual DR1 channel slots in a cube built by combining observations. The sample is surface brightness at one sky pixel, with no single observation date or confirmed source association. Available channels vary by position. Blank and flagged channels stay as gaps. The optional 102-point continuum in the dated analysis is a separate interpolated model.”
+
+### 3:05–3:30 · Context and close
+
+If the prepared context tab says **Sky image rendered from the selected context survey**, show the survey credit and cyan FITS footprint, then return to **Canvas**. If the service is slow or unavailable, show the cached demonstration field in **Canvas**.
+
+> “Context imagery helps orient the field. The dated FITS images and calibration checks are what let us compare the SPHEREx observations. This demo runs locally from verified archive samples.”
+
+## Run the local D5 example
+
+The comparison tab is [Difference & Stack](http://127.0.0.1:15173/?target=wise_0855&tab=diff). The pair’s FITS URLs and SHA-256 values are in the [D5 pair manifest](../data/manifests/d5_comparison.json). If the view reports **Eligible D5 pair unavailable**, run the comparison integrity check from the setup above. Rerun the comparison bootstrap if inputs are missing, then reopen the view. This pair is separate from the ten preview frames. Keep the 378/400 D6 deep-field control as supporting evidence for judge questions. [Calibration evidence](DETECTOR_CALIBRATION.md)
+
+| Input | Local cache path |
+|---|---|
+| 2025-04-24 22:10:56.336 UTC | `data/cache/demo-comparison/7fad22722d3beab1d4d3680b7d6a939d3946ebc59fbe4ead1fe22400f45239ed.fits` |
+| 2026-04-24 21:21:00.091 UTC | `data/cache/demo-comparison/fd63b5f4ead244b6c5fb2e19bcea29d09260274bad069421d9fa77db5c6b3fcd.fits` |
+| IRSA D5 spectral calibration | `data/cache/spectral-calibration/spectral-d59bd98b5d1d14ae8d74499b1c1ccb3f.fits` |
+
+## Offline Spectral Cube
+
+The compact preview covers the [five staged coordinates](CHALLENGE_REQUIREMENTS.md#dr1-cube-coverage), within 0.000005° on each axis, with a native 25 × 25 map window per channel. Keep the preset coordinates unchanged to use it. The cube tries the archive first. The prepared demo can show these five samples with archive access disabled. Other positions can require internet access, as can Aladin remote surveys and live query mode. If the cube archive fails outside the preview coordinates, the app reports the archive error. The [source records](../data/manifests/cube_preview_sources.json) identify the exact tiles, extraction positions, and archive checksums or ETags.
+
+## After the demo
+
+Stop the launcher-owned servers from the same repository root.
+
+~~~powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/stop-demo.ps1
+~~~

@@ -35,7 +35,7 @@ export const LightCurveChart: React.FC<LightCurveChartProps> = ({
     );
   }
 
-  const { points, is_variable, variability_index, mean_flux_mjy_sr, min_flux_mjy_sr, max_flux_mjy_sr, amplitude_delta_mjy_sr } = series;
+  const { points, is_variable, variability_index, min_flux_mjy_sr, max_flux_mjy_sr } = series;
 
   // SVG Geometry
   const width = 280;
@@ -62,23 +62,18 @@ export const LightCurveChart: React.FC<LightCurveChartProps> = ({
   const yMax = maxVal + paddingFlux;
   const yRange = Math.max(1e-4, yMax - yMin);
 
-  const xCoords = points.map((_, i) => {
-    return points.length === 1 ? padLeft + plotW / 2 : padLeft + (i / (points.length - 1)) * plotW;
-  });
-
+  // Use real elapsed time when every observation has a valid timestamp.
+  const dates = points.map(p => p.mjd);
+  const timed = dates.every((d): d is number => d != null && Number.isFinite(d));
+  const firstDate = timed ? Math.min(...dates as number[]) : 0;
+  const lastDate = timed ? Math.max(...dates as number[]) : 0;
+  const xCoords = points.map((p, i) => timed && lastDate > firstDate
+    ? padLeft + ((p.mjd! - firstDate) / (lastDate - firstDate)) * plotW
+    : points.length === 1 ? padLeft + plotW / 2 : padLeft + (i / (points.length - 1)) * plotW);
   const yCoords = points.map((p) => {
     const fluxVal = p.net_flux_mjy_sr != null ? p.net_flux_mjy_sr : (minVal + maxVal) / 2.0;
-    const norm = (fluxVal - yMin) / yRange;
-    return padTop + plotH - norm * plotH;
+    return padTop + plotH - ((fluxVal - yMin) / yRange) * plotH;
   });
-
-  const meanY = padTop + plotH - ((mean_flux_mjy_sr - yMin) / yRange) * plotH;
-
-  // SVG Polyline Path connecting valid data points
-  const polyPoints = points
-    .map((p, i) => (p.net_flux_mjy_sr != null && (p.valid ?? true) ? `${xCoords[i]},${yCoords[i]}` : null))
-    .filter((pt): pt is string => pt !== null)
-    .join(' ');
 
   return (
     <div className="bg-slate-950/90 border border-slate-800 rounded-lg p-3 space-y-2">
@@ -87,16 +82,16 @@ export const LightCurveChart: React.FC<LightCurveChartProps> = ({
         <div className="flex items-center gap-1.5">
           <Activity className="w-3.5 h-3.5 text-cyan-400" />
           <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-200">
-            Light Curve (Aperture Flux)
+            Field aperture samples over time
           </span>
         </div>
         <div>
           {!hasDetectorPair ? (
-            <span className="text-[10px] text-slate-300">Not enough comparable observations</span>
+            <span className="text-[10px] text-slate-300">Not enough samples from one detector</span>
           ) : is_variable ? (
             <span className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-950/80 text-amber-300 border border-amber-800/80 animate-pulse">
               <Flame className="w-3 h-3 text-amber-400" />
-              Variation flagged (index={variability_index})
+              Detector-group threshold flagged (index={variability_index})
             </span>
           ) : (
             <span className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-950/60 text-emerald-300 border border-emerald-800/60">
@@ -107,14 +102,14 @@ export const LightCurveChart: React.FC<LightCurveChartProps> = ({
         </div>
       </div>
 
-      <p className="text-[10px] text-slate-300">A heuristic compares measurements within each detector; it does not establish variability or stability. Wavelength and uncertainty differences require review.</p>
+      <p className="text-[10px] text-slate-300">These are background-subtracted sums of surface-brightness pixels, not calibrated source flux. A heuristic groups samples by detector; matching detectors do not guarantee matching wavelengths, source identity, variability or stability.</p>
 
       {/* SVG Plot */}
       <div className="relative">
         <svg
           viewBox={`0 0 ${width} ${height}`}
           role="img"
-          aria-label={`SPHEREx Multi-Epoch Photometric Light Curve across ${points.length} epochs. Mean flux is ${mean_flux_mjy_sr.toFixed(2)} MegaJanskys per steradian with amplitude variation ${amplitude_delta_mjy_sr.toFixed(2)}.`}
+          aria-label={`Field aperture samples from ${points.length} observations. ${timed && lastDate > firstDate ? "Horizontal position shows elapsed time." : "Horizontal position shows observation order."}` }
           className="w-full h-28 bg-slate-900/60 rounded border border-slate-800/70 select-none"
         >
           {/* Y Axis Gridlines */}
@@ -129,36 +124,13 @@ export const LightCurveChart: React.FC<LightCurveChartProps> = ({
             {yMin.toFixed(1)}
           </text>
 
-          {/* Mean flux dashed line */}
-          <line
-            x1={padLeft}
-            y1={meanY}
-            x2={width - padRight}
-            y2={meanY}
-            stroke="#38bdf8"
-            strokeDasharray="3,3"
-            strokeWidth="0.9"
-            opacity="0.7"
-          />
-
-          {/* Connecting line */}
-          {points.length > 1 && (
-            <polyline
-              points={polyPoints}
-              fill="none"
-              stroke="#06b6d4"
-              strokeWidth="1.8"
-              strokeLinejoin="round"
-            />
-          )}
-
           {/* Data Points */}
           {points.map((p, i) => {
             const isSelected = selectedObsId === p.obs_id;
             const isHovered = hoveredPoint?.obs_id === p.obs_id;
             const isValid = p.net_flux_mjy_sr != null && (p.valid ?? true);
             const netLabel = isValid
-              ? `net flux ${p.net_flux_mjy_sr!.toFixed(2)} MegaJanskys per steradian`
+              ? `aperture sum ${p.net_flux_mjy_sr!.toFixed(2)} MegaJanskys per steradian times pixels`
               : `measurement unavailable (${p.reason || 'unprojectable'})`;
             return (
               <g
@@ -200,7 +172,7 @@ export const LightCurveChart: React.FC<LightCurveChartProps> = ({
             <div>
               <span className="text-slate-400">Net:</span>{' '}
               {hoveredPoint.net_flux_mjy_sr != null
-                ? `${hoveredPoint.net_flux_mjy_sr.toFixed(2)} MJy/sr`
+                ? `${hoveredPoint.net_flux_mjy_sr.toFixed(2)} (MJy/sr)·pixels`
                 : `Unavailable (${hoveredPoint.reason || 'N/A'})`}
             </div>
             <div><span className="text-slate-400">Band:</span> {hoveredPoint.detector}</div>
@@ -225,7 +197,7 @@ export const LightCurveChart: React.FC<LightCurveChartProps> = ({
                 <th scope="col" className="py-1 px-1.5 font-semibold">Obs ID</th>
                 <th scope="col" className="py-1 px-1.5 font-semibold">Date (UTC)</th>
                 <th scope="col" className="py-1 px-1.5 font-semibold">Band</th>
-                <th scope="col" className="py-1 px-1.5 font-semibold text-right">Net Flux (MJy/sr)</th>
+                <th scope="col" className="py-1 px-1.5 font-semibold text-right">Aperture sum ((MJy/sr)·pixels)</th>
                 <th scope="col" className="py-1 px-1.5 font-semibold text-right">SNR</th>
               </tr>
             </thead>
@@ -264,21 +236,7 @@ export const LightCurveChart: React.FC<LightCurveChartProps> = ({
         </div>
       </details>
 
-      {/* Summary Metrics */}
-      <div className="grid grid-cols-3 gap-1.5 pt-1 text-center font-mono">
-        <div className="bg-slate-900/60 p-1.5 rounded border border-slate-800">
-          <span className="text-[9px] text-slate-400 block">Mean Flux</span>
-          <span className="text-[11px] text-slate-200">{mean_flux_mjy_sr.toFixed(2)}</span>
-        </div>
-        <div className="bg-slate-900/60 p-1.5 rounded border border-slate-800">
-          <span className="text-[9px] text-slate-400 block">Delta (ΔF)</span>
-          <span className="text-[11px] text-cyan-400 font-semibold">{amplitude_delta_mjy_sr.toFixed(2)}</span>
-        </div>
-        <div className="bg-slate-900/60 p-1.5 rounded border border-slate-800">
-          <span className="text-[9px] text-slate-400 block">Peak Max</span>
-          <span className="text-[11px] text-amber-400 font-semibold">{max_flux_mjy_sr.toFixed(2)}</span>
-        </div>
-      </div>
+      <p className="text-[10px] text-slate-400">{timed && lastDate > firstDate ? 'Horizontal position shows elapsed time.' : 'Horizontal position shows observation order; dates are unavailable or identical.'} Points are not connected because passbands may differ.</p>
     </div>
   );
 };

@@ -1,5 +1,15 @@
 # SPHEREx Discovery — Prioritized Backlog
 
+> **Current availability baseline.** Dated observation search, FITS viewing, timeline/blink, and the browser sky context have verification evidence. Candidate motion and photometry still need independent target validation. Difference and pair co-addition validate each request against matched per-pixel calibration. Incompatible pairs return HTTP 422. The 102-point continuum is interpolated. The separate DR1 Spectral Cube mode has live API verification on tile 7945. Historical milestones below describe development and previous test runs. See [the current traceability matrix](docs/CHALLENGE_REQUIREMENTS.md).
+
+
+## Target science follow-up
+
+- [ ] Resolve the exact IRSA `planeid, uri, contentchecksum` associations for sampled D1, D2 and D4 frames, including the D2 control. Completed jobs verified the sampled DR1 D3 and D5 mappings. D6 is verified in sampled DR1 and QR3 frames. The local resolver has no verified QR3 D3/D5 mappings. [Detector calibration audit](docs/DETECTOR_CALIBRATION.md)
+- [ ] Use the verified D5 field pair for arithmetic only. The calibrated D3 pair fails native-pixel alignment. For motion validation, seek an independently associated feature in a pair with clean cores, matched passbands and usable local alignment. The 18-pair D1–D6 screen and earlier D6 audit have no validated motion result. Establish association in each exposure and validate centroid error with clean stars, subpixel injections and nearby stationary controls. [Broader archive evidence](docs/MOTION_MULTIDETECTOR.md)
+- [ ] Select new D6 validation fields for isolation and independent measured infrared spectra, with exposure-level area/response provenance and matched-passband repeats. The six-frame real catalog study yielded zero eligible stars and zero empirical blanks. Joint scenes with epoch-aware neighbors and explicit unresolved systems are needed for crowded areas. See [real-source validation](docs/D6_CONTROL_VALIDATION.md).
+- [ ] Verify the provisioned Render service URL and its health response before changing the frontend proxy. Both configured candidate hosts returned HTTP 404.
+
 ## P0: Core Challenge & Eligibility (ALL COMPLETED)
 - [x] `P0-001` | COMPLETED | Live NASA IRSA SIA2 observation search integration (`irsa_client.py`)
 - [x] `P0-002` | COMPLETED | Multi-extension FITS cutout pipeline & parsing (`cutout_service.py`, `fits_processing.py`)
@@ -34,7 +44,7 @@
 - [x] `P3-001` | COMPLETED | Aladin Lite v3 Sky Context integration with survey switching (2MASS, AllWISE, DSS2, Pan-STARRS) (`AladinViewer.tsx`)
 - [x] `P3-002` | COMPLETED | Interactive SPHEREx celestial footprint overlay box synced to RA/Dec/FOV (`AladinViewer.tsx`, `CanvasViewer.tsx`)
 - [x] `P3-003` | COMPLETED | Dual-mode viewer switcher pill tabs (SPHEREx Canvas vs Aladin Lite Sky Context) (`CanvasViewer.tsx`)
-- [x] `P3-004` | COMPLETED | Scientific WCS reprojection using `reproject_interp` with FFT shift fallback (`comparison.py`, `frames.py`)
+- [x] `P3-004` | HISTORICAL | Scientific WCS reprojection using `reproject_interp` with FFT shift fallback (`comparison.py`, `frames.py`)
 - [x] `P3-005` | COMPLETED | WebP image encoding in `fits_processing.py` and API endpoints (`?format=webp`)
 - [x] `P3-006` | COMPLETED | Added `reproject`, `pyvo`, and `astroquery` to `backend/requirements.txt`
 - [x] `P3-007` | COMPLETED | Polished shadcn/ui-inspired glassmorphic cards, telemetry pills, and alignment method indicators
@@ -45,7 +55,7 @@
 - [x] `P5-002` | COMPLETED | Missing quality mask state preserved (`None`) without guessing SPHEREx flag semantics from raw bits (`fits_processing.py`)
 - [x] `P5-003` | COMPLETED | WCS-WAVE calibrated wavelength extraction returns unavailable (`None`) when target coordinate projection fails (`fits_processing.py`)
 - [x] `P5-004` | COMPLETED | Removed all preset coordinates/names and hardcoded temperatures from spectrum SED; added documented Planck blackbody fit with inputs, uncertainty, and limitations (`spectrum.py`)
-- [x] `P5-005` | COMPLETED | Uncensored empirical SNR improvement estimator in image stacking, removing arbitrary `[0.5, 2.5 * sqrt(N)]` clamping (`stacking.py`)
+- [x] `P5-005` | HISTORICAL | Uncensored empirical SNR improvement estimator in image stacking, removing arbitrary `[0.5, 2.5 * sqrt(N)]` clamping (`stacking.py`)
 - [x] `P5-006` | COMPLETED | Preserved invalid pixels (NaN/Inf) as masks without fabricated fill values across image loading, photometry, stacking, and motion (`fits_processing.py`, `photometry.py`, `stacking.py`, `motion.py`)
 - [x] `P5-007` | COMPLETED | Comprehensive regression tests for all 5 audit issues (total 93 pytest tests passing) (`test_scientific_audit_regression.py`)
 - [x] `P5-008` | COMPLETED | Neutral measured broadband continuum shape descriptions replacing inferred astrophysical classifications (`spectrum.py`, `report.py`, `SpectrumChart.tsx`)
@@ -55,10 +65,10 @@
 ## P4: Potential Considerations & Advanced Science Discoveries (ALL COMPLETED)
 - [x] `P4-001` | COMPLETED | On-the-fly spectra generation endpoint (`GET /api/science/spectrum`) gathering aperture fluxes across the 6 SPHEREx detector arrays (D1: 0.75–1.12 µm, D2: 1.12–1.68 µm, D3: 1.68–2.42 µm, D4: 2.42–3.82 µm, D5: 3.82–4.42 µm, D6: 4.42–5.00 µm) (`spectrum.py`)
 - [x] `P4-002` | COMPLETED | Interactive spectrophotometric SED chart (`SpectrumChart.tsx`) with up to six measured detector band points (D1–D6), an illustrative/interpolated 102-point continuum (never described as 102 observed resolved SPHEREx channels), neutral broadband continuum shape descriptions (`continuum_shape`), and removal of inferred astrophysical classifications/`spectral_class` from the API, integrated into `MetadataPanel.tsx` telemetry tabs
-- [x] `P4-003` | COMPLETED | Astronomical image co-addition & stacking endpoint (`POST /api/frames/stack`) supporting `mean`, `median`, and `sum` with celestial WCS registration via `reproject_interp` (`stacking.py`, `frames.py`)
-- [x] `P4-004` | COMPLETED | Operation mode switcher in `ComparisonView.tsx`: "Difference ($I_2 - I_1$)" (reveals moving sources/dipoles and transients) vs "Co-Add Stack ($I_1 + I_2$)" (reveals faint static infrared sources and brown dwarfs) with $\sim\sqrt{N}$ SNR gain badge and noise suppression telemetry
-- [x] `P4-005` | COMPLETED | Comprehensive automated test suite expansion with tests in `test_stacking_and_spectrum.py`, bringing total passing backend tests to 69 (0 failures)
-- [x] `P4-006` | COMPLETED | Robust sigma-clipped background noise isolation, non-overlapping celestial WCS footprint rejection, duplicate frame validation, multi-epoch stacking scope switcher, and detector array filter buttons in `SpectrumChart.tsx`
+- [x] `P4-003` | VERIFIED FOR PAIRS | Co-addition validates aligned pixel passbands and propagates variance. Requests containing more than two exposures are unavailable.
+- [x] `P4-004` | VERIFIED FOR PAIRS | Difference and co-addition accept a validated deep-field example and reject incompatible Barnard’s Star epochs.
+- [x] `P4-005` | HISTORICAL | Added stacking and spectrum tests. See TEST_RESULTS.md for verification runs.
+- [x] `P4-006` | HISTORICAL | Robust sigma-clipped background noise isolation, non-overlapping celestial WCS footprint rejection, duplicate frame validation, multi-epoch stacking scope switcher, and detector array filter buttons in `SpectrumChart.tsx`
 
 ## P5: Scientific Correctness Audit & Codebase Hardening (ALL COMPLETED & VERIFIED)
 - [x] `P5-001` | COMPLETED | Corrected SPHEREx FLAGS parsing using documented Level 2 FITS header metadata (`MSKN*`/`MSKM*`); non-zero pixels are not automatically bad; distinguished nominal astronomical `SOURCE` (bit 21, 2097152) and `FULLSAMPLE` (bit 12, 4096) from fatal quality defects (`NONFUNC` dead pixel = 64, `OVERFLOW` saturation = 2, `SUR_ERROR` fit failure = 4, `HOT` = 1024, `COLD` = 2048, `NONLINEAR` = 32768, `SNOWBALL` cosmic ray = 134217728, `TRANSIENT` = 1) (`fits_processing.py`)
@@ -66,7 +76,7 @@
 - [x] `P5-003` | COMPLETED | Labeled 102-channel continuum model explicitly as "Estimated Continuum Model (Interpolated)" and clearly separated it from observed SPHEREx channels in both backend and frontend (`spectrum.py`, `SpectrumChart.tsx`)
 - [x] `P5-004` | COMPLETED | Astrometric motion tracks requested celestial target (RA, Dec) via WCS across epochs, locates subpixel centroid around expected coordinates, converts shifts through celestial WCS via `pixel_to_world`, and computes annual proper motion $\mu$ using true epoch baseline in years $\Delta t = |t_2 - t_1|$ (`motion.py`, `science.py`)
 - [x] `P5-005` | COMPLETED | Differencing enforces LVF wavelength compatibility (`em_min`, `em_max`), preserves data quality masks as mid-gray (128), and returns clear descriptive errors on failed reprojection or non-overlapping celestial footprints (`comparison.py`, `frames.py`)
-- [x] `P5-006` | COMPLETED | Stacking co-adds only compatible detector arrays, propagates variance ($\text{Var}_{\text{stack}} = \frac{1}{N^2} \sum \text{Var}_i$ for mean co-addition), propagates bitwise OR of fatal quality masks, and accurately reports measured SNR improvement (`stacking.py`, `frames.py`)
+- [x] `P5-006` | HISTORICAL | Stacking co-adds only compatible detector arrays, propagates variance ($\text{Var}_{\text{stack}} = \frac{1}{N^2} \sum \text{Var}_i$ for mean co-addition), propagates bitwise OR of fatal quality masks, and accurately reports measured SNR improvement (`stacking.py`, `frames.py`)
 - [x] `P5-007` | COMPLETED | Disambiguated and explicitly labeled fallback catalog provenance: "Curated Reference Catalog (Demo)" vs "Live ESA Gaia TAP" (`catalogs.py`, `catalog_service.py`, `CanvasViewer.tsx`, `astronomy.ts`)
 - [x] `P5-008` | COMPLETED | Created comprehensive regression test suite (`test_scientific_audit_regression.py`) covering all 6 priorities, bringing total passing backend tests to 77 (0 failures) with clean frontend build
 - [x] `P5-009` | COMPLETED | Skeptical audit hardening: integrated official SPHEREx WCS-WAVE dispersion calibration, discrete geometric boundary aperture area coverage correction, masked-pixel variance propagation isolation in co-addition, equatorial vector proper motion components $(\Delta\alpha\cos\delta, \Delta\delta)$, and strict target coordinate anchoring in photometry and astrometry (81 passing tests, clean frontend build)
@@ -94,13 +104,13 @@
 - **Aperture Edge and Mask Correction:** Clipped or invalid/masked apertures and annuli with no source-free background pixels now return unavailable. Investigate validated PSF-aware alternatives and background estimation before restoring measurements in these cases.
 - **High-Concurrency Remote IRSA Proxy Resilience:** Upstream IRSA SIA2/IBE endpoints may encounter 502/503 timeouts during heavy traffic; protected by 3.5s timeout and local 22-asset demo cache.
 - **Full Survey Tile Ingestion:** Automated ingestion pipeline for full-size (~70 MB each) Level 2 tiles beyond the 22 pre-cached demonstration cutouts.
-- **External CDN Dependency for Aladin Lite v3:** Aladin Lite context tiles rely on external CDS servers; native CanvasViewer provides 100% offline fallback.
-- **Manual Verification Status:** Automated test suites verified (93 backend pytest, 41 a11y checks, 22 demo assets, clean frontend build, IRSA 200 OK); no manual physical visual inspection or physical screen-reader audio checks were performed.
+- **Network coverage:** Aladin remote survey tiles, live archive queries, and cube positions outside the five cached presets can require internet access. After dependency installation and IRSA bootstrap, the cached FITS and five cube presets can be demonstrated with archive access disabled.
+- **Historical verification:** Older milestones record 93 backend tests and 41 UI checks. See [TEST_RESULTS.md](TEST_RESULTS.md) for current checks and browser evidence. Physical screen-reader audio checks remain pending.
 
 - **Scientific validation:** Verify within-detector effective wavelength compatibility, demo/live provenance throughout derived analyses, and independently validate actual target detections, motion and variability.
 - **Human accessibility:** Test keyboard workflows, narrow screens and physical screen readers; source-pattern checks alone do not establish accessibility conformance.
 - **Cached cutout selection:** Live requests now use isolated exact-coordinate and size cache keys; old potentially contaminated cache entries are retained but not trusted. Demo cutouts have fixed coverage, which the viewer labels. Verify actual coverage and size across additional live and offline cases.
 
-- **Restore scientifically validated image arithmetic:** Integrate the correct release-specific spectral WCS files, align per-pixel passbands with celestial reprojection, define and validate a defensible compatibility criterion, and test actual compatible and incompatible observations. The public difference and co-addition endpoints intentionally return 422 until then; blink remains available.
+- **Extend calibrated image arithmetic validation:** Accepted pixels must pass native-WCS registration and per-pixel passband checks. Collect more real compatible pairs and quantify correlated uncertainty and ePSF effects. Incompatible pairs return HTTP 422; blink remains available.
 
   - IRSA documents detector-pixel `CWAVE` and `CBAND` arrays in release-specific spectral WCS calibration FITS files; calibration files are not available through SIA2. Identify each observation’s matching calibration version before retrieval. Sources: https://caltech-ipac.github.io/spherex-archive-documentation/spherex-data-products/ and https://caltech-ipac.github.io/spherex-archive-documentation/spherex-data-access/.

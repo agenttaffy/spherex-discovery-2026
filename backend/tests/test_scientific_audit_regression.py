@@ -111,24 +111,12 @@ def test_priority_2_photometry_wcs_target_measurement_and_variance():
     assert phot["snr"] > 8.0
 
 
-def test_priority_2_spectrum_interpolation_labeled_correctly():
-    """
-    Priority 2: In spectrum generation, ensure 102 channels are explicitly labeled
-    as 'Estimated Continuum Model (Interpolated)' and separated from observed detector channels.
-    """
-    from app.services.demo_service import demo_service
-    ra, dec = 269.45208, 4.69339  # Barnard's Star
-    recs = demo_service.find_matching_observations(ra, dec, radius_deg=0.1)
-    spec = generate_spectrum_for_target(ra, dec, recs, None)
-
-    assert "continuum_model_label" in spec
-    assert "Estimated Continuum Model (Interpolated)" in spec["continuum_model_label"]
-    assert "observed_channels" in spec
-    # Verify each channel in channels_102 carries interpolated metadata
-    for ch in spec["channels_102"]:
-        assert ch["is_interpolated"] is True
-        assert ch["is_observed"] is False
-        assert "Estimated Continuum Model (Interpolated)" in ch["model_label"]
+def test_priority_2_spectrum_does_not_invent_detector_channels():
+    spec = generate_spectrum_for_target(269.45208, 4.69339, [], None)
+    assert spec["bands"] == []
+    assert spec["channels_102"] == []
+    assert spec["continuum_curve"] == []
+    assert "Unavailable" in spec["continuum_model_label"]
 
 
 def test_priority_3_astrometric_motion_wcs_target_tracking():
@@ -236,16 +224,19 @@ def test_priority_5_stacking_detector_compatibility_and_variance():
     assert stats["propagated_noise_sigma"] == pytest.approx(0.5, rel=0.1)
 
 
-def test_priority_6_gaia_provenance_explicit_labeling():
+def test_priority_6_gaia_provenance_explicit_labeling(monkeypatch):
     """
     Priority 6: Explicitly label catalog sources with provenance ('Curated Reference Catalog (Demo)').
     """
     import asyncio
+    from unittest.mock import AsyncMock
+    from app.services.catalog_service import catalog_service
+    monkeypatch.setattr(catalog_service, "query_catalog", AsyncMock(return_value=[{"provenance": "VizieR Gaia DR3 (J2016.0)", "catalog_source": "VizieR Gaia DR3 (J2016.0)"}]))
     sources = asyncio.run(query_reference_catalog(ra=269.45208, dec=4.69339, radius_deg=0.08))
     assert len(sources) > 0
     for s in sources:
         assert "provenance" in s
-        assert s["provenance"] in (PROVENANCE_DEMO, PROVENANCE_LIVE_GAIA)
+        assert s["provenance"] == "VizieR Gaia DR3 (J2016.0)"
         assert "catalog_source" in s
 
 
@@ -408,7 +399,7 @@ def test_priority_1_source_mask_background_exclusion_without_aperture_rejection(
     source masks in the background annulus are excluded to prevent background noise contamination,
     while nominal source pixels in the target aperture are NOT rejected.
     """
-    img = np.ones((25, 25), dtype=np.float32) * 2.0
+    img = np.ones((25, 25), dtype=np.float32) * 2.0 + 0.1 * (np.indices((25, 25)).sum(axis=0) % 2)
     # Center target star (at 12, 12)
     img[12, 12] = 20.0
 
@@ -481,9 +472,10 @@ def test_priority_2_discovery_report_sed_truthfulness():
     )
 
     md = rep["markdown_report"]
-    assert "## 5. Spectral Energy Distribution (SED)" in md
-    assert "Estimated Continuum Model (Interpolated across 6 detector bandpasses)" in md
-    assert "102 individual channel values represent an interpolated continuum curve" in md
+    assert "## 5. Detector Field Samples" in md
+    assert "not calibrated source flux densities" in md
+    assert "resolved source spectrum" in md
+    assert "Estimated Continuum Model" not in md
     assert "WCS-WAVE" in md
     assert "SPHEREx-D1" in md
     assert "SPHEREx-D3" in md
@@ -557,7 +549,7 @@ def test_priority_1_lightcurve_source_mask_background_exclusion():
     from app.science.photometry import build_lightcurve_series
 
     h, w = 25, 25
-    img = np.ones((h, w), dtype=np.float32) * 5.0
+    img = np.ones((h, w), dtype=np.float32) * 5.0 + 0.1 * (np.indices((h, w)).sum(axis=0) % 2)
     # Target at center (12, 12)
     img[12, 12] = 80.0
     # Contaminant source at (12, 17) in background annulus
@@ -930,9 +922,8 @@ def test_audit_spectrum_truthfulness_tightened_temperature_and_neutral_shapes():
         dec_deg=4.693,
         spectrum_data=mock_spec_converged,
     )
-    assert "Broadband Continuum Shape:" in rep["markdown_report"]
-    assert "Single-Temperature Blackbody Continuum Fit:" in rep["markdown_report"]
-    assert "not an object's known physical temperature" in rep["markdown_report"]
+    assert "A resolved source spectrum, continuum shape, integrated source flux and temperature are unavailable" in rep["markdown_report"]
+    assert "Single-Temperature Blackbody Continuum Fit:" not in rep["markdown_report"]
     assert "Candidate Profile" not in rep["markdown_report"]
     assert "Brown Dwarf" not in rep["markdown_report"]
 
@@ -1006,7 +997,7 @@ def test_audit_nan_inf_preserved_as_masks_not_fabricated():
 
     # 4. Photometry: input image is not mutated
     clean_copy = f1.copy()
-    phot = compute_aperture_photometry(f1, center_y=5.0, center_x=5.0)
+    phot = compute_aperture_photometry(f1, center_y=5.0, center_x=5.0, variance=np.ones_like(f1))
     assert phot["valid"] is True
     # Verify original array unchanged
     assert np.isnan(f1[2, 2])

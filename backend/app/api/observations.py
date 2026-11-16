@@ -12,7 +12,7 @@ async def get_observations(
     ra: str = Query(..., description="Right Ascension in decimal degrees or sexagesimal"),
     dec: str = Query(..., description="Declination in decimal degrees or sexagesimal"),
     fov: float = Query(DEFAULT_FOV_DEG, description="Field of View / search radius in degrees"),
-    collection: str = Query("spherex_dr1", description="SPHEREx collection (spherex_dr1, spherex_qr3)"),
+    collection: str = Query("spherex_dr1", description="Wide: spherex_dr1, spherex_qr3 or ALL; opt-in deep: spherex_dr1_deep, spherex_qr3_deep or DEEP"),
     detector: Optional[str] = Query(None, description="Optional detector filter (e.g. SPHEREx-D1)"),
     limit: int = Query(50, ge=1, le=200, description="Max observations to return"),
 ):
@@ -42,10 +42,15 @@ async def get_observations(
         limit=limit,
     )
 
+    search_status = getattr(records, "archive_search_status", "unknown")
     return ObservationQueryResponse(
         target={"ra": ra_deg, "dec": dec_deg, "fov": fov},
         collection=collection,
         total_found=len(records),
+        archive_search_status=search_status,
+        total_found_is_lower_bound=(search_status != "available" or collection.upper() == "DEEP" or collection.lower().endswith("_deep") or len(records) >= limit or any(
+            record.search_provenance in {"saved_irsa_search", "cached_demo", "demo_metadata", "cloud_header_survey"} for record in records
+        )),
         returned_count=len(records),
         observations=records,
     )

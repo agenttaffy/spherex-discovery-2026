@@ -8,7 +8,7 @@ Interactive OpenAPI / Swagger UI: `http://localhost:8000/docs`
 ## 1. System & Health
 
 ### `GET /health`
-Returns system status, software versions, cached frame count, and live NASA IRSA connectivity state.
+Returns system status, software version, the root cache file count, and live NASA IRSA connectivity state. When `demo_cache_only` is true, the service skips the live connectivity probe and uses the selected manifest for observation searches.
 
 **Response:**
 ```json
@@ -17,6 +17,7 @@ Returns system status, software versions, cached frame count, and live NASA IRSA
   "timestamp": "2026-11-14T16:30:00Z",
   "version": "1.0.0",
   "irsa_connected": true,
+  "demo_cache_only": false,
   "cached_frames": 22
 }
 ```
@@ -29,7 +30,13 @@ Returns system status, software versions, cached frame count, and live NASA IRSA
 Returns list of the 5 official challenge demonstration target presets with verified celestial coordinates and notable features.
 
 ### `GET /demo/manifest`
-Returns complete verification manifest of all 22 verified DR1/QR3 Level 2 FITS cutouts cached locally for guaranteed presentation uptime.
+Returns the active manifest, its entry count and the preset count. The default has 22 entries. The optional staged preview has ten entries when selected at startup.
+
+### `GET /demo/comparison`
+
+Available when `SPHEREX_DEMO_CACHE_ONLY=1`. Returns two chronological `ObservationRecord` objects for the fixed-footprint DR1 D5 field near the epoch-propagated Epsilon Indi position. The records have IDs `demo_comparison_2025W17_4B_0027_3_D5` and `demo_comparison_2026W17_2A_0308_3_D5`. Request this endpoint before submitting these IDs to `POST /frames/diff` or `POST /frames/stack`.
+
+The route verifies both science FITS SHA-256 digests and the exact D5 calibration MD5 before registering the pair. It returns HTTP 503 with the missing or invalid input category if the verified inputs are unavailable, and HTTP 404 outside cache-only mode. The cutout footprints are fixed. Both arithmetic endpoints independently validate the pair and include the matched-pixel mask and calibration provenance in the result. This separate pair is excluded from the manifest counts and ordinary preset search results. [Local cache and launch instructions](DEMO_SCRIPT.md#run-the-local-d5-example)
 
 ### `GET /observations`
 Queries NASA IRSA SIA2 service (with automatic local manifest fallback) for SPHEREx observations matching coordinates.
@@ -37,10 +44,20 @@ Queries NASA IRSA SIA2 service (with automatic local manifest fallback) for SPHE
 **Query Parameters:**
 - `ra` (string/float, required): Right Ascension in decimal degrees ($[0, 360)$) or sexagesimal (`17h57m48.5s`).
 - `dec` (string/float, required): Declination in decimal degrees ($[-90, +90]$) or sexagesimal (`+04d41m36s`).
-- `fov` (float, optional, default: `0.04`): Search cone radius in degrees ($0.001$ to $0.5$).
-- `collection` (string, optional, default: `spherex_dr1`): Data release (`spherex_dr1` or `spherex_qr3`).
+- `fov` (float, optional, default: `0.04`): Search cone radius in degrees (greater than 0 and at most 0.3).
+- `collection` (string, optional, default: `spherex_dr1`): Use `spherex_dr1` or `spherex_qr3` for a single wide-survey release, or `ALL` for the configured wide releases. Opt in to the deep fields with `spherex_dr1_deep`, `spherex_qr3_deep`, or `DEEP` for both deep releases. Each returned observation retains its actual collection. Results are bounded by `limit`; combined deep counts are marked as lower bounds, and a failed/unavailable archive cannot establish that a position has no coverage. The packaged offline indices do not invent deep-field results. [IRSA SPHEREx collection documentation](https://irsa.ipac.caltech.edu/spherex-archive-documentation/spherex-data-access/)
 - `detector` (string, optional): Filter by detector array (e.g. `SPHEREx-D1` to `SPHEREx-D6`).
 - `limit` (int, optional, default: `50`): Max observations returned.
+
+`total_found` counts returned records, not necessarily the full archive. `archive_search_status` reports the outcome of this request's live image-search queries:
+
+- `available`: every requested collection returned a valid SIA table; that table may contain zero rows.
+- `partial`: at least one collection returned a valid table and another failed or was unavailable.
+- `unavailable`: no requested live collection succeeded because the archive could not be queried.
+- `not_checked`: cache-only mode did not attempt a live search.
+- `unknown`: the caller did not provide a search outcome.
+
+The status describes the live search, while each observation's `search_provenance` separately describes where its metadata came from. Thus a response can report an unavailable live search and still return explicitly labeled saved or demonstration records. `total_found_is_lower_bound` is true for non-`available` status, deep-field queries, results reaching the requested limit, or historical/demo fallback records. A successful empty table means no rows were returned for the query; it does not independently guarantee the absence of coverage or source detection.
 
 ---
 
@@ -87,60 +104,38 @@ Retrieves calibrated FITS image cutout, Astropy celestial WCS parameters, qualit
 }
 ```
 
-### `POST /frames/diff`
-Temporarily returns HTTP 422: per-pixel wavelength compatibility has not been validated with separate spectral WCS products. Same-detector labels and broad wavelength ranges are insufficient.
+`target_predictions` and `target_photometry` are keyed by preset ID. The prediction uses the real FITS IMAGE midpoint (`MJD-AVG`, UTC), linear catalog proper motion, and native WCS. Its `pixel` gives zero-based `(x, y)` and the footprint result; projection may be unavailable. The prediction provides no source association.
 
-**Request Body:**
-```json
-{
-  "frame_id_1": "spherex_dr1_2025W33_1A_0144_1_SPHEREx_D3",
-  "frame_id_2": "spherex_qr3_2026W33_1A_0144_2_SPHEREx_D3"
-}
-```
+`target_photometry.status` is `unavailable`. `aperture_status` is `not_checked` when inputs or footprint are insufficient, `unavailable` when the field aperture fails checks, or `field_sample_only` when the field aperture passes. The response provides the reason, ePSF extension presence and pixel counts where available. It carries no target flux. Simulated images and local fixtures omit both maps’ entries.
+
+### `POST /frames/diff`
+
+Subtracts the first exposure from the second for validated pixels. Supply `frame_id_1`, `frame_id_2`, an optional `fov` in degrees (default 0.04), and an optional `format` (`png` or `webp`). The response includes `diff_stats`, `image_base64`, and `colormapped_base64`.
 
 ### `POST /frames/stack`
-Computes astronomical image co-addition across multi-epoch or multi-detector observation frames using celestial WCS registration via `reproject_interp` with sub-pixel 2D FFT shift fallback.
 
-**Request Body:**
-```json
-{
-  "frame_ids": [
-    "spherex_dr1_2025W33_1A_0144_1_SPHEREx_D3",
-    "spherex_qr3_2026W33_1A_0144_2_SPHEREx_D3"
-  ],
-  "method": "mean",
-  "format": "webp"
-}
-```
+Combines two to six independent exposures from the same detector. Supply registered `frame_ids`, an optional `method` (`mean`, `median`, or `sum`), and optionally `fov`, `format`, and `stretch`. Median is supported only for two exposures, where it equals the mean. Every retained pixel must meet the common passband threshold across all selected exposures. The response includes `image_base64`, `noise_stats`, and `frame_count`. Multi-exposure behavior has controlled fixture tests but has not yet been validated against three or more real compatible exposures.
 
-**Response Schema:**
-```json
-{
-  "success": true,
-  "method": "mean",
-  "frame_count": 2,
-  "frame_ids": ["spherex_dr1_...", "spherex_qr3_..."],
-  "dimensions": [20, 20],
-  "snr_improvement_factor": 1.41,
-  "snr_gain_status": "measured",
-  "theoretical_snr_gain": 1.414,
-  "theoretical_gain_model": "sqrt(N)",
-  "noise_stats": {
-    "reference_noise_sigma": 0.428,
-    "stacked_noise_sigma": 0.303,
-    "mean_flux_mjy_sr": 2.145
-  },
-  "stacked_image_base64": "data:image/webp;base64,...",
-  "wcs": { ... }
-}
-```
+Both endpoints align nearest native sample pairs on the reference celestial WCS within 0.5 comparison pixels and require at least 90% overlap of the wider nominal CWAVE-centered CBAND interval. They exclude invalid, flagged, and repeated samples. Pixels flagged only SOURCE or FULLSAMPLE are eligible. The response provides native-order `surface_brightness_mjy_sr` and `variance_mjy_sr_squared` arrays with `null` for excluded pixels and a transparent display mask. The `calibration` object identifies the archive calibration plane, checksum, method, overlap threshold, and retained pixels. The variance assumes independent exposures. HTTP 422 indicates unavailable calibration or no compatible pixels. HTTP 404 indicates an unknown frame ID. Far-separated fields and duplicate input are rejected with HTTP 400.
+
+### `GET /cube/spectrum`
+
+Returns a co-added DR1 sky-pixel sample for `ra` and `dec` in ICRS degrees. The response gives the requested coordinate, the NESTED HPX tile, and the zero-based index and sky center of the nearest native pixel. An optional `channel` (1–102) includes a native map around that pixel. The default `source=archive_first` checks IRSA. `source=preview_only` explicitly requests the verified packaged preview without an archive lookup; it returns 404 for coordinates not in that preview and labels its source accordingly. `source=pinned_cloud` skips SIA discovery and reads the explicitly dated DR1 cloud product; it does not establish that a newer version is unavailable.
+
+The `channels` array has 102 ordered slots with detector, subchannel, wavelength center, lower and upper wavelength bounds, bandwidth in µm, hit count, unsigned quality flags, and status. Only `measured` records carry non-null `surface_brightness_mjy_sr`. The other statuses are `no_coverage`, `flagged`, `blank_channel` (including DR1 channels 51 and 52), and `missing_wavelength`. A finite diagnostic `archive_brightness_mjy_sr` may still be present on an excluded channel. The plot uses the measured field and leaves gaps.
+
+The inspector uses up to six detector field aperture sums; it does not generate a resolved continuum or source temperature. The cube contains measured channels from the DR1 FITS mosaic. A cube sample has no single observation epoch or source extraction. Its coordinate does not confirm source association, detection, target photometry, motion, or variability. HTTP 404 indicates no tile/footprint at the request, whereas HTTP 503 reports an upstream archive access failure and HTTP 502 reports unreadable archive data. [IRSA DR1 data products](https://caltech-ipac.github.io/spherex-archive-documentation/spherex-data-products/)
+
+For the archive path, IRSA SIA is queried to discover a tile and its bytes are read from the public cloud. A successful SIA-discovered result has `source: "irsa_archive"` and a `cloud` object with the mirror URL, ETag and transferred byte count. If the SIA lookup cannot supply a usable tile, the service tries the explicitly pinned DR1 `hips_20261026` layout and reports `source: "cloud_dr1_pinned"` and `cloud.discovery: "pinned_dr1_release"`; it does not claim that this is the newest product. A cloud failure or unreadable tile can return HTTP 200 with `source: "cached_dr1_preview"` for an unambiguous match to one of the [five audited preview coordinates](CHALLENGE_REQUIREMENTS.md#dr1-cube-coverage). Each supplied RA and Dec must be within `0.000005`° of the cached extraction coordinate. The response retains the requested coordinates. The `preview` object reports the extraction coordinate, UTC generation date, matched preset ID, tolerance, archive failure reason, and original FITS URL and identity. All sources expose `sample_kind: "coadded_dr1_sky_pixel"`, `observation_epoch: null`, and `source_association: "unconfirmed"`.
+
+Unmatched requests retain the original 503 or 502. A 404 footprint/coverage result remains authoritative. The compact artifact stores 102 ordered channel records and the 102 native 25 × 25 windows per preset, including blank windows and nulls. A visible neighbor in a window provides no measurement at a blank central pixel.
 
 ---
 
 ## 4. Scientific Differentiation Endpoints
 
 ### `GET /science/catalogs`
-Retrieves nearby reference stars from Gaia DR3 & SIMBAD with high-precision proper motions, parallaxes, and G-magnitudes.
+Retrieves up to 200 nearby Gaia DR3 sources from VizieR, sorted by G magnitude. Returned catalog positions refer to epoch J2016.0. The separate image projection can approximately propagate positions with known proper motions to the FITS exposure midpoint; it does not model parallax or radial motion. Proper motion and parallax can be missing. An upstream failure returns HTTP 503; no curated fallback is fabricated.
 
 **Query Parameters:**
 - `ra` (string/float, required): Right Ascension.
@@ -149,7 +144,7 @@ Retrieves nearby reference stars from Gaia DR3 & SIMBAD with high-precision prop
 - `catalog` (string, optional, default: `gaia_dr3`): Catalog identifier.
 
 ### `GET /science/photometry`
-Extracts multi-epoch circular aperture photometry with background annulus subtraction, returning time-series flux measurements and a heuristic variation flag (not confirmation of variability or stability).
+Summarizes cached cutouts among up to 60 search records using circular field apertures and background annulus subtraction. It does not download missing cutouts. A detector-group heuristic does not confirm variability, stability, matching wavelengths or source identity. Response metadata includes `analysis_source`, `observations_considered` and `cutouts_available`. Legacy values named flux are sums of surface-brightness pixels, not calibrated source flux densities.
 
 **Query Parameters:**
 - `ra` (string/float, required): Right Ascension.
@@ -188,99 +183,12 @@ Extracts multi-epoch circular aperture photometry with background annulus subtra
 ```
 
 ### `POST /science/motion`
-Measures candidate astrometric displacement and annual proper motion rate ($\mu$ in arcsec/year and mas/year) between two observation epochs.
 
-**Request Body:**
-```json
-{
-  "frame_id_1": "spherex_dr1_2025W33_1A_0144_1_SPHEREx_D3",
-  "frame_id_2": "spherex_qr3_2026W33_1A_0144_2_SPHEREx_D3",
-  "pixel_scale_arcsec": 6.2
-}
-```
-
-**Response Schema:**
-```json
-{
-  "eligible": true,
-  "frame_1": "spherex_dr1_2025W33_1A_0144_1_SPHEREx_D3",
-  "frame_2": "spherex_qr3_2026W33_1A_0144_2_SPHEREx_D3",
-  "motion": {
-    "dx_pixels": -0.32,
-    "dy_pixels": 1.63,
-    "displacement_pixels": 1.66,
-    "displacement_arcsec": 10.31,
-    "position_angle_deg": 355.6,
-    "delta_time_days": 365.25,
-    "delta_time_years": 1.0,
-    "proper_motion_arcsec_yr": 10.31,
-    "proper_motion_mas_yr": 10310.0,
-    "motion_class": "High Proper Motion Candidate",
-    "centroid_detected": true,
-    "confidence_score": 0.94
-  }
-}
-```
+Automatic motion measurement is unavailable. The endpoint returns HTTP 422 for registered frames because the same source, wavelength compatibility, image quality and astrometric uncertainties have not been independently validated. Unknown frame IDs return HTTP 404. Use blink or a validated difference for visual investigation; neither establishes proper motion.
 
 ### `GET /science/spectrum`
-Computes Spectral Energy Distribution (SED) by extracting circular aperture photometry across up to six SPHEREx detector arrays (D1: 0.75–1.12 µm, D2: 1.12–1.68 µm, D3: 1.68–2.42 µm, D4: 2.42–3.82 µm, D5: 3.82–4.42 µm, D6: 4.42–5.00 µm) with approximate WCS-WAVE visualization wavelengths and propagated `VARIANCE` uncertainties where available; otherwise nominal wavelengths or background-estimated uncertainties are labeled. Accompanied by an illustrative/interpolated 102-point continuum model.
 
-> [!IMPORTANT]
-> **Spectrophotometry Truthfulness:**
-> - There are up to six measured detector-band points (D1–D6) plus an illustrative/interpolated 102-point continuum; this is **not 102 observed resolved SPHEREx channels**.
-> - `continuum_shape` is a neutral broadband descriptor (e.g. *"flux rises toward longer measured bands"* or *"peak among measured detector bands"*), not an astrophysical or spectral classification. `spectral_class` was removed from the API.
-> - `estimated_temperature_k` / `temperature_fit` is strictly an optional single-temperature blackbody continuum fit requiring at least 3 distinct measured detector bands with valid propagated uncertainties ($\text{dof} \ge 1$). It is not an object's known physical temperature.
-> - When zero archive bands exist, `peak_wavelength_um`, `peak_detector`, `peak_flux_mjy_sr`, `estimated_temperature_k`, and `integrated_flux_mjy_sr_um` are `null` (`unavailable`), with `peak_is_measured: false`.
-
-**Query Parameters:**
-- `ra` (string/float, required): Right Ascension.
-- `dec` (string/float, required): Declination.
-- `fov` (float, optional, default: `0.04`): Search field of view in degrees.
-
-**Response Schema:**
-```json
-{
-  "target": { "ra": 269.45208, "dec": 4.69339 },
-  "total_observed_bands": 2,
-  "bands": [
-    {
-      "detector": "SPHEREx-D3",
-      "wavelength_um": 2.050,
-      "flux_mjy_sr": 12.45,
-      "flux_err_mjy_sr": 0.35,
-      "snr": 35.6,
-      "is_observed": true,
-      "measurement_status": "measured",
-      "calibration_source": "WCS-WAVE"
-    }
-  ],
-  "channels_102": [
-    {
-      "channel_index": 1,
-      "detector": "SPHEREx-D1",
-      "wavelength_um": 0.75,
-      "flux_mjy_sr": 0.05,
-      "is_observed": false,
-      "is_interpolated": true,
-      "model_label": "Estimated Continuum Model (Interpolated) - Illustrative Continuum, Never Observed Resolution"
-    }
-  ],
-  "summary": {
-    "peak_wavelength_um": 2.050,
-    "peak_detector": "SPHEREx-D3",
-    "peak_flux_mjy_sr": 12.45,
-    "peak_is_measured": true,
-    "estimated_temperature_k": null,
-    "continuum_shape": "flux rises toward longer measured bands",
-    "integrated_flux_mjy_sr_um": 18.25,
-    "temperature_fit": {
-      "status": "unavailable",
-      "temperature_k": null,
-      "reason": "Insufficient observed detector bands (minimum 3 distinct bands required for dof >= 1)"
-    }
-  }
-}
-```
+Returns available detector-level field aperture sums from cached cutouts among up to 60 search records for `ra`, `dec`, and optional `fov` in degrees; missing images are not downloaded. The `bands` array contains only available measurements; the legacy `channels_102` and `continuum_curve` arrays are empty. The legacy field named `flux_mjy_sr` is a sum of surface-brightness pixels, not calibrated source flux density; `flux_density_mjy` is null. Source association, a resolved continuum, integrated source flux, and temperature are unavailable. The separately documented `/cube/spectrum` serves actual DR1 cube sky-pixel samples.
 
 ### `POST /science/report`
 Generates a formal, structured Space Apps scientific discovery report with J2000 sexagesimal formatting, proper motion analysis, light curve statistics, and verified IRSA DOI 10.26131/IRSA678 citations.
@@ -294,7 +202,7 @@ Generates a formal, structured Space Apps scientific discovery report with J2000
   "target_type": "High Proper Motion Star",
   "motion_data": { ... },
   "photometry_data": { ... },
-  "notes": "Verified displacement across DR1 (2025) and QR3 (2026)."
+  "notes": "Candidate offset requires an independent check."
 }
 ```
 
@@ -302,6 +210,6 @@ Generates a formal, structured Space Apps scientific discovery report with J2000
 Observation records identify search provenance as `irsa_query`, `cached_demo`, or `unknown`; an IRSA search result may still use cached image bytes. Spectrum band `uncertainty_source` distinguishes `variance_propagated`, `background_estimate`, `unknown`, and illustrative model errors. Only valid propagated uncertainties can enter the temperature fit. The `is_variable` light-curve field is a heuristic flag and does not establish variability or stability.
 
 
-**Current comparison limitation:** `/api/frames/diff` and `/api/frames/stack` return HTTP 422 for otherwise eligible frames until per-pixel spectral compatibility can be validated. Blink remains available. The embedded WCS-WAVE lookup is approximate and intended for visualization; see the [IRSA explanatory supplement](https://irsa.ipac.caltech.edu/data/SPHEREx/docs/SPHEREx_Expsupp.pdf).
+The embedded WCS-WAVE lookup is intended for visualization. Pair validation uses the matching per-pixel maps from the separate spectral calibration FITS files. See the [IRSA explanatory supplement](https://irsa.ipac.caltech.edu/data/SPHEREx/docs/SPHEREx_Expsupp.pdf).
 
 Photometry is unavailable if the aperture is clipped, contains invalid or masked pixels, or has no valid source-free background annulus. No area-only correction is applied to missing point-source flux.

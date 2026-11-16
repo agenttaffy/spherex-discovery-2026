@@ -25,9 +25,15 @@ def test_footprint_uses_pixel_edges_with_rotated_wcs_across_ra_seam():
 @pytest.mark.parametrize("preset", demo_service.get_presets(), ids=lambda p: p.id)
 def test_cached_target_footprints_match_full_fits_wcs(preset):
     records = demo_service.find_matching_observations(preset.ra, preset.dec, radius_deg=0.01)
-    assert records
-    entry = next(row for row in demo_service.raw_manifest if row["obs_id"] == records[0].obs_id and row["detector"] == records[0].detector and row["collection"] == records[0].collection)
-    hdul = load_fits_cutout(cache_service.get(entry["cutout_url"]))
+    if not records:
+        pytest.skip("No staged real cutout metadata near this preset")
+    entry = next((row for row in demo_service.raw_manifest if row["obs_id"] == records[0].obs_id and row["detector"] == records[0].detector and row["collection"] == records[0].collection), None)
+    if entry is None:
+        pytest.skip("Matched metadata has no staged real cutout")
+    cached = cache_service.get(entry["cutout_url"])
+    if not cached:
+        pytest.skip("Real FITS cutout is not staged locally")
+    hdul = load_fits_cutout(cached)
     image, header = extract_primary_image(hdul)
     corners = np.array(cutout_footprint(header, image.shape))
     assert corners.shape == (4, 2)
@@ -43,9 +49,17 @@ def test_missing_celestial_wcs_has_no_footprint():
 
 def test_catalog_projection_uses_actual_cutout_wcs():
     preset = demo_service.get_presets()[0]
-    record = demo_service.find_matching_observations(preset.ra, preset.dec, radius_deg=0.01)[0]
-    entry = next(row for row in demo_service.raw_manifest if row["obs_id"] == record.obs_id and row["detector"] == record.detector and row["collection"] == record.collection)
-    image, header = extract_primary_image(load_fits_cutout(cache_service.get(entry["cutout_url"])))
+    records = demo_service.find_matching_observations(preset.ra, preset.dec, radius_deg=0.01)
+    if not records:
+        pytest.skip("No staged real cutout metadata near this preset")
+    record = records[0]
+    entry = next((row for row in demo_service.raw_manifest if row["obs_id"] == record.obs_id and row["detector"] == record.detector and row["collection"] == record.collection), None)
+    if entry is None:
+        pytest.skip("Matched metadata has no staged real cutout")
+    cached = cache_service.get(entry["cutout_url"])
+    if not cached:
+        pytest.skip("Real FITS cutout is not staged locally")
+    image, header = extract_primary_image(load_fits_cutout(cached))
     wcs = WCS(header).celestial
     sky = wcs.pixel_to_world(4.0, 6.0).icrs
     response = TestClient(app).post('/api/frames/project-catalog', json={
@@ -57,3 +71,31 @@ def test_catalog_projection_uses_actual_cutout_wcs():
     assert positions[0]['x'] == pytest.approx(4.0, abs=1e-5)
     assert positions[0]['y'] == pytest.approx(6.0, abs=1e-5)
     assert positions[1] is None
+
+
+def test_catalog_projection_shifts_proper_motion_when_exposure_time_exists():
+    preset = demo_service.get_presets()[0]
+    records = demo_service.find_matching_observations(preset.ra, preset.dec, radius_deg=0.01)
+    if not records:
+        pytest.skip("No staged real cutout metadata near this preset")
+    record = records[0]
+    entry = next((row for row in demo_service.raw_manifest if row["obs_id"] == record.obs_id and row["detector"] == record.detector and row["collection"] == record.collection), None)
+    if entry is None:
+        pytest.skip("Matched metadata has no staged real cutout")
+    cached = cache_service.get(entry["cutout_url"])
+    if not cached:
+        pytest.skip("Real FITS cutout is not staged locally")
+    image, header = extract_primary_image(load_fits_cutout(cached))
+    wcs = WCS(header).celestial
+    sky = wcs.pixel_to_world(image.shape[1] / 2, image.shape[0] / 2).icrs
+    response = TestClient(app).post('/api/frames/project-catalog', json={
+        'frame_id': record.id, 'fov': 0.04,
+        'coordinates': [[sky.ra.deg, sky.dec.deg], [sky.ra.deg, sky.dec.deg]],
+        'proper_motions': [[1000, 0], [None, None]],
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert data['exposure_mjd'] is not None
+    first, second = data['positions']
+    assert first['motion_applied'] is True and second['motion_applied'] is False
+    assert abs(first['x'] - second['x']) > 0.1 or abs(first['y'] - second['y']) > 0.1

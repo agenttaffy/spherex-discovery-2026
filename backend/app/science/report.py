@@ -46,25 +46,9 @@ def generate_discovery_report(
         for obs in observations[:8]:
             md_lines.append(f"| `{obs.get('obs_id', 'N/A')}` | {obs.get('utc_date', 'N/A')} | {obs.get('collection', 'N/A')} | {obs.get('detector', 'N/A')} | {obs.get('mjd', 'N/A')} | {obs.get('search_provenance', 'unknown')} |")
 
-    # Astrometric Motion Analysis
+    # Client-supplied shifts are not proof that the same source was tracked.
     if motion_data:
-        md_lines.extend([
-            "",
-            "## 3. Astrometric Motion & Centroid Analysis",
-            f"- **Motion Classification:** **{motion_data.get('motion_class', 'N/A')}**",
-            f"- **Angular Displacement:** {motion_data.get('displacement_arcsec', 0.0):.3f} arcsec ({motion_data.get('displacement_pixels', 0.0):.3f} pixels)",
-            f"- **Shift Vectors:** Δx = {motion_data.get('dx_pixels', 0.0):.3f} px, Δy = {motion_data.get('dy_pixels', 0.0):.3f} px",
-            f"- **Position Angle (North through East):** {motion_data.get('position_angle_deg', 0.0):.1f}°",
-            f"- **Time Baseline:** {motion_data.get('delta_time_days', 0.0):.1f} days ({motion_data.get('delta_time_years', 0.0):.3f} years)",
-            f"- **Calculated Proper Motion:** **{motion_data.get('proper_motion_arcsec_yr', 0.0):.3f} arcsec/year** ({motion_data.get('proper_motion_mas_yr', 0.0):.1f} mas/yr)",
-            f"- **Centroid Detection Confidence:** {float(motion_data.get('confidence_score', 0.0))*100:.0f}%",
-        ])
-        if "pm_ra_cosdec_mas_yr" in motion_data and "pm_dec_mas_yr" in motion_data:
-            md_lines.append(
-                f"- **Equatorial Vector Components:** μα* = {motion_data['pm_ra_cosdec_mas_yr']:.1f} mas/yr, μδ = {motion_data['pm_dec_mas_yr']:.1f} mas/yr"
-            )
-        if motion_data.get("wcs_tracking"):
-            md_lines.append("- **Astrometric Calibration:** WCS-anchored centroiding with pointing-shift isolation")
+        md_lines.extend(["", "## 3. Astrometric Motion", "- Automatic motion measurement is unavailable until source association, wavelength compatibility, image quality and astrometric uncertainties are independently validated."])
 
     # Photometric Variability Analysis
     if photometry_data and photometry_data.get("valid_points_count") == 0:
@@ -76,57 +60,25 @@ def generate_discovery_report(
             f"- **Variability Heuristic:** **{'Variation flagged' if photometry_data.get('is_variable') else 'No variation flagged'}**. This threshold does not establish variability or stability; review wavelength compatibility and uncertainties.",
             f"- **Total Epoch Points:** {photometry_data.get('total_points', 0)}",
             f"- **Variability Index (std/mean):** {photometry_data.get('variability_index', 0.0):.3f}",
-            f"- **Mean Net Flux:** {photometry_data.get('mean_flux_mjy_sr', 0.0):.4f} MJy/sr",
-            f"- **Peak Flux Observed:** {photometry_data.get('max_flux_mjy_sr', 0.0):.4f} MJy/sr",
-            f"- **Flux Range (ΔF):** {photometry_data.get('amplitude_delta_mjy_sr', 0.0):.4f} MJy/sr",
+            f"- **Mean field aperture sum:** {photometry_data.get('mean_flux_mjy_sr', 0.0):.4f} (MJy/sr)·pixels",
+            f"- **Peak field aperture sum:** {photometry_data.get('max_flux_mjy_sr', 0.0):.4f} (MJy/sr)·pixels",
+            f"- **Aperture-sum range:** {photometry_data.get('amplitude_delta_mjy_sr', 0.0):.4f} (MJy/sr)·pixels",
         ])
 
-    # Spectral Energy Distribution Analysis
+    # Field samples are not calibrated source spectrophotometry.
     if spectrum_data:
         obs_bands = spectrum_data.get("observed_channels") or spectrum_data.get("observed_detector_bands") or []
-        total_obs = spectrum_data.get("total_observed_bands", len(obs_bands))
-        summary = spectrum_data.get("summary", {})
-        shape_desc = summary.get("continuum_shape") or "insufficient observed coverage"
-        bb_fit = spectrum_data.get("temperature_fit") or summary.get("temperature_fit") or {}
-
         md_lines.extend([
-            "",
-            "## 5. Spectral Energy Distribution (SED)",
-            f"- **Observed Detector Bands:** {total_obs} of 6 bands. WCS-WAVE wavelengths are approximate visualization estimates; science analysis requires separate spectral WCS products.",
-            "- **Spectrophotometric Continuum:** Estimated Continuum Model (Interpolated across 6 detector bandpasses)",
-            "- **Spectral Line Caveat:** The 102 individual channel values represent an interpolated continuum curve across the 6 SPHEREx detector arrays, not 102 independently resolved spectral line measurements.",
-            f"- **Broadband Continuum Shape:** {shape_desc} (Note: broadband continuum shape across measured detector bands, not an astrophysical classification)",
+            "", "## 5. Detector Field Samples",
+            f"- **Available detector samples:** {len(obs_bands)} of 6.",
+            "- Samples are background-subtracted sums of surface-brightness pixels, not calibrated source flux densities. They may come from different dates and do not confirm source identity.",
+            "- A resolved source spectrum, continuum shape, integrated source flux and temperature are unavailable from these samples.",
         ])
-
-        if bb_fit.get("status") == "converged" and bb_fit.get("temperature_k") is not None:
-            unc_str = f"± {bb_fit.get('uncertainty_k')} K" if bb_fit.get("uncertainty_k") is not None else "uncertainty unconstrained"
-            stats_parts = []
-            if bb_fit.get("reduced_chi2") is not None:
-                stats_parts.append(f"reduced χ² = {bb_fit['reduced_chi2']}")
-            if bb_fit.get("degrees_of_freedom") is not None:
-                stats_parts.append(f"dof = {bb_fit['degrees_of_freedom']}")
-            stats_str = f" ({', '.join(stats_parts)})" if stats_parts else ""
-            md_lines.append(
-                f"- **Single-Temperature Blackbody Continuum Fit:** T = {bb_fit['temperature_k']} {unc_str}{stats_str}. Note: Single-temperature broadband continuum fit; not an object's known physical temperature."
-            )
-        else:
-            limit_reason = bb_fit.get("reason") or bb_fit.get("limitations") or "Insufficient observed detector bands (minimum 3 distinct bands with propagated errors required for dof >= 1)"
-            md_lines.append(
-                f"- **Single-Temperature Blackbody Continuum Fit:** Unavailable ({limit_reason})"
-            )
-
-        if total_obs == 0:
-            md_lines.append(
-                "- **Archive Coverage Status:** No observed archive bands available. Summary metrics (peak wavelength, peak flux, temperature fit) are unavailable."
-            )
-        elif obs_bands:
-            md_lines.append("")
-            md_lines.append("### Observed Detector Photometry")
-            md_lines.append("| Detector | λ_eff (μm) | Net Flux (MJy/sr) | ± Uncertainty | Uncertainty source | Calibration |")
-            md_lines.append("| :--- | :--- | :--- | :--- | :--- | :--- |")
-            for b in obs_bands:
+        if obs_bands:
+            md_lines.extend(["", "| Detector | Approx. wavelength (µm) | Aperture sum ((MJy/sr)·pixels) | Uncertainty | Calibration |", "| :--- | :--- | :--- | :--- | :--- |"])
+            for band in obs_bands:
                 md_lines.append(
-                    f"| {b.get('detector', 'N/A')} | {b.get('wavelength_um', 0.0):.3f} | {b.get('flux_mjy_sr', 0.0):.4f} | ±{b.get('flux_err_mjy_sr', 0.0):.4f} | {b.get('uncertainty_source', 'unknown')} | {b.get('calibration_source', 'unknown')} |"
+                    f"| {band.get('detector', 'N/A')} | {band.get('wavelength_um', 0.0):.3f} | {band.get('flux_mjy_sr', 0.0):.4f} | {band.get('flux_err_mjy_sr', 0.0):.4f} | {band.get('calibration_source', 'unknown')} |"
                 )
 
     if notes:

@@ -1,5 +1,7 @@
 export interface ObservationRecord {
   search_provenance?: string;
+  search_snapshot_saved?: string | null;
+  catalog_coverage?: 'inside' | 'outside' | null;
   id: string;
   obs_id: string;
   collection: string;
@@ -39,7 +41,27 @@ export interface WCSInfo {
   ctype2?: string;
 }
 
+export interface TargetPrediction {
+  ra: number;
+  dec: number;
+  mjd: number;
+  pixel: { x: number; y: number; inside: boolean } | null;
+  reference_url: string;
+}
+
+export interface PhotometryEvidence {
+  status: 'unavailable';
+  aperture_status: 'not_checked' | 'unavailable' | 'field_sample_only';
+  reason: string;
+  epsf_present: boolean;
+  core_pixels: number | null;
+  usable_core_pixels: number | null;
+  background_pixels: number | null;
+}
+
 export interface FrameResponse {
+  target_predictions?: Record<string, TargetPrediction>;
+  target_photometry?: Record<string, PhotometryEvidence>;
   footprint_icrs_deg?: number[][] | null;
   frame_id: string;
   obs_id: string;
@@ -68,10 +90,30 @@ export interface DemoPreset {
   notable_feature: string;
 }
 
+export interface ComparisonCalibration {
+  alignment: string;
+  compatibility: string;
+  minimum_passband_overlap: number;
+  minimum_retained_overlap: number;
+  retained_pixels: number;
+  reference_pixels: number;
+  calibrations: Array<{
+    observation_id: string;
+    science_release: string;
+    plane_id: string;
+    calibration_url: string;
+    md5: string;
+    checksum_source: string;
+    association_url: string | null;
+    sha256: string | null;
+  }>;
+}
+
 export interface DiffResult {
   eligible: boolean;
   frame_1: string;
   frame_2: string;
+  calibration: ComparisonCalibration;
   diff_stats: {
     rms_diff_mjy_sr: number;
     peak_positive_flux: number;
@@ -90,8 +132,8 @@ export interface CatalogSource {
   dec: number;
   g_mag?: number | null;
   bp_rp?: number | null;
-  pm_ra?: number;
-  pm_dec?: number;
+  pm_ra?: number | null;
+  pm_dec?: number | null;
   parallax_mas?: number | null;
   designation: string;
   catalog: string;
@@ -182,7 +224,7 @@ export interface SpectrumBandPoint {
   calibration_source?: string;
   color: string;
   flux_mjy_sr: number;
-  flux_density_mjy: number;
+  flux_density_mjy: number | null;
   peak_flux_mjy_sr: number;
   flux_err_mjy_sr: number;
   snr: number;
@@ -229,13 +271,14 @@ export interface StackResult {
   method: 'mean' | 'median' | 'sum';
   frame_count: number;
   frame_ids: string[];
+  calibration: ComparisonCalibration;
   dimensions: [number, number];
   snr_improvement_factor: number | null;
   snr_gain_status?: string;
-  theoretical_snr_gain: number;
+  theoretical_snr_gain: number | null;
   theoretical_gain_model?: string;
   noise_stats: {
-    reference_noise_sigma: number;
+    reference_noise_sigma: number | null;
     stacked_noise_sigma: number;
     mean_flux_mjy_sr: number;
     max_flux_mjy_sr: number;

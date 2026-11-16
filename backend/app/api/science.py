@@ -4,10 +4,8 @@ from pydantic import BaseModel
 from app.science.coordinates import parse_coordinates
 from app.services.irsa_client import irsa_client, OBSERVATION_REGISTRY
 from app.services.cutout_service import cutout_service
-from app.services.catalog_service import catalog_service
-from app.science.comparison import check_comparison_eligibility
+from app.services.catalog_service import catalog_service, CatalogUnavailable
 from app.science.fits_processing import load_fits_cutout, extract_primary_image
-from app.science.motion import measure_astrometric_motion
 from app.science.photometry import build_lightcurve_series
 from app.science.report import generate_discovery_report
 from app.science.spectrum import generate_spectrum_for_target
@@ -37,7 +35,7 @@ async def get_catalogs(
     ra: str = Query(..., description="Right Ascension in decimal degrees or sexagesimal"),
     dec: str = Query(..., description="Declination in decimal degrees or sexagesimal"),
     radius: float = Query(0.08, description="Search radius in degrees"),
-    catalog: str = Query("gaia_dr3", description="Catalog name (gaia_dr3, simbad)"),
+    catalog: str = Query("gaia_dr3", description="Reference catalog (gaia_dr3)"),
 ):
     """
     Returns reference catalog stars (e.g. Gaia DR3) with proper motions and magnitudes
@@ -51,12 +49,14 @@ async def get_catalogs(
     if radius <= 0 or radius > 1.0:
         raise HTTPException(status_code=400, detail="Radius must be between 0.001 and 1.0 degrees.")
 
-    sources = await catalog_service.query_catalog(
-        ra=ra_deg,
-        dec=dec_deg,
-        radius_deg=radius,
-        catalog_name=catalog,
-    )
+    try:
+        sources = await catalog_service.query_catalog(
+            ra=ra_deg, dec=dec_deg, radius_deg=radius, catalog_name=catalog,
+        )
+    except CatalogUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {
         "catalog": catalog,
         "center": {"ra": ra_deg, "dec": dec_deg},
@@ -93,23 +93,24 @@ async def get_photometry(
         radius_deg=fov,
         collection=coll_filter,
         detector=detector,
-        limit=20,
+        limit=60,
     )
 
     # 2. Extract image cutouts for each epoch
     epoch_frames = []
     for obs in observations:
-        b = None
-        cached_url = obs.access_url
-        reg_item = OBSERVATION_REGISTRY.get(obs.id)
-        if reg_item and "cached_cutout_url" in reg_item:
-            from app.services.cache_service import cache_service
-            b = cache_service.get(reg_item["cached_cutout_url"])
-        if not b:
-            try:
-                b = await cutout_service.fetch_cutout_fits(obs.access_url, obs.ra, obs.dec, fov_deg=fov)
-            except Exception:
-                b = None
+        # Analysis never downloads every search result in the background.
+        from app.services.cache_service import cache_service
+        from app.services.cutout_service import cutout_cache_key
+        reg_item = OBSERVATION_REGISTRY.get(obs.id, {})
+        cached_url = reg_item.get("cached_cutout_url")
+        checksum = reg_item.get("cached_cutout_sha256")
+        b = cache_service.get_verified(cached_url, checksum) if cached_url and checksum else (cache_service.get(cached_url) if cached_url else None)
+        if not b and obs.access_url:
+            key = cutout_cache_key(obs.access_url, obs.ra, obs.dec, fov)
+            # Match the viewer's precedence and use only local cache; never
+            # initiate a cloud or IRSA download for background analysis.
+            b = cache_service.get(key) or cache_service.get(f"cloud-{key}")
 
         if b:
             try:
@@ -141,6 +142,9 @@ async def get_photometry(
 
     series = build_lightcurve_series(epoch_frames, target_ra=ra_deg, target_dec=dec_deg)
     series["target"] = {"ra": ra_deg, "dec": dec_deg}
+    series["analysis_source"] = "cached_cutouts_only"
+    series["observations_considered"] = len(observations)
+    series["cutouts_available"] = len(epoch_frames)
     return series
 
 @router.get("/science/spectrum")
@@ -151,8 +155,7 @@ async def get_spectrum(
     fov: float = Query(0.04, description="Cutout radius in degrees"),
 ):
     """
-    Computes on-the-fly calibrated Spectral Energy Distribution (SED: Flux vs. Wavelength)
-    across up to six detector bands, plus an illustrative 102-point continuum.
+    Summarizes available cached detector field samples without fabricating a spectrum.
     """
     try:
         ra_deg, dec_deg = parse_coordinates(ra, dec)
@@ -169,21 +172,8 @@ async def get_spectrum(
         dec=dec_deg,
         radius_deg=max(fov, 0.08),
         collection=coll_filter,
-        limit=50,
+        limit=60,
     )
-
-    # Preload cutouts for observations if accessible
-    for obs in observations:
-        reg_item = OBSERVATION_REGISTRY.get(obs.id)
-        has_cached = False
-        if reg_item and "cached_cutout_url" in reg_item:
-            from app.services.cache_service import cache_service
-            has_cached = cache_service.get(reg_item["cached_cutout_url"]) is not None
-        if not has_cached and obs.access_url:
-            try:
-                await cutout_service.fetch_cutout_fits(obs.access_url, obs.ra, obs.dec, fov_deg=fov)
-            except Exception:
-                pass
 
     spectrum = generate_spectrum_for_target(
         ra=ra_deg,
@@ -192,62 +182,21 @@ async def get_spectrum(
         cutout_fetcher=cutout_service,
         fov_deg=fov,
     )
+    spectrum["analysis_source"] = "cached_cutouts_only"
+    spectrum["observations_considered"] = len(observations)
     return spectrum
 
 @router.post("/science/motion")
 async def compute_astrometric_motion(req: MotionRequest = Body(...)):
-    """
-    Calculates astrometric vector shift and proper motion rate between two observation epochs.
-    """
-    meta1 = OBSERVATION_REGISTRY.get(req.frame_id_1)
-    meta2 = OBSERVATION_REGISTRY.get(req.frame_id_2)
-
-    if not meta1 or not meta2:
+    """Do not report proper motion without verified cross-epoch source association."""
+    if req.frame_id_1 not in OBSERVATION_REGISTRY or req.frame_id_2 not in OBSERVATION_REGISTRY:
         raise HTTPException(status_code=404, detail="One or both frame IDs not found in registry.")
+    raise HTTPException(status_code=422, detail=(
+        "Automatic motion measurement is unavailable: source association, image quality, "
+        "wavelength compatibility, and astrometric uncertainties must be independently validated. "
+        "Use blink or a validated difference to inspect the field."
+    ))
 
-    eligible, reason = check_comparison_eligibility(meta1, meta2)
-    if not eligible:
-        raise HTTPException(status_code=400, detail=f"Comparison ineligible: {reason}")
-
-    # Fetch cutout bytes
-    b1 = None
-    if "cached_cutout_url" in meta1:
-        from app.services.cache_service import cache_service
-        b1 = cache_service.get(meta1["cached_cutout_url"])
-    if not b1:
-        b1 = await cutout_service.fetch_cutout_fits(meta1["access_url"], meta1["ra"], meta1["dec"])
-
-    b2 = None
-    if "cached_cutout_url" in meta2:
-        from app.services.cache_service import cache_service
-        b2 = cache_service.get(meta2["cached_cutout_url"])
-    if not b2:
-        b2 = await cutout_service.fetch_cutout_fits(meta2["access_url"], meta2["ra"], meta2["dec"])
-
-    i1, h1 = extract_primary_image(load_fits_cutout(b1), preserve_nan=True)
-    i2, h2 = extract_primary_image(load_fits_cutout(b2), preserve_nan=True)
-
-    tgt_coord = None
-    if req.target_ra is not None and req.target_dec is not None:
-        tgt_coord = (req.target_ra, req.target_dec)
-
-    motion = measure_astrometric_motion(
-        img1=i1,
-        img2=i2,
-        meta1=meta1,
-        meta2=meta2,
-        wcs1=h1,
-        wcs2=h2,
-        target_coord=tgt_coord,
-        pixel_scale_arcsec=req.pixel_scale_arcsec or 6.2,
-    )
-
-    return {
-        "eligible": True,
-        "frame_1": req.frame_id_1,
-        "frame_2": req.frame_id_2,
-        "motion": motion,
-    }
 
 @router.post("/science/report")
 async def make_discovery_report(req: ReportRequest = Body(...)):

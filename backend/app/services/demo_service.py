@@ -1,64 +1,67 @@
 import json
+import hashlib
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 import numpy as np
 from astropy.time import Time
-from app.config import MANIFESTS_DIR
+from app.config import DEMO_DATASET_FILE, DEFAULT_COLLECTION, DEMO_CACHE_ONLY, MANIFESTS_DIR
 from app.models.schemas import ObservationRecord, DemoPreset
 from app.services.cache_service import cache_service
 from app.services.irsa_client import OBSERVATION_REGISTRY
 
-DEMO_DATASET_FILE = MANIFESTS_DIR / "demo_dataset.json"
-
+# Starting positions are the epoch-dependent predictions in the packaged,
+# audited demo-preview manifest. They are search centers, not confirmations
+# that the target was detected. Keeping them independent of the local FITS
+# cache also makes a fresh checkout use the same vetted sky positions.
 OFFICIAL_PRESETS: List[DemoPreset] = [
     DemoPreset(
         id="barnards_star",
         name="Barnard's Star",
-        ra=269.45208,
-        dec=4.69339,
-        description="Highest proper motion star known (10.3 arcsec/yr). Visible 1.6-pixel displacement across 1-year baseline.",
+        ra=269.4461286205729,
+        dec=4.769998359667445,
+        description="Nearby star with high catalog proper motion. Check the epoch and footprint before measuring the source.",
         target_type="High Proper Motion Star",
-        default_collection="spherex_dr1",
-        notable_feature="Astrometric motion across DR1 (Aug 2025) and QR3 (Aug 2026)",
+        default_collection=DEFAULT_COLLECTION,
+        notable_feature="Epoch-dependent sky position",
     ),
     DemoPreset(
         id="wise_0855",
         name="WISE 0855",
-        ra=133.79513,
-        dec=-7.24515,
-        description="Coldest known brown dwarf (~250 K), 7.2 light-years distant. Emits almost purely in mid-infrared wavelengths.",
+        ra=133.75896227492004,
+        dec=-7.242116064321349,
+        description="Nearby Y dwarf with high catalog proper motion and very faint optical emission.",
         target_type="Y-type Sub-stellar Brown Dwarf",
-        default_collection="spherex_dr1",
-        notable_feature="Strong infrared emission in D4/D5 bands; invisible in optical",
+        default_collection=DEFAULT_COLLECTION,
+        notable_feature="Infrared brown dwarf",
     ),
     DemoPreset(
         id="rw_aurigae",
         name="RW Aurigae",
-        ra=76.95420,
-        dec=30.40140,
+        ra=76.95658820303035,
+        dec=30.401287398865755,
         description="Classical T Tauri binary system with circumstellar disk disruption causing dramatic photometric dimming.",
         target_type="Young Stellar Object / Variable Star",
-        default_collection="spherex_dr1",
-        notable_feature="Multi-magnitude infrared brightness variations",
+        default_collection=DEFAULT_COLLECTION,
+        notable_feature="Variable young binary with unresolved components in SPHEREx",
     ),
     DemoPreset(
         id="r_draconis",
         name="R Draconis",
-        ra=248.33750,
-        dec=66.70420,
-        description="Mira-type pulsating red giant with a 245-day period and large infrared pulsation amplitude.",
+        ra=248.16722768733652,
+        dec=66.75502445923215,
+        description="Mira-type pulsating red giant. SPHEREx variability requires suitable comparable data.",
         target_type="Pulsating Asymptotic Giant Branch Star",
-        default_collection="spherex_dr1",
-        notable_feature="Periodic flux pulsation visible in Level 2 time series",
+        default_collection=DEFAULT_COLLECTION,
+        notable_feature="Pulsating variable",
     ),
     DemoPreset(
         id="epsilon_indi_b",
         name="Epsilon Indi B",
-        ra=330.84000,
-        dec=-56.78600,
+        ra=331.09813086506205,
+        dec=-56.801144263858404,
         description="Nearby binary brown dwarf system with prominent orbital and proper motion (4.7 arcsec/yr).",
         target_type="Binary Brown Dwarf System",
-        default_collection="spherex_dr1",
+        default_collection=DEFAULT_COLLECTION,
         notable_feature="High proper motion and brown dwarf spectral signature",
     ),
 ]
@@ -69,7 +72,47 @@ class DemoService:
         self.raw_manifest: List[Dict[str, Any]] = []
         self.demo_records: List[ObservationRecord] = []
         self.base_url_to_cutout: Dict[str, str] = {}
+        self.preview_metadata: List[Dict[str, Any]] = []
         self.load_manifest()
+        self.load_packaged_preview_metadata()
+
+    def load_packaged_preview_metadata(self) -> None:
+        """Use vetted metadata on a default checkout even before images are cached.
+
+        Explicit custom manifests and offline-only mode retain their existing
+        behavior. These entries describe archive images, not cached cutouts.
+        """
+        if DEMO_CACHE_ONLY or self.dataset_path.resolve() != (MANIFESTS_DIR / "demo_dataset.json").resolve():
+            return
+        from app.services.cloud_cutout import expected_image_identity
+        try:
+            raw = (MANIFESTS_DIR / "demo_preview.json").read_bytes()
+            sources = json.loads((MANIFESTS_DIR / "demo_preview_assets.json").read_text(encoding="utf-8"))
+            if hashlib.sha256(raw).hexdigest() != sources["preview_manifest_sha256"]:
+                return
+            entries = json.loads(raw)
+            if not isinstance(entries, list):
+                return
+            for entry in entries:
+                if entry.get("catalog_coverage") != "inside":
+                    continue
+                url = entry.get("cutout_url", "").split("?", 1)[0]
+                detector = str(entry.get("detector", ""))
+                if (not detector.startswith("SPHEREx-D") or
+                        expected_image_identity(url) != (entry.get("obs_id"), detector.removeprefix("SPHEREx-D"))):
+                    continue
+                # Retain only complete coordinate/time records that can be
+                # tied to the exact official image URL.
+                try:
+                    ra, dec = float(entry["ra"]), float(entry["dec"])
+                    mjd = float(Time(entry["utc_date"], format="isot").mjd)
+                except (KeyError, ValueError, TypeError):
+                    continue
+                if not np.isfinite([ra, dec, mjd]).all() or not (0 <= ra < 360 and -90 <= dec <= 90):
+                    continue
+                self.preview_metadata.append(entry)
+        except (OSError, ValueError, TypeError, KeyError):
+            return
 
     def load_manifest(self) -> None:
         """
@@ -91,6 +134,7 @@ class DemoService:
                 utc_date = entry.get("utc_date")
                 ra = float(entry.get("ra", 0.0))
                 dec = float(entry.get("dec", 0.0))
+                coverage = entry.get("catalog_coverage")
 
                 clean_band = detector.replace("-", "_").replace(" ", "_")
                 record_id = f"{collection}_{obs_id}_{clean_band}".replace("/", "_")
@@ -135,6 +179,7 @@ class DemoService:
                     ra=ra,
                     dec=dec,
                     search_provenance="cached_demo",
+                    catalog_coverage=coverage if coverage in ("inside", "outside") else None,
                 )
                 self.demo_records.append(rec)
 
@@ -173,10 +218,60 @@ class DemoService:
             if dist_deg <= radius_deg:
                 matches.append(rec)
 
+        preview_matches: List[ObservationRecord] = []
+        for entry in self.preview_metadata:
+            entry_collection, band = entry["collection"], entry["detector"]
+            if collection and collection != "ALL" and collection != entry_collection:
+                continue
+            if detector and detector.upper() != "ALL" and detector.lower() != band.lower():
+                continue
+            delta_ra = (float(entry["ra"]) - ra + 180.0) % 360.0 - 180.0
+            if np.hypot(delta_ra * np.cos(np.radians(dec)), float(entry["dec"]) - dec) > radius_deg:
+                continue
+            obs_id = entry["obs_id"]
+            record_id = f"demo_metadata_{entry_collection}_{obs_id}_{band.replace('-', '_')}__at_{ra:.6f}_{dec:.6f}"
+            url = entry["cutout_url"].split("?", 1)[0]
+            record = ObservationRecord(id=record_id, obs_id=obs_id, collection=entry_collection,
+                detector=band, mjd=float(Time(entry["utc_date"], format="isot").mjd),
+                utc_date=entry["utc_date"], access_url=url, ra=ra, dec=dec,
+                search_provenance="demo_metadata")
+            OBSERVATION_REGISTRY[record_id] = record.model_dump()
+            preview_matches.append(record)
+
+        if preview_matches:
+            # Older default entries explicitly marked outside the target
+            # footprint are not useful demonstrations at the vetted position.
+            matches = [record for record in matches if record.catalog_coverage != "outside"]
+            # The curated version supersedes an older entry for the same image.
+            unique = {(record.collection, record.obs_id, record.detector): record for record in matches}
+            for record in preview_matches:
+                unique[(record.collection, record.obs_id, record.detector)] = record
+            matches = list(unique.values())
+
         matches.sort(key=lambda x: x.mjd or 0.0)
         return matches
 
     def get_presets(self) -> List[DemoPreset]:
-        return OFFICIAL_PRESETS
+        presets = []
+        for preset in OFFICIAL_PRESETS:
+            covered = [
+                entry for entry in self.raw_manifest
+                if entry.get("target_name") == preset.name
+                and entry.get("catalog_coverage") == "inside"
+                and entry.get("predicted_degrees") is not None
+            ]
+            if not covered:
+                covered = [entry for entry in self.preview_metadata if entry.get("target_name") == preset.name
+                           and entry.get("predicted_degrees") is not None]
+            if not covered:
+                presets.append(preset)
+                continue
+            latest = max(covered, key=lambda entry: entry["utc_date"])
+            collections = {entry["collection"] for entry in covered}
+            presets.append(preset.model_copy(update={
+                "ra": latest["predicted_degrees"][0], "dec": latest["predicted_degrees"][1],
+                "default_collection": latest["collection"] if len(collections) == 1 else "ALL",
+            }))
+        return presets
 
 demo_service = DemoService()

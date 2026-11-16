@@ -1,0 +1,9 @@
+{
+  "saved_date_local": "2026-11-14",
+  "date_basis": "original local snapshot file modification date; query timestamp not independently recorded",
+  "source_file_sha256": "fc102a5a4d151cefc0d2400730420682d2fe2f0963e5afa71e248c3a48fa98ed",
+  "searches": 9,
+  "rows_before_deduplication": 1648,
+  "note": "Historical IRSA SIA search metadata only; not FITS images. Coverage, availability and completeness require separate checks.",
+  "snapshot_sha256": "ca8f34ac97f6547ac66396b552d11f025da89e17d82fb507969bae6641dad1ff"
+}

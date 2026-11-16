@@ -1,40 +1,43 @@
+import asyncio
+import logging
 from typing import Optional, Literal, List
+
+import httpx
 import numpy as np
+from astropy.coordinates import angular_separation
+from astropy.wcs import NoConvergence, WcsError
 from fastapi import APIRouter, Query, HTTPException, Body
-from pydantic import BaseModel
+from fastapi.concurrency import run_in_threadpool
+from pydantic import BaseModel, Field
+
+from app.config import MAX_FOV_DEG
 from app.models.schemas import FrameResponse
+from app.services.cache_service import cache_service
 from app.services.cutout_service import cutout_service
 from app.services.irsa_client import OBSERVATION_REGISTRY
-from app.science.comparison import check_comparison_eligibility, compute_difference_frame
-from app.science.stacking import compute_coadd_stack
+from app.services.spectral_calibration_service import load_calibrated_exposure
+from app.science.calibrated_comparison import compare_calibrated_pair, coadd_calibrated_exposures
 from app.science.fits_processing import (
     load_fits_cutout,
     extract_primary_image,
     render_image_to_base64,
-    render_image_to_base64_png,
     apply_stretch,
 )
 
 router = APIRouter()
-
-def require_validated_spectral_compatibility() -> None:
-    """Prevent image arithmetic until per-pixel spectral calibration is validated."""
-    raise HTTPException(
-        status_code=422,
-        detail=("Difference and co-addition are unavailable: per-pixel wavelength "
-                "compatibility has not been validated using the separate spectral WCS "
-                "calibration products. Matching detector labels alone is insufficient. "
-                "Use blink playback for visual inspection."),
-    )
+logger = logging.getLogger(__name__)
+MINIMUM_PASSBAND_OVERLAP = 0.9
 
 class DiffRequest(BaseModel):
     frame_id_1: str
     frame_id_2: str
+    fov: float = Field(default=0.04, gt=0, le=MAX_FOV_DEG)
     format: Optional[str] = "png"
 
 class StackRequest(BaseModel):
     frame_ids: List[str]
     method: Optional[Literal["mean", "median", "sum"]] = "mean"
+    fov: float = Field(default=0.04, gt=0, le=MAX_FOV_DEG)
     format: Optional[str] = "png"
     stretch: Optional[str] = "asinh"
 
@@ -43,6 +46,7 @@ class CatalogProjectionRequest(BaseModel):
     frame_id: str
     fov: float = 0.05
     coordinates: List[List[float]]
+    proper_motions: Optional[List[Optional[List[Optional[float]]]]] = None
 
 
 @router.post("/frames/project-catalog")
@@ -52,7 +56,6 @@ async def project_catalog(req: CatalogProjectionRequest):
     import astropy.units as u
     from astropy.wcs.utils import wcs_to_celestial_frame
     from app.science.fits_processing import extract_astropy_wcs
-    from app.services.cache_service import cache_service
 
     if req.fov <= 0 or req.fov > 2 or len(req.coordinates) > 500:
         raise HTTPException(status_code=400, detail="Invalid field of view or too many coordinates.")
@@ -61,32 +64,40 @@ async def project_catalog(req: CatalogProjectionRequest):
         raise HTTPException(status_code=404, detail="Observation not found.")
     if any(len(p) != 2 or not np.isfinite(p).all() or not -90 <= p[1] <= 90 for p in req.coordinates):
         raise HTTPException(status_code=400, detail="Invalid ICRS coordinate.")
+    if req.proper_motions is not None and (len(req.proper_motions) != len(req.coordinates) or any(
+        motion is not None and len(motion) != 2 for motion in req.proper_motions
+    )):
+        raise HTTPException(status_code=400, detail="Proper motions must correspond to the catalog coordinates.")
     try:
-        data = cache_service.get(meta["cached_cutout_url"]) if meta.get("cached_cutout_url") else None
-        if not data:
-            data = await cutout_service.fetch_cutout_fits(meta["access_url"], meta["ra"], meta["dec"], fov_deg=req.fov)
+        data = await _comparison_cutout(meta, req.fov)
         image, header = extract_primary_image(load_fits_cutout(data), preserve_nan=True)
         wcs = extract_astropy_wcs(header)
         if wcs is None or not wcs.has_celestial:
             raise ValueError("Celestial WCS is unavailable")
         if not req.coordinates:
             return {"positions": []}
-        coords = np.asarray(req.coordinates, dtype=float)
+        from app.science.gaia_motion import propagate_gaia_positions
+        try:
+            start, end = float(header["MJD-BEG"]), float(header["MJD-END"])
+            exposure_mjd = (start + end) / 2 if np.isfinite([start, end]).all() and start < end else None
+        except (KeyError, TypeError, ValueError):
+            exposure_mjd = None
+        coords, propagated = propagate_gaia_positions(req.coordinates, req.proper_motions, exposure_mjd)
         sky = SkyCoord(ra=coords[:, 0] * u.deg, dec=coords[:, 1] * u.deg, frame="icrs")
         celestial = wcs.celestial
         native = sky.transform_to(wcs_to_celestial_frame(celestial))
         positions = []
-        for lon, lat in zip(native.spherical.lon.deg, native.spherical.lat.deg):
+        for lon, lat, shifted in zip(native.spherical.lon.deg, native.spherical.lat.deg, propagated):
             try:
                 px, py = celestial.all_world2pix([[lon, lat]], 0, quiet=False)[0]
                 if np.isfinite(px) and np.isfinite(py) and -0.5 <= px < image.shape[1] - 0.5 and -0.5 <= py < image.shape[0] - 0.5:
-                    positions.append({"x": float(px), "y": float(py)})
+                    positions.append({"x": float(px), "y": float(py), "motion_applied": bool(shifted)})
                 else:
                     positions.append(None)
             except Exception:
                 # A failed inverse WCS must never be presented as a matched source.
                 positions.append(None)
-        return {"positions": positions}
+        return {"positions": positions, "exposure_mjd": exposure_mjd}
     except Exception as exc:
         raise HTTPException(status_code=422, detail=f"Catalog projection unavailable: {exc}") from exc
 
@@ -111,173 +122,170 @@ async def get_frame(
         return frame
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error rendering frame: {str(e)}")
 
+async def _comparison_cutout(meta: dict, fov: float) -> bytes:
+    if checksum := meta.get("cached_cutout_sha256"):
+        data = cache_service.get_verified(meta["cached_cutout_url"], checksum)
+        if data is None:
+            raise ValueError("A verified demo FITS cutout is missing or fails its checksum")
+        return data
+    cached = cache_service.get(meta["cached_cutout_url"]) if meta.get("cached_cutout_url") else None
+    if cached is not None:
+        return cached
+    return await cutout_service.fetch_cutout_fits(meta["access_url"], meta["ra"], meta["dec"], fov_deg=fov)
+
+
+def _validated_comparison(cutouts: list[bytes], metadata: list[dict]) -> dict:
+    exposures, calibrations, intervals, observation_ids = [], [], [], []
+    for data, meta in zip(cutouts, metadata):
+        with load_fits_cutout(data) as science:
+            header = science["IMAGE"].header
+            obs_id = header["OBSID"]
+            detector = str(header["DETECTOR"]).strip()
+            if obs_id != meta["obs_id"] or f"SPHEREx-D{detector}" != meta["detector"]:
+                raise ValueError("FITS exposure identity does not match the selected observation")
+            start, end = float(header["MJD-BEG"]), float(header["MJD-END"])
+            if not np.isfinite([start, end]).all() or start >= end:
+                raise ValueError("FITS exposure time interval is unavailable")
+            intervals.append((start, end))
+            if obs_id in observation_ids:
+                raise ValueError("Select two independent exposures")
+            observation_ids.append(obs_id)
+            release = meta["collection"].removeprefix("spherex_").removesuffix("_deep")
+            if release not in {"dr1", "qr3", "qr2"}:
+                raise ValueError("The science release could not be verified")
+            exposure, artifact = load_calibrated_exposure(science, release)
+            exposures.append(exposure)
+            calibrations.append({
+                "observation_id": obs_id, "science_release": release,
+                "plane_id": artifact.plane_id, "calibration_url": artifact.url,
+                "md5": artifact.checksum,
+                "checksum_source": artifact.checksum_source,
+                "association_url": artifact.association_url,
+                "sha256": artifact.sha256,
+            })
+    ordered_intervals = sorted(intervals)
+    if any(current[0] < previous[1] for previous, current in zip(ordered_intervals, ordered_intervals[1:])):
+        raise ValueError("Selected exposure time intervals overlap")
+    result = (compare_calibrated_pair(*exposures, minimum_passband_overlap=MINIMUM_PASSBAND_OVERLAP)
+              if len(exposures) == 2 else
+              coadd_calibrated_exposures(exposures, minimum_passband_overlap=MINIMUM_PASSBAND_OVERLAP))
+    result["calibrations"] = calibrations
+    return result
+
+
+async def _compare_selected(frame_ids: list[str], fov: float) -> dict:
+    metadata = []
+    for frame_id in frame_ids:
+        meta = OBSERVATION_REGISTRY.get(frame_id)
+        if not meta:
+            raise HTTPException(404, f"Observation '{frame_id}' was not found.")
+        metadata.append(meta)
+    if frame_ids[0] == frame_ids[1]:
+        raise HTTPException(400, "Select two distinct observations.")
+    if all(meta.get("ra") is not None and meta.get("dec") is not None for meta in metadata):
+        first = np.deg2rad([metadata[0]["ra"], metadata[0]["dec"]])
+        for meta in metadata[1:]:
+            other = np.deg2rad([meta["ra"], meta["dec"]])
+            if np.rad2deg(angular_separation(*first, *other)) > max(0.5, 2 * fov):
+                raise HTTPException(400, "A cutout is too far from reference frame to overlap.")
+    if any(meta.get("detector") != metadata[0].get("detector") for meta in metadata[1:]):
+        raise HTTPException(422, "Select two observations from the same detector for calibrated comparison.")
+    try:
+        cutouts = await asyncio.gather(*(_comparison_cutout(meta, fov) for meta in metadata))
+        return await run_in_threadpool(_validated_comparison, cutouts, metadata)
+    except (ValueError, OSError, KeyError, httpx.HTTPError, NoConvergence, WcsError) as exc:
+        logger.info("Rejected comparison between %s: %s", frame_ids, exc)
+        reason = str(exc) if isinstance(exc, ValueError) and not isinstance(exc, httpx.HTTPError) else "Required FITS or calibration data unavailable."
+        raise HTTPException(
+            422, f"Could not verify per-pixel wavelength compatibility using spectral WCS calibration. {reason}",
+        ) from exc
+
+
+def _comparison_metadata(result: dict) -> dict:
+    return {key: result[key] for key in (
+        "alignment", "compatibility", "minimum_passband_overlap", "minimum_retained_overlap",
+        "retained_pixels", "reference_pixels", "calibrations",
+    )}
+
+
+def _science_plane(values: np.ndarray, valid: np.ndarray) -> list:
+    return np.where(valid, values.astype(object), None).tolist()
+
+
 @router.post("/frames/diff")
 async def diff_frames(req: DiffRequest = Body(...)):
-    """
-    Computes scientific difference image between two observations (frame 2 minus frame 1).
-    Utilizes astropy / reproject WCS celestial alignment across epochs.
-    """
-    meta1 = OBSERVATION_REGISTRY.get(req.frame_id_1)
-    meta2 = OBSERVATION_REGISTRY.get(req.frame_id_2)
+    """Compute frame 2 minus frame 1 for matched native exposure pixels."""
+    result = await _compare_selected([req.frame_id_1, req.frame_id_2], req.fov)
+    difference = result["difference"]
+    variance = result["difference_variance"]
+    valid = np.isfinite(difference)
+    retained = difference[valid]
+    limit = max(float(np.max(np.abs(retained))), np.finfo(float).tiny)
+    display = np.full(difference.shape, 128, dtype=np.uint8)
+    display[valid] = np.round(127.5 * (1 + retained / limit)).astype(np.uint8)
+    format = req.format or "png"
+    return {
+        "eligible": True,
+        "frame_1": req.frame_id_1, "frame_2": req.frame_id_2,
+        "diff_stats": {
+            "rms_diff_mjy_sr": float(np.sqrt(np.mean(retained**2))),
+            "peak_positive_flux": float(max(0, retained.max())),
+            "peak_negative_flux": float(min(0, retained.min())),
+            "sigma_mjy_sr": float(np.median(np.sqrt(variance[valid]))),
+            "alignment_method": "native_wcs",
+        },
+        "dimensions": list(difference.shape),
+        "calibration": _comparison_metadata(result),
+        "surface_brightness_mjy_sr": _science_plane(difference, valid),
+        "variance_mjy_sr_squared": _science_plane(variance, valid),
+        "image_base64": render_image_to_base64(display, format=format, valid_mask=valid),
+        "colormapped_base64": render_image_to_base64(
+            display, colormap="coolwarm", format=format, valid_mask=valid,
+        ),
+    }
 
-    if not meta1 or not meta2:
-        raise HTTPException(status_code=404, detail="One or both frame IDs not found in registry.")
-
-    eligible, reason = check_comparison_eligibility(meta1, meta2)
-    if not eligible:
-        raise HTTPException(status_code=400, detail=f"Comparison ineligible: {reason}")
-
-    require_validated_spectral_compatibility()
-
-    try:
-        # Fetch cutouts using cache or cutout service
-        b1 = None
-        if "cached_cutout_url" in meta1:
-            from app.services.cache_service import cache_service
-            b1 = cache_service.get(meta1["cached_cutout_url"])
-        if not b1:
-            b1 = await cutout_service.fetch_cutout_fits(meta1["access_url"], meta1["ra"], meta1["dec"])
-
-        b2 = None
-        if "cached_cutout_url" in meta2:
-            from app.services.cache_service import cache_service
-            b2 = cache_service.get(meta2["cached_cutout_url"])
-        if not b2:
-            b2 = await cutout_service.fetch_cutout_fits(meta2["access_url"], meta2["ra"], meta2["dec"])
-        
-        hd1 = load_fits_cutout(b1)
-        hd2 = load_fits_cutout(b2)
-        i1, h1 = extract_primary_image(hd1, preserve_nan=True)
-        i2, h2 = extract_primary_image(hd2, preserve_nan=True)
-
-        from app.science.fits_processing import extract_fatal_quality_mask
-        mask1 = extract_fatal_quality_mask(hd1)
-        mask2 = extract_fatal_quality_mask(hd2)
-
-        diff_u8, stats = compute_difference_frame(i1, i2, wcs1=h1, wcs2=h2, mask1=mask1, mask2=mask2)
-        diff_b64 = render_image_to_base64(diff_u8, format=req.format or "png")
-        colormapped_b64 = render_image_to_base64(diff_u8, colormap="coolwarm", format=req.format or "png")
-
-        return {
-            "eligible": True,
-            "frame_1": req.frame_id_1,
-            "frame_2": req.frame_id_2,
-            "diff_stats": stats,
-            "dimensions": [int(diff_u8.shape[0]), int(diff_u8.shape[1])],
-            "image_base64": diff_b64,
-            "colormapped_base64": colormapped_b64,
-        }
-    except ValueError as ve:
-        raise HTTPException(status_code=400, detail=str(ve))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error computing frame difference: {e}")
 
 @router.post("/frames/stack")
 async def stack_frames(req: StackRequest = Body(...)):
-    """
-    Computes scientific image co-addition / stacking across multiple observation frames.
-    Uses astropy / reproject WCS celestial alignment to register frames onto a shared celestial grid.
-    Computes SNR improvement factor (~sqrt(N)) and noise reduction statistics.
-    """
-    if not req.frame_ids or len(req.frame_ids) < 2:
-        raise HTTPException(status_code=400, detail="At least 2 frame IDs are required for co-addition/stacking.")
-    if len(set(req.frame_ids)) < 2:
-        raise HTTPException(status_code=400, detail="At least 2 distinct frame IDs are required for co-addition/stacking.")
-
-    images = []
-    wcs_list = []
-    variances = []
-    masks = []
-    detectors = []
-    resolved_ids = []
-    metas = []
-
-    for fid in req.frame_ids:
-        meta = OBSERVATION_REGISTRY.get(fid)
-        if not meta:
-            raise HTTPException(status_code=404, detail=f"Frame ID '{fid}' not found in observation registry.")
-        metas.append(meta)
-
-    # Check celestial proximity across frames to ensure overlapping footprints
-    ref_ra = float(metas[0].get("ra", 0.0))
-    ref_dec = float(metas[0].get("dec", 0.0))
-    for m in metas[1:]:
-        c_ra = float(m.get("ra", 0.0))
-        c_dec = float(m.get("dec", 0.0))
-        delta_ra = (ref_ra - c_ra + 180.0) % 360.0 - 180.0
-        mean_dec_rad = np.radians((ref_dec + c_dec) / 2.0)
-        dist_deg = float(np.hypot(delta_ra * np.cos(mean_dec_rad), ref_dec - c_dec))
-        if dist_deg > 0.5:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Frame '{m.get('id')}' pointing is too far from reference frame ({dist_deg:.2f}° > 0.5°). Co-addition requires overlapping celestial footprints."
-            )
-
-    require_validated_spectral_compatibility()
-
-    for fid, meta in zip(req.frame_ids, metas):
-
-        b = None
-        if "cached_cutout_url" in meta:
-            from app.services.cache_service import cache_service
-            b = cache_service.get(meta["cached_cutout_url"])
-        if not b and "access_url" in meta:
-            b = await cutout_service.fetch_cutout_fits(meta["access_url"], meta["ra"], meta["dec"])
-
-        if not b:
-            raise HTTPException(status_code=404, detail=f"Unable to load FITS data for frame '{fid}'.")
-
-        try:
-            hd = load_fits_cutout(b)
-            img, hdr = extract_primary_image(hd, preserve_nan=True)
-            from app.science.fits_processing import extract_variance_data, extract_fatal_quality_mask
-            var = extract_variance_data(hd)
-            mask = extract_fatal_quality_mask(hd)
-            images.append(img)
-            wcs_list.append(hdr)
-            variances.append(var)
-            masks.append(mask)
-            detectors.append(meta.get("detector"))
-            resolved_ids.append(fid)
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to process FITS cutout for frame '{fid}': {e}")
-
-    try:
-        stacked_float, stats = compute_coadd_stack(
-            images=images,
-            wcs_list=wcs_list,
-            method=req.method or "mean",
-            variances=variances,
-            masks=masks,
-            detectors=detectors,
-        )
-        u8_stacked = apply_stretch(stacked_float, method=req.stretch or "asinh")
-        stacked_b64 = render_image_to_base64(u8_stacked, format=req.format or "png")
-
-        return {
-            "success": True,
-            "method": stats["method"],
-            "frame_count": stats["frame_count"],
-            "frame_ids": resolved_ids,
-            "dimensions": [int(stacked_float.shape[0]), int(stacked_float.shape[1])],
-            "snr_improvement_factor": stats["snr_improvement_factor"],
-            "snr_gain_status": stats.get("snr_gain_status"),
-            "theoretical_snr_gain": stats["theoretical_snr_gain"],
-            "theoretical_gain_model": stats.get("theoretical_gain_model"),
-            "noise_stats": {
-                "reference_noise_sigma": stats["reference_noise_sigma"],
-                "stacked_noise_sigma": stats["stacked_noise_sigma"],
-                "mean_flux_mjy_sr": stats["mean_flux_mjy_sr"],
-                "max_flux_mjy_sr": stats["max_flux_mjy_sr"],
-                "min_flux_mjy_sr": stats["min_flux_mjy_sr"],
-            },
-            "alignment_method": stats["alignment_method"],
-            "image_base64": stacked_b64,
-        }
-    except ValueError as ve:
-        raise HTTPException(status_code=400, detail=str(ve))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error computing frame co-addition: {e}")
+    """Co-add independent exposures over their validated pixel overlap."""
+    if len(req.frame_ids) < 2 or len(set(req.frame_ids)) != len(req.frame_ids):
+        raise HTTPException(400, "At least 2 distinct frame IDs are required.")
+    if len(req.frame_ids) > 6:
+        raise HTTPException(422, "Select at most six exposures for a calibrated co-add.")
+    method = req.method or "mean"
+    if method == "median" and len(req.frame_ids) != 2:
+        raise HTTPException(422, "Median co-add is supported only for two exposures; select mean or sum.")
+    result = await _compare_selected(req.frame_ids, req.fov)
+    # A two-value median equals the arithmetic mean.
+    factor = len(req.frame_ids) if method == "sum" else 1
+    values = result["mean"] * factor
+    variance = result["mean_variance"] * factor**2
+    valid = np.isfinite(values)
+    retained = values[valid]
+    display = np.zeros(values.shape, dtype=np.uint8)
+    display[valid] = apply_stretch(retained, method=req.stretch or "asinh")
+    return {
+        "success": True,
+        "method": method, "frame_count": len(req.frame_ids), "frame_ids": req.frame_ids,
+        "dimensions": list(values.shape),
+        "snr_improvement_factor": None,
+        "snr_gain_status": "unavailable",
+        "theoretical_snr_gain": None,
+        "noise_stats": {
+            "reference_noise_sigma": None,
+            "stacked_noise_sigma": float(np.median(np.sqrt(variance[valid]))),
+            "mean_flux_mjy_sr": float(retained.mean()),
+            "max_flux_mjy_sr": float(retained.max()),
+            "min_flux_mjy_sr": float(retained.min()),
+        },
+        "alignment_method": "native_wcs",
+        "calibration": _comparison_metadata(result),
+        "surface_brightness_mjy_sr": _science_plane(values, valid),
+        "variance_mjy_sr_squared": _science_plane(variance, valid),
+        "image_base64": render_image_to_base64(display, format=req.format or "png", valid_mask=valid),
+    }

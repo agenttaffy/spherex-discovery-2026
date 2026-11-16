@@ -1,0 +1,47 @@
+{
+  "barnards_star": {
+    "ra": 269.4520769586187,
+    "dec": 4.693364966576667,
+    "pm_ra_cosdec": -801.551,
+    "pm_dec": 10362.394,
+    "identifier": "GJ 699",
+    "epoch_jyear": 2000.0,
+    "reference_url": "https://simbad.harvard.edu/simbad/sim-id?Ident=GJ+699"
+  },
+  "epsilon_indi_b": {
+    "ra": 331.04414658852124,
+    "dec": -56.782844195116105,
+    "pm_ra_cosdec": 3981.977,
+    "pm_dec": -2466.832,
+    "identifier": "2MASS J22041052-5646577",
+    "epoch_jyear": 2000.0,
+    "reference_url": "https://simbad.harvard.edu/simbad/sim-id?Ident=2MASS+J22041052-5646577"
+  },
+  "wise_0855": {
+    "ra": 133.81890825,
+    "dec": -7.247048,
+    "pm_ra_cosdec": -8123.7,
+    "pm_dec": 673.2,
+    "identifier": "WISEA J085510.74-071442.5",
+    "epoch_jyear": 2000.0,
+    "reference_url": "https://simbad.harvard.edu/simbad/sim-id?Ident=WISEA+J085510.74-071442.5"
+  },
+  "rw_aurigae": {
+    "ra": 76.95652603458333,
+    "dec": 30.401438173888888,
+    "pm_ra_cosdec": 7.23,
+    "pm_dec": -20.33,
+    "identifier": "RW Aur",
+    "epoch_jyear": 2000.0,
+    "reference_url": "https://simbad.harvard.edu/simbad/sim-id?Ident=RW+Aur"
+  },
+  "r_draconis": {
+    "ra": 248.16761083295,
+    "dec": 66.75497941722,
+    "pm_ra_cosdec": -20.643,
+    "pm_dec": 6.149,
+    "identifier": "R Dra",
+    "epoch_jyear": 2000.0,
+    "reference_url": "https://simbad.harvard.edu/simbad/sim-id?Ident=R+Dra"
+  }
+}

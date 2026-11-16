@@ -14,18 +14,22 @@ import {
 const API_BASE = '/api';
 
 const frameCache = new Map<string, FrameResponse>();
+const frameRequests = new Map<string, Promise<FrameResponse>>();
 let frameCacheGeneration = 0;
 
 export function clearFrameCache(): void {
   frameCacheGeneration += 1;
   frameCache.clear();
+  frameRequests.clear();
 }
 
-export async function checkHealth(): Promise<{ status: string; irsa_connected: boolean; cached_frames: number }> {
+export async function checkHealth(): Promise<{ status: string; irsa_connected: boolean; demo_cache_only?: boolean; cached_frames: number }> {
   const resp = await fetch(`${API_BASE}/health`);
   if (!resp.ok) throw new Error('Health check failed');
   return resp.json();
 }
+
+export type ArchiveSearchStatus = 'available' | 'partial' | 'unavailable' | 'not_checked' | 'unknown';
 
 export async function fetchObservations(
   ra: number | string,
@@ -34,7 +38,7 @@ export async function fetchObservations(
   collection: string = 'spherex_dr1',
   detector?: string,
   limit: number = 60
-): Promise<{ target: {ra: number; dec: number; fov: number}; observations: ObservationRecord[]; total_found: number }> {
+): Promise<{ target: {ra: number; dec: number; fov: number}; observations: ObservationRecord[]; total_found: number; archive_search_status?: ArchiveSearchStatus }> {
   const params = new URLSearchParams({
     ra: String(ra),
     dec: String(dec),
@@ -65,16 +69,26 @@ export async function fetchFrame(
   if (frameCache.has(cacheKey)) {
     return frameCache.get(cacheKey)!;
   }
-  const resp = await fetch(
-    `${API_BASE}/frames/${encodeURIComponent(frameId)}?stretch=${stretch}&fov=${fov}&format=${format}`
-  );
-  if (!resp.ok) {
-    const err = await resp.json().catch(() => ({ detail: 'Failed to fetch frame' }));
-    throw new Error(err.detail || 'Failed to fetch frame');
+  const existing = frameRequests.get(cacheKey);
+  if (existing) return existing;
+  const request = (async () => {
+    const resp = await fetch(
+      `${API_BASE}/frames/${encodeURIComponent(frameId)}?stretch=${stretch}&fov=${fov}&format=${format}`
+    );
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ detail: 'Failed to fetch frame' }));
+      throw new Error(err.detail || 'Failed to fetch frame');
+    }
+    const data: FrameResponse = await resp.json();
+    if (generation === frameCacheGeneration) frameCache.set(cacheKey, data);
+    return data;
+  })();
+  frameRequests.set(cacheKey, request);
+  try {
+    return await request;
+  } finally {
+    if (frameRequests.get(cacheKey) === request) frameRequests.delete(cacheKey);
   }
-  const data: FrameResponse = await resp.json();
-  if (generation === frameCacheGeneration) frameCache.set(cacheKey, data);
-  return data;
 }
 
 export function prefetchFrame(
@@ -95,15 +109,25 @@ export async function fetchDemoPresets(): Promise<DemoPreset[]> {
   return resp.json();
 }
 
+export async function fetchDemoComparison(signal: AbortSignal): Promise<ObservationRecord[]> {
+  const resp = await fetch(`${API_BASE}/demo/comparison`, { signal });
+  if (!resp.ok) {
+    const body = await resp.json().catch(() => ({}));
+    throw new Error(body.detail || 'Eligible D5 pair unavailable in the local cache.');
+  }
+  return resp.json();
+}
+
 export async function computeDiff(
   frameId1: string,
   frameId2: string,
-  format: string = 'webp'
+  format: string = 'webp',
+  fov: number = 0.04,
 ): Promise<DiffResult> {
   const resp = await fetch(`${API_BASE}/frames/diff`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ frame_id_1: frameId1, frame_id_2: frameId2, format }),
+    body: JSON.stringify({ frame_id_1: frameId1, frame_id_2: frameId2, format, fov }),
   });
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({ detail: 'Failed to compute diff' }));
@@ -131,10 +155,10 @@ export async function fetchCatalogs(
   return resp.json();
 }
 
-export async function projectCatalog(frameId: string, fov: number, sources: CatalogSource[]): Promise<({x: number; y: number} | null)[]> {
+export async function projectCatalog(frameId: string, fov: number, sources: CatalogSource[]): Promise<({x: number; y: number; motion_applied: boolean} | null)[]> {
   const response = await fetch(`${API_BASE}/frames/project-catalog`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ frame_id: frameId, fov, coordinates: sources.map(source => [source.ra, source.dec]) }),
+    body: JSON.stringify({ frame_id: frameId, fov, coordinates: sources.map(source => [source.ra, source.dec]), proper_motions: sources.map(source => [source.pm_ra, source.pm_dec]) }),
   });
   if (!response.ok) throw new Error('Catalog positions could not be projected onto this image.');
   return (await response.json()).positions;
@@ -229,7 +253,8 @@ export async function stackFrames(
   frameIds: string[],
   method: 'mean' | 'median' | 'sum' = 'mean',
   format: string = 'png',
-  stretch: string = 'asinh'
+  stretch: string = 'asinh',
+  fov: number = 0.04,
 ): Promise<StackResult> {
   const resp = await fetch(`${API_BASE}/frames/stack`, {
     method: 'POST',
@@ -239,6 +264,7 @@ export async function stackFrames(
       method,
       format,
       stretch,
+      fov,
     }),
   });
   if (!resp.ok) {

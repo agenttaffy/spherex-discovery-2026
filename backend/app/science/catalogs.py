@@ -1,8 +1,8 @@
 from typing import List, Dict, Any, Optional
-from app.services.catalog_service import catalog_service, CURATED_GAIA_CATALOG
+from app.services.catalog_service import catalog_service
 
-PROVENANCE_DEMO = "Curated Reference Catalog (Demo)"
-PROVENANCE_LIVE_GAIA = "Live ESA Gaia TAP"
+PROVENANCE_DEMO = "Curated Reference Catalog (Demo)"  # legacy identifier
+PROVENANCE_LIVE_GAIA = "VizieR Gaia DR3 (J2016.0)"
 
 async def query_reference_catalog(
     ra: float,
@@ -11,9 +11,7 @@ async def query_reference_catalog(
     catalog_name: str = "gaia_dr3",
 ) -> List[Dict[str, Any]]:
     """
-    Queries celestial reference sources (Gaia DR3 / CatWISE) near (ra, dec).
-    Explicitly labels provenance as either 'Curated Reference Catalog (Demo)'
-    or 'Live ESA Gaia TAP'.
+    Queries Gaia DR3 near the requested position, preserving catalog provenance.
     """
     return await catalog_service.query_catalog(
         ra=ra,
