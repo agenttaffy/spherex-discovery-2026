@@ -52,6 +52,8 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations: se
   const knownRdraThird = searchObservations.findIndex(o => o.obs_id === '2026W17_1B_0434_4' && o.detector === 'SPHEREx-D6' && Math.abs(o.ra - 248.16722768733652) < 0.00015 && Math.abs(o.dec - 66.75502445923215) < 0.00015);
   const knownEpsilonFirst = searchObservations.findIndex(o => o.obs_id === '2025W17_4B_0027_3' && o.detector === 'SPHEREx-D5' && Math.abs(o.ra - 331.09813086506205) < 0.00015 && Math.abs(o.dec + 56.801144263858404) < 0.00015);
   const knownEpsilonSecond = searchObservations.findIndex(o => o.obs_id === '2026W17_2A_0308_3' && o.detector === 'SPHEREx-D5' && Math.abs(o.ra - 331.09813086506205) < 0.00015 && Math.abs(o.dec + 56.801144263858404) < 0.00015);
+  const knownRwFirst = searchObservations.findIndex(o => o.obs_id === '2025W36_1A_0606_2' && o.detector === 'SPHEREx-D1' && o.collection === 'spherex_dr1' && Math.abs(o.ra - 76.95658820303035) < 0.00015 && Math.abs(o.dec - 30.401287398865755) < 0.00015);
+  const knownRwSecond = searchObservations.findIndex(o => o.obs_id === '2026W10_1A_0445_2' && o.detector === 'SPHEREx-D1' && o.collection === 'spherex_dr1' && Math.abs(o.ra - 76.95658820303035) < 0.00015 && Math.abs(o.dec - 30.401287398865755) < 0.00015);
   const extraIds = extraStackIds.filter(id => observations.some(o => o.id === id && o.detector === obs1?.detector) && id !== obs1?.id && id !== obs2?.id);
   const draftIds = draftExtraIds.filter(id => observations.some(o => o.id === id && o.detector === obs1?.detector) && id !== obs1?.id && id !== obs2?.id);
   const extraKey = extraIds.join('|');
@@ -184,7 +186,9 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations: se
                 {calibration.calibrations.map(source => <li key={source.observation_id}>
                   <a className="underline" href={source.calibration_url}>{source.observation_id} calibration</a>
                   <p className="text-slate-300">Plane {source.plane_id}</p>
-                  <p className="text-slate-300">MD5 {source.md5}</p>
+                  <p className="text-slate-300">MD5 {source.md5} · {source.checksum_source}</p>
+                  {source.sha256 && <p className="text-slate-300">SHA-256 {source.sha256}</p>}
+                  {source.association_url && <a className="underline" href={source.association_url}>IRSA association for a checked example using this calibration ID</a>}
                 </li>)}
               </ul>
             </details>}
@@ -353,6 +357,18 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations: se
               if (draftIds.length && stackMethod === 'median') setStackMethod('mean');
             }}>Apply {draftIds.length} additional exposure{draftIds.length === 1 ? '' : 's'}</button>
           </details>
+        )}
+        {!curated && Math.abs(fov - 0.04) < 0.000001 && knownRwFirst >= 0 && knownRwSecond >= 0 && (
+          <div className="mt-3">
+            <button type="button" className="rounded border border-cyan-700 px-3 py-1.5 text-xs text-cyan-200 hover:bg-cyan-950" onClick={() => {
+              setIndex1(knownRwFirst);
+              setIndex2(knownRwSecond);
+              setExtraStackIds([]);
+              setDraftExtraIds([]);
+              setOpMode('diff');
+            }}>Try checked RW Aurigae D1 field pair</button>
+            <p className="mt-1 text-xs text-slate-300">A previous run retained 218 of 529 field pixels. Each run rechecks compatibility; target detection and motion are unconfirmed.</p>
+          </div>
         )}
         {!curated && Math.abs(fov - 0.04) < 0.000001 && knownEpsilonFirst >= 0 && knownEpsilonSecond >= 0 && (
           <div className="mt-3">
@@ -555,6 +571,9 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations: se
                     <a className="text-cyan-200 underline" href={source.calibration_url}>
                       {source.observation_id} · {source.science_release.toUpperCase()} calibration
                     </a>
+                    <span className="block text-slate-300">{source.checksum_source}</span>
+                    {source.sha256 && <span className="block break-all text-slate-300">SHA-256 {source.sha256}</span>}
+                    {source.association_url && <a className="text-cyan-200 underline" href={source.association_url}>IRSA association for a checked example using this calibration ID</a>}
                   </li>
                 ))}
               </ul>

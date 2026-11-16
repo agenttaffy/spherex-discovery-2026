@@ -475,7 +475,8 @@ Testing IRSA SIA connectivity to: https://irsa.ipac.caltech.edu/SIA?COLLECTION=s
 
 ## Cloud and clean-checkout verification (2026-11-15)
 
-- Backend: 272 passed and 4 skipped on the working checkout; a clean checkout without downloaded FITS data passed 265 tests and skipped 11. Three expected Astropy warnings arose from malformed-data and WCS test fixtures.
-- Frontend production build and six focused navigation, blink, CSV, cache, provenance, and spectrum checks passed. The build reports a large Aladin bundle.
+- Backend: 276 passed and 4 skipped on the working checkout; a clean checkout without downloaded FITS data passed 269 tests and skipped 11. Three expected Astropy warnings arose from malformed-data and WCS test fixtures.
+- Frontend production build and seven focused navigation, blink, CSV, sharing, cache, provenance, and spectrum checks passed. The build reports a large Aladin bundle.
 - A real Epsilon Indi D5 field pair returned 485 of 529 valid field pixels for difference, mean and sum at the checked position and field size. These are field comparisons, not a confirmed detection or motion measurement.
-- Live deep-field SIA searches timed out. Some detector calibration associations remain unverified, and visual end-to-end testing of the newest controls is outstanding.
+- IRSA DataLink and cross-mirror checks established example calibration associations for D1, D2 and D4; reuse for other images with the same detector and UUID is an inference, as documented in the detector calibration audit. A checked RW Aurigae D1 field pair retained 218/529 pixels; the screenshot pair failed wavelength compatibility. A checked Epsilon Indi D2 field pair retained 486/529 pixels. Neither field test confirms a target detection or motion.
+- Live deep-field SIA searches timed out. Unknown calibration identifiers remain unavailable, and visual end-to-end testing of the newest controls is outstanding.

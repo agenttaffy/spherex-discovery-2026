@@ -12,6 +12,22 @@ from app.services.spectral_calibration_service import find_calibration_artifact
 from app.services import spectral_calibration_service as calibration
 
 
+@pytest.mark.parametrize(("detector", "plane", "checksum", "sha256"), [
+    ("1", "019f4f98-edf0-744b-9600-424841d46dc0", "624790eba5fdde40a6cb2187099e415d", "44fb48b236e25a99d42c8986da0064cc58359527e1fc76e182eda52371a1ae23"),
+    ("2", "019f4f99-03f1-7376-a5a0-676318f2ddb6", "af87630c33716cd77ae54ab6c63d388d", "0eb4e27f351e6161e21372818f9e811480a7ab8bab9295722f180791e151a463"),
+    ("4", "019f4f99-3265-766b-b368-e28eb08fdbed", "438a1d94ca7b392cf854f68d18bfd7db", "dbdcb8addb4ffe817f31786c8cb359b1f47df3528173e9d4602b94c84f7d7c1a"),
+])
+def test_verified_datalink_mapping_is_exact_and_labels_digest_source(detector, plane, checksum, sha256):
+    artifact = calibration.verified_artifact("dr1", detector, plane)
+    assert artifact is not None
+    assert artifact.checksum == checksum and artifact.sha256 == sha256
+    assert "Locally computed MD5" in artifact.checksum_source
+    assert "datalink/links/spherex" in artifact.association_url
+    assert calibration.verified_artifact("dr1", "6", plane) is None
+    assert calibration.verified_artifact("dr1", detector, "00000000-0000-0000-0000-000000000000") is None
+    assert calibration.verified_artifact("qr3", detector, plane) == artifact
+
+
 @pytest.mark.parametrize(("detector", "plane_id", "checksum"), [
     ("3", "019f4f99-19af-763f-8f2e-b7dc6cd00055", "327f973e59efeaa101bf1fe9ac7c354e"),
     ("5", "019f4f99-48fc-73a4-b778-eb25bf616d6b", "d59bd98b5d1d14ae8d74499b1c1ccb3f"),
@@ -158,3 +174,12 @@ def test_calibration_never_accepts_unverified_download_or_arbitrary_source():
             calibration.download_verified_bytes(client, artifact)
         with pytest.raises(ValueError, match="Unsupported"):
             calibration.download_verified_bytes(client, calibration.CalibrationArtifact("plane", "https://evil.example/file", "0" * 32))
+
+
+def test_cross_mirror_digest_requires_both_md5_and_sha256():
+    body = b"test calibration bytes"
+    url = "https://irsa.ipac.caltech.edu/ibe/data/spherex/dr1/spectral_wcs/cal-swcs-v5-2026-191/1/spectral_wcs_D1.fits"
+    artifact = calibration.CalibrationArtifact("plane", url, hashlib.md5(body).hexdigest(), sha256="0" * 64)
+    with httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(200, content=body))) as client:
+        with pytest.raises(ValueError, match="could not be downloaded"):
+            calibration.download_verified_bytes(client, artifact)

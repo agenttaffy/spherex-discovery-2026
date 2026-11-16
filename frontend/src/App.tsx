@@ -11,6 +11,7 @@ import { AboutPage } from './pages/AboutPage';
 import { GuidedTourModal } from './components/layout/GuidedTourModal';
 import { DiscoveryReportModal } from './components/science/DiscoveryReportModal';
 import { CubeView } from './components/science/CubeView';
+import { applyCubeSharePosition, type SkyPosition } from './components/science/cubeShare';
 import { OrbitalIntro } from './components/layout/OrbitalIntro';
 import {
   ObservationRecord,
@@ -65,6 +66,7 @@ export const App: React.FC = () => {
   // UI & Stretch state
   const [stretch, setStretch] = useState('asinh');
   const [colormap, setColormap] = useState('grayscale');
+  const [displayedCube, setDisplayedCube] = useState<SkyPosition | null>(null);
   const [isBlinkActive, setIsBlinkActive] = useState(false);
 
   // Gaia DR3 & Photometry Science state
@@ -83,6 +85,7 @@ export const App: React.FC = () => {
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [reportData, setReportData] = useState<DiscoveryReport | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
 
   // Loading states
   const [loadingObs, setLoadingObs] = useState(false);
@@ -98,6 +101,11 @@ export const App: React.FC = () => {
 
   const targetName = presets.find((preset) => preset.id === selectedPresetId)?.name
     ?? (searchedTarget ? 'Custom coordinates' : 'Sky explorer');
+  const cubeDraftRa = Number(ra), cubeDraftDec = Number(dec);
+  // A cube deep link can still be loaded when the separate image search fails.
+  const cubeDraftPosition = ra.trim() && dec.trim() && Number.isFinite(cubeDraftRa) && Number.isFinite(cubeDraftDec)
+    && cubeDraftRa >= 0 && cubeDraftRa < 360 && cubeDraftDec >= -90 && cubeDraftDec <= 90
+    ? { ra: cubeDraftRa, dec: cubeDraftDec } : null;
   const workspaceStatus = loadingObs ? 'Searching the archive'
     : loadingFrame ? 'Loading cutout'
       : observations.length > 0 ? `${observations.length} observation${observations.length === 1 ? '' : 's'}${observations.length >= 60 ? ' shown (limit)' : ''}`
@@ -364,6 +372,11 @@ export const App: React.FC = () => {
 
   // Share URL Deep Link
   const handleCopyShareLink = async () => {
+    if (activeTab === 'cube' && !displayedCube) {
+      setShareError('Load a spectrum successfully before sharing this 102 Bands view.');
+      return;
+    }
+    setShareError(null);
     const url = new URL(window.location.href);
     if (activeTab !== 'explorer') {
       url.searchParams.set('tab', activeTab);
@@ -384,6 +397,7 @@ export const App: React.FC = () => {
       url.searchParams.delete('obs');
       url.searchParams.delete('obs_detector');
     }
+    if (activeTab === 'cube') applyCubeSharePosition(url, displayedCube);
     window.history.replaceState({}, '', url.toString());
 
     try {
@@ -391,7 +405,7 @@ export const App: React.FC = () => {
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 2000);
     } catch {
-      setErrorMessage('The share link is in the address bar; copy it from there.');
+      setShareError('The share link is in the address bar; copy it from there.');
     }
   };
 
@@ -447,6 +461,9 @@ export const App: React.FC = () => {
         copiedLink={copiedLink}
         onRefreshConnection={refreshConnectionStatus}
       />
+      {shareError && <div role="alert" className="bg-rose-950/80 px-4 py-2 text-xs text-rose-100 flex justify-between gap-3">
+        <span>{shareError}</span><button type="button" aria-label="Dismiss share message" onClick={() => setShareError(null)}>✕</button>
+      </div>}
 
       {/* Main Workspace Layout */}
       <main id="main-workspace" className="observatory-main flex flex-col flex-1 min-h-0 relative">
@@ -455,7 +472,7 @@ export const App: React.FC = () => {
         ) : activeTab === 'diff' ? (
           <ComparisonView observations={observations} fov={searchedQuery?.fov ?? fov} namedTarget={!!selectedPresetId} demoCacheOnly={demoCacheOnly} />
         ) : activeTab === 'cube' ? (
-          <div className="observatory-panel flex-1 min-h-0 overflow-y-auto"><CubeView target={searchedTarget ?? presets.find(preset => preset.id === selectedPresetId) ?? null} /></div>
+          <div className="observatory-panel flex-1 min-h-0 overflow-y-auto"><CubeView target={searchedTarget ?? cubeDraftPosition ?? presets.find(preset => preset.id === selectedPresetId) ?? null} onDisplayedPosition={setDisplayedCube} /></div>
         ) : (
           <>
             {/* Mobile Panel Switcher & Observation Identity Strip (< lg) */}

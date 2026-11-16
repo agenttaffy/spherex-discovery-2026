@@ -103,6 +103,9 @@ export interface ComparisonCalibration {
     plane_id: string;
     calibration_url: string;
     md5: string;
+    checksum_source: string;
+    association_url: string | null;
+    sha256: string | null;
   }>;
 }
 

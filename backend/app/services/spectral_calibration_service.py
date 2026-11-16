@@ -31,6 +31,11 @@ class CalibrationArtifact:
     plane_id: str
     url: str
     checksum: str
+    # Most mappings use an independently published IRSA TAP checksum. Other
+    # sources must be named explicitly and must never masquerade as TAP metadata.
+    checksum_source: str = "IRSA TAP published MD5"
+    association_url: str | None = None
+    sha256: str | None = None
 
 
 # IRSA TAP job 28334899. Both DR1 and QR3 science headers reference this UUID.
@@ -41,8 +46,42 @@ _VERIFIED_D6 = CalibrationArtifact(
     "e665c189ad63ca0cd032c0797e8aabf2",
 )
 
-# Exact completed IRSA TAP jobs 28349004 (D3) and 28350118 (D5).
+# Evidence source is recorded on each artifact. D3 and D5 are from exact
+# completed IRSA TAP jobs 28349004 and 28350118, respectively.
 _VERIFIED_ARTIFACTS = {
+    # DataLink for each linked science observation returned the named spectral
+    # WCS product; that exact science FITS HISTORY names the UUID below. Using
+    # the mapping for another exposure is an inference from the same globally
+    # identifying plane UUID and detector, not a fresh DataLink check of that
+    # exposure. Both digests were computed locally from separately downloaded
+    # identical IRSA and S3 bytes; they are not published IRSA TAP checksums.
+    ("dr1", "1", "019f4f98-edf0-744b-9600-424841d46dc0"): CalibrationArtifact(
+        "019f4f98-edf0-744b-9600-424841d46dc0",
+        f"{IRSA_HOST}/ibe/data/spherex/dr1/spectral_wcs/cal-swcs-v5-2026-191/1/"
+        "spectral_wcs_D1_spx_cal-swcs-v5-2026-191.fits",
+        "624790eba5fdde40a6cb2187099e415d",
+        "Locally computed MD5; identical IRSA and public S3 mirror bytes",
+        "https://irsa.ipac.caltech.edu/datalink/links/spherex?ID=ivo%3A%2F%2Firsa.ipac%2Fspherex_dr1%3F2025W36_1A_0095_1%2FD1",
+        "44fb48b236e25a99d42c8986da0064cc58359527e1fc76e182eda52371a1ae23",
+    ),
+    ("dr1", "2", "019f4f99-03f1-7376-a5a0-676318f2ddb6"): CalibrationArtifact(
+        "019f4f99-03f1-7376-a5a0-676318f2ddb6",
+        f"{IRSA_HOST}/ibe/data/spherex/dr1/spectral_wcs/cal-swcs-v5-2026-191/2/"
+        "spectral_wcs_D2_spx_cal-swcs-v5-2026-191.fits",
+        "af87630c33716cd77ae54ab6c63d388d",
+        "Locally computed MD5; identical IRSA and public S3 mirror bytes",
+        "https://irsa.ipac.caltech.edu/datalink/links/spherex?ID=ivo%3A%2F%2Firsa.ipac%2Fspherex_dr1%3F2026W17_2A_0308_3%2FD2",
+        "0eb4e27f351e6161e21372818f9e811480a7ab8bab9295722f180791e151a463",
+    ),
+    ("dr1", "4", "019f4f99-3265-766b-b368-e28eb08fdbed"): CalibrationArtifact(
+        "019f4f99-3265-766b-b368-e28eb08fdbed",
+        f"{IRSA_HOST}/ibe/data/spherex/dr1/spectral_wcs/cal-swcs-v5-2026-191/4/"
+        "spectral_wcs_D4_spx_cal-swcs-v5-2026-191.fits",
+        "438a1d94ca7b392cf854f68d18bfd7db",
+        "Locally computed MD5; identical IRSA and public S3 mirror bytes",
+        "https://irsa.ipac.caltech.edu/datalink/links/spherex?ID=ivo%3A%2F%2Firsa.ipac%2Fspherex_dr1%3F2026W17_1B_0162_3%2FD4",
+        "dbdcb8addb4ffe817f31786c8cb359b1f47df3528173e9d4602b94c84f7d7c1a",
+    ),
     ("dr1", "3", "019f4f99-19af-763f-8f2e-b7dc6cd00055"): CalibrationArtifact(
         "019f4f99-19af-763f-8f2e-b7dc6cd00055",
         f"{IRSA_HOST}/ibe/data/spherex/dr1/spectral_wcs/cal-swcs-v5-2026-191/3/"
@@ -78,7 +117,8 @@ def verified_cached_bytes(artifact: CalibrationArtifact) -> bytes | None:
             data = path.read_bytes()
         except OSError:
             continue
-        if hashlib.md5(data).hexdigest() == artifact.checksum:
+        if (hashlib.md5(data).hexdigest() == artifact.checksum
+                and (artifact.sha256 is None or hashlib.sha256(data).hexdigest() == artifact.sha256.lower())):
             return data
     return None
 
@@ -92,7 +132,8 @@ def download_verified_bytes(client: httpx.Client, artifact: CalibrationArtifact)
     if not artifact.url.startswith(IRSA_HOST + "/"):
         raise ValueError("Unsupported calibration source")
     path = artifact.url.removeprefix(IRSA_HOST)
-    if not _PATH.fullmatch(path) or not _CHECKSUM.fullmatch(artifact.checksum):
+    if (not _PATH.fullmatch(path) or not _CHECKSUM.fullmatch(artifact.checksum)
+            or (artifact.sha256 is not None and not re.fullmatch(r"[a-fA-F0-9]{64}", artifact.sha256))):
         raise ValueError("Unsupported calibration path or checksum")
     cloud = "https://nasa-irsa-spherex.s3.us-east-1.amazonaws.com" + path.removeprefix("/ibe/data/spherex")
     last_error = None
@@ -108,6 +149,8 @@ def download_verified_bytes(client: httpx.Client, artifact: CalibrationArtifact)
             data = bytes(content)
             if hashlib.md5(data).hexdigest() != artifact.checksum.lower().removeprefix("md5:"):
                 raise ValueError("Spectral calibration checksum mismatch")
+            if artifact.sha256 is not None and hashlib.sha256(data).hexdigest() != artifact.sha256.lower():
+                raise ValueError("Spectral calibration SHA-256 mismatch")
             return data
         except (httpx.HTTPError, OSError, ValueError) as exc:
             last_error = exc

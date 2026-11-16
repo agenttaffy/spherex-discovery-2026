@@ -146,6 +146,7 @@ export const SearchControls: React.FC<SearchControlsProps> = ({
 
       {/* Query Parameters */}
       <div className="border-t border-slate-800/80 pt-3 space-y-3">
+        <p className="text-[11px] text-slate-300">Changes to field of view, release, or detector apply when you select Discover Observations.</p>
         <div>
           <label className="text-xs font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-1.5 mb-1.5">
             <Layers className="w-3.5 h-3.5 text-cyan-400" />

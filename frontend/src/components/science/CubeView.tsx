@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { cubeSpectrumCsv, type CubeData } from './cubeCsv';
 import { detectorChannels, firstUsefulChannel, nextMeasuredChannel } from './bandNavigation';
+import { displayedCubePosition, type SkyPosition } from './cubeShare';
 
 const channelStatuses: Record<string, string> = {
   measured: 'Measured',
@@ -10,7 +11,10 @@ const channelStatuses: Record<string, string> = {
   missing_wavelength: 'Wavelength unavailable',
 };
 
-export function CubeView({ target }: { target: { ra: number; dec: number } | null }) {
+export function CubeView({ target, onDisplayedPosition }: {
+  target: { ra: number; dec: number } | null;
+  onDisplayedPosition: (position: SkyPosition | null) => void;
+}) {
   const [editedRa, setRa] = useState<string | null>(null);
   const [editedDec, setDec] = useState<string | null>(null);
   const ra = editedRa ?? String(target?.ra ?? 269.45208);
@@ -20,6 +24,11 @@ export function CubeView({ target }: { target: { ra: number; dec: number } | nul
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [scanning, setScanning] = useState(false);
+
+  useEffect(() => {
+    onDisplayedPosition(displayedCubePosition(data, query));
+  }, [data, query, onDisplayedPosition]);
+  useEffect(() => () => onDisplayedPosition(null), [onDisplayedPosition]);
 
   useEffect(() => {
     if (!query) return;
@@ -120,6 +129,7 @@ export function CubeView({ target }: { target: { ra: number; dec: number } | nul
         <form className="glass-card flex flex-wrap items-end gap-3 p-3" onSubmit={event => {
           event.preventDefault();
           setScanning(false);
+          onDisplayedPosition(null);
           setData(null);
           setQuery({ ra, dec, channel: 1 });
         }}>

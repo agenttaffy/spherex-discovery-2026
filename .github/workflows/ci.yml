@@ -41,6 +41,7 @@ jobs:
           node scripts/test-band-navigation.mjs
           node scripts/test-blink-selection.mjs
           node scripts/test-cube-csv.mjs
+          node scripts/test-cube-share.mjs
           node scripts/test-frame-cache.mjs
           node scripts/test-image-provenance.mjs
           node scripts/test-quick-spectrum.mjs

@@ -164,6 +164,9 @@ def _validated_comparison(cutouts: list[bytes], metadata: list[dict]) -> dict:
                 "observation_id": obs_id, "science_release": release,
                 "plane_id": artifact.plane_id, "calibration_url": artifact.url,
                 "md5": artifact.checksum,
+                "checksum_source": artifact.checksum_source,
+                "association_url": artifact.association_url,
+                "sha256": artifact.sha256,
             })
     ordered_intervals = sorted(intervals)
     if any(current[0] < previous[1] for previous, current in zip(ordered_intervals, ordered_intervals[1:])):
