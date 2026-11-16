@@ -49,7 +49,15 @@ Queries NASA IRSA SIA2 service (with automatic local manifest fallback) for SPHE
 - `detector` (string, optional): Filter by detector array (e.g. `SPHEREx-D1` to `SPHEREx-D6`).
 - `limit` (int, optional, default: `50`): Max observations returned.
 
-`total_found` counts returned records, not necessarily the full archive. `total_found_is_lower_bound` is true when the requested limit is reached or records come from a historical/demo fallback. An empty result does not by itself distinguish no coverage from an archive outage.
+`total_found` counts returned records, not necessarily the full archive. `archive_search_status` reports the outcome of this request's live image-search queries:
+
+- `available`: every requested collection returned a valid SIA table; that table may contain zero rows.
+- `partial`: at least one collection returned a valid table and another failed or was unavailable.
+- `unavailable`: no requested live collection succeeded because the archive could not be queried.
+- `not_checked`: cache-only mode did not attempt a live search.
+- `unknown`: the caller did not provide a search outcome.
+
+The status describes the live search, while each observation's `search_provenance` separately describes where its metadata came from. Thus a response can report an unavailable live search and still return explicitly labeled saved or demonstration records. `total_found_is_lower_bound` is true for non-`available` status, deep-field queries, results reaching the requested limit, or historical/demo fallback records. A successful empty table means no rows were returned for the query; it does not independently guarantee the absence of coverage or source detection.
 
 ---
 

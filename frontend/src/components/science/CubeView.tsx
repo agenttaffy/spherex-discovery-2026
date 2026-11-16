@@ -14,7 +14,7 @@ const channelStatuses: Record<string, string> = {
 export function CubeView({ target, onDisplayedPosition, autoLoadPosition, onAutoLoadConsumed }: {
   target: { ra: number; dec: number } | null;
   onDisplayedPosition: (position: SkyPosition | null) => void;
-  autoLoadPosition: SkyPosition | null;
+  autoLoadPosition: (SkyPosition & { pinnedCloud?: boolean }) | null;
   onAutoLoadConsumed: () => void;
 }) {
   const [editedRa, setRa] = useState<string | null>(null);
@@ -22,7 +22,7 @@ export function CubeView({ target, onDisplayedPosition, autoLoadPosition, onAuto
   const ra = editedRa ?? String(target?.ra ?? 269.45208);
   const dec = editedDec ?? String(target?.dec ?? 4.69339);
   const [query, setQuery] = useState<{ ra: string; dec: string; channel: number; forceArchive?: boolean; pinnedCloud?: boolean } | null>(
-    () => autoLoadPosition ? { ra: String(autoLoadPosition.ra), dec: String(autoLoadPosition.dec), channel: 1 } : null
+    () => autoLoadPosition ? { ra: String(autoLoadPosition.ra), dec: String(autoLoadPosition.dec), channel: 1, pinnedCloud: autoLoadPosition.pinnedCloud } : null
   );
   const [data, setData] = useState<CubeData | null>(null);
   const [error, setError] = useState('');
@@ -172,7 +172,8 @@ export function CubeView({ target, onDisplayedPosition, autoLoadPosition, onAuto
             ) : data.source === 'cloud_dr1_pinned' ? (
               <section className="glass-card px-3 py-2 text-sm text-amber-200" aria-label="Cube sample source">
                 <p>Cloud DR1 cube · pinned {data.cloud?.pinned_version ?? 'release'}</p>
-                <p className="text-slate-300">The IRSA search did not provide a usable tile URL. This dated release was read directly from the public cloud; it may not be the newest product.</p>
+                <p className="text-slate-300">{query.pinnedCloud ? 'This view reads a specific DR1 release directly from the public cloud.' : 'The IRSA search did not provide a usable tile URL, so this view reads a specific DR1 release directly from the public cloud.'} Use Check latest IRSA cube to look for a newer product.</p>
+                <button type="button" disabled={loading} onClick={() => setQuery({ ...query, forceArchive: true, pinnedCloud: false })} className="mt-2 mr-3 rounded border border-cyan-500/60 px-3 py-1 text-cyan-200 disabled:opacity-50">Check latest IRSA cube</button>
                 {data.cloud?.cloud_url && <a className="text-cyan-200 underline break-all" href={data.cloud.cloud_url}>Cloud FITS source</a>}
               </section>
             ) : (

@@ -7,6 +7,8 @@
 
 Chrome verification covered direct 102 Bands links, timeline playback, the Gaia DR3 search, and the checked RW Aurigae difference and co-add. The comparison cards identify excluded pixels with a checkerboard. [Browser verification](TEST_RESULTS.md#browser-verification-2026-11-15)
 
+Explorer distinguishes IRSA search outages from a valid empty result. When no dated images are available, Explorer can show a labeled DR1 channel map from the public cloud at the requested coordinates. The timeline and calibrated comparisons still require dated observations.
+
 The main frontend now shares the orbital candidate’s blue-violet glass surfaces, local Geist and Instrument Serif fonts, and coral action accents. The Explorer frames the full FITS image at fit zoom with nearest-neighbor rendering. The existing research views and data sources remain in the same navigation. [Browser and science checks](TEST_RESULTS.md#glass-observatory-integration)
 **Earlier implementation milestone:** Phase 8 Scientific Truthfulness Pass (Neutral Broadband Continuum Shape Descriptions Without Astrobiological/Stellar Class Inferences, Strict Temperature Fit Constraints Requiring >= 3 Distinct Bands with Propagated Uncertainties, Unavailable Zero-Observation Summary Metrics Without Synthetic Peak Claims, Explicit Unavailable Photometry State on Projection Failure, Missing Quality Mask State Without Guessing Bits, Uncensored SNR Improvement Estimator in Stacking, Preserved NaN/Inf Masks Without Fabricated Fill Values, Diverging Difference Palettes, 102-Channel Accessible Spectrophotometric Continuum Tables, 93 Passing Pytest Tests, 41 Passing Accessibility Checks, Clean Production Build).
 

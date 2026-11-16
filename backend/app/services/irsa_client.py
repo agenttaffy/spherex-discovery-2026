@@ -18,6 +18,30 @@ SIA_REQUIRED_FIELDS = {"obs_id", "energy_bandpassname", "access_url", "t_min"}
 DEEP_COLLECTIONS = ("spherex_dr1_deep", "spherex_qr3_deep")
 
 
+class ObservationResults(list):
+    """List-compatible rows plus the outcome of this specific archive search.
+
+    The status is request-local, so overlapping searches cannot overwrite one
+    another. Row provenance still separately identifies cached/survey records.
+    """
+    def __init__(self, rows=(), archive_search_status: str = "unknown"):
+        super().__init__(rows)
+        self.archive_search_status = archive_search_status
+
+
+def _combined_search_status(groups) -> str:
+    statuses = [getattr(group, "archive_search_status", "unknown") for group in groups]
+    if not statuses or "unknown" in statuses:
+        return "unknown"
+    if all(status == "available" for status in statuses):
+        return "available"
+    if any(status in {"available", "partial"} for status in statuses):
+        return "partial"
+    if all(status == "not_checked" for status in statuses):
+        return "not_checked"
+    return "unavailable"
+
+
 def _finite_number(value: Any) -> Optional[float]:
     try:
         number = float(value)
@@ -114,13 +138,14 @@ class IRSAClient:
                 if len(merged) >= limit:
                     break
             merged.sort(key=lambda record: (record.mjd is None, record.mjd or 0.0))
-            return merged
+            return ObservationResults(merged, _combined_search_status(groups))
 
         now = time.time()
         if DEMO_CACHE_ONLY or now < self._offline_until or now < self._offline_by_collection.get(collection, 0.0):
             # During the cooldown, don't keep retrying a failing archive just
             # because this particular sky position has no saved results.
-            return self._offline_observations(ra, dec, radius_deg, collection, detector, limit)
+            fallback = self._offline_observations(ra, dec, radius_deg, collection, detector, limit)
+            return ObservationResults(fallback, "not_checked" if DEMO_CACHE_ONLY else "unavailable")
 
         params = {
             "POS": f"circle {ra:.6f} {dec:.6f} {radius_deg:.4f}",
@@ -209,7 +234,7 @@ class IRSAClient:
             fallback = self._offline_observations(ra, dec, radius_deg, collection, detector, limit)
             if fallback:
                 print(f"[IRSAClient] Using {len(fallback)} attributed offline observations for ({ra:.4f}, {dec:.4f})")
-                return fallback
+                return ObservationResults(fallback, "unavailable")
         # If archive is offline or query returned no records, check verified demonstration dataset
         if not records:
             from app.services.demo_service import demo_service
@@ -223,7 +248,7 @@ class IRSAClient:
             fallback = [record for record in fallback if record.collection == collection]
             if fallback:
                 print(f"[IRSAClient] Using {len(fallback)} verified demonstration observations for ({ra:.4f}, {dec:.4f})")
-                return fallback[:limit]
+                return ObservationResults(fallback[:limit], "unavailable" if search_failed else "available")
 
         # Sort chronologically by UTC / MJD
         records.sort(key=lambda x: (x.mjd is None, x.mjd or 0.0))
@@ -235,7 +260,7 @@ class IRSAClient:
             else:
                 records = [records[round(i * (len(records) - 1) / (limit - 1))] for i in range(limit)]
         OBSERVATION_REGISTRY.update({record.id: candidate_metadata[record.id] for record in records})
-        return records
+        return ObservationResults(records, "unavailable" if search_failed else "available")
 
     async def check_connectivity(self) -> bool:
         """

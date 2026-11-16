@@ -485,4 +485,6 @@ Testing IRSA SIA connectivity to: https://irsa.ipac.caltech.edu/SIA?COLLECTION=s
 
 - A local Chrome browser opened the Epsilon Indi coordinate link in embed mode, automatically loaded the cached DR1 spectrum with 102 channel slots, and displayed the wavelength scan control.
 - The RW Aurigae DR1/D1 search returned 38 records during this check. Choosing the checked pair in the browser produced the difference and a two-exposure co-add, each with 218/529 retained field pixels. The comparison view uses a labeled checkerboard for pixels excluded from either calculation.
-- Epsilon Indi time-lapse advanced from observation 1 to 2. Enabling the Gaia DR3 overlay returned 153 reference sources for that field.
+- Epsilon Indi time-lapse advanced from observation 1 to 2. Enabling the Gaia DR3 overlay returned 153 reference sources. Chrome also loaded AllWISE imagery and displayed the SPHEREx footprint over the settled sky view.
+- M57 (RA 283.39617°, Dec +33.02918°) returned an explicit IRSA search outage with no saved dated frames. The Explorer loaded the official AWS DR1 cube at the same coordinates, displaying 610 of 625 native channel-1 pixels. The 102 Bands view showed 100 measured channels after opening it from Explorer. The mosaic is co-added across dates and does not enable playback or comparison.
+- Full local backend suite after the search status update: 282 passed, 4 skipped and 3 expected Astropy warnings. Tests distinguish successful empty searches, outages, and partial releases.

@@ -42,11 +42,13 @@ async def get_observations(
         limit=limit,
     )
 
+    search_status = getattr(records, "archive_search_status", "unknown")
     return ObservationQueryResponse(
         target={"ra": ra_deg, "dec": dec_deg, "fov": fov},
         collection=collection,
         total_found=len(records),
-        total_found_is_lower_bound=(collection.upper() == "DEEP" or collection.lower().endswith("_deep") or len(records) >= limit or any(
+        archive_search_status=search_status,
+        total_found_is_lower_bound=(search_status != "available" or collection.upper() == "DEEP" or collection.lower().endswith("_deep") or len(records) >= limit or any(
             record.search_provenance in {"saved_irsa_search", "cached_demo", "demo_metadata", "cloud_header_survey"} for record in records
         )),
         returned_count=len(records),

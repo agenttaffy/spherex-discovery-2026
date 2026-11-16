@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { CubeChannel } from './cubeCsv';
+import type { CubeChannel, CubeData } from './cubeCsv';
 import { measuredSkyPixels } from './quickSpectrumModel';
 
 type Preview = {
@@ -7,21 +7,28 @@ type Preview = {
   tile: number;
   pixel: { ra: number; dec: number };
   preview?: { generated_on?: string };
+  cloud?: { pinned_version?: string | null };
   channels: CubeChannel[];
 };
 type State = { key: string; preview?: Preview; error?: string } | null;
 
 /** Lightweight inspector view. It never launches an archive or cloud tile download. */
-export function QuickSkySpectrum({ position, enabled, onOpenCube }: {
+export function QuickSkySpectrum({ position, enabled, fieldCube = null, onOpenCube }: {
   position: { ra: number; dec: number } | null;
   enabled: boolean;
+  fieldCube?: CubeData | null;
   onOpenCube: () => void;
 }) {
   const key = position ? `${position.ra},${position.dec}` : '';
   const [state, setState] = useState<State>(null);
+  const matchingFieldCube = position && fieldCube && fieldCube.ra === position.ra && fieldCube.dec === position.dec
+    && Array.isArray(fieldCube.channels) && fieldCube.channels.length === 102
+    && fieldCube.channels.every(point => point && typeof point === 'object') && Number.isFinite(fieldCube.tile)
+    && Number.isFinite(fieldCube.pixel?.ra) && Number.isFinite(fieldCube.pixel?.dec)
+    ? fieldCube : null;
 
   useEffect(() => {
-    if (!position || !enabled) return;
+    if (!position || !enabled || matchingFieldCube) return;
     const controller = new AbortController();
     setState(null);
     const params = new URLSearchParams({ ra: String(position.ra), dec: String(position.dec), source: 'preview_only' });
@@ -41,9 +48,16 @@ export function QuickSkySpectrum({ position, enabled, onOpenCube }: {
         if (!controller.signal.aborted) setState({ key, error: problem instanceof Error ? problem.message : 'The cached sky-pixel preview could not be loaded.' });
       });
     return () => controller.abort();
-  }, [key, enabled]);
+  }, [key, enabled, matchingFieldCube]);
 
-  const preview = state?.key === key ? state.preview : undefined;
+  const preview = matchingFieldCube || (state?.key === key ? state.preview : undefined);
+  const error = !matchingFieldCube && state?.key === key ? state.error : undefined;
+  const pending = !matchingFieldCube && state?.key !== key;
+  const sourceLabel = preview?.source === 'cloud_dr1_pinned'
+    ? `Public cloud DR1 cube${preview.cloud?.pinned_version ? ` · ${preview.cloud.pinned_version}` : ''}`
+    : preview?.source === 'irsa_archive'
+      ? `IRSA-discovered DR1 cube${preview.cloud ? ' · public cloud' : ''}`
+      : `Cached DR1 sample${preview?.preview?.generated_on ? ` · saved ${preview.preview.generated_on}` : ''}`;
   const points = preview ? measuredSkyPixels(preview.channels) : [];
   const values = points.map(point => point.surface_brightness_mjy_sr as number);
   const minimum = values.length ? Math.min(...values) : 0;
@@ -55,19 +69,19 @@ export function QuickSkySpectrum({ position, enabled, onOpenCube }: {
   const x = (wave: number) => 32 + (wave - minWave) / (maxWave - minWave) * 228;
   const y = (value: number) => 95 - (value - lower) / (upper - lower) * 75;
 
-  return <section className="rounded-lg border border-slate-700 bg-slate-950/90 p-3 space-y-2" aria-label="Cached sky-pixel spectrum">
+  return <section className="rounded-lg border border-slate-700 bg-slate-950/90 p-3 space-y-2" aria-label="DR1 sky-pixel spectrum">
     <div>
       <h3 className="text-xs font-semibold text-slate-100">DR1 sky-pixel spectrum</h3>
       <p className="text-[11px] text-slate-300">Co-added across dates; this is a sky pixel, not confirmed target photometry or a single observation.</p>
     </div>
     {!position ? <p className="text-xs text-slate-400">Search coordinates to inspect a cached sample.</p>
       : !enabled ? <p className="text-xs text-slate-400">Open analysis to load a cached sample.</p>
-      : state?.key !== key ? <p role="status" className="text-xs text-slate-300">Loading cached sample…</p>
-      : state.error ? <p role="status" className="text-xs text-amber-200">{state.error} Use 102 Bands to check the archive.</p>
-      : preview && points.length === 0 ? <p role="status" className="text-xs text-amber-200">The cached sky-pixel preview has no usable channels at this position. Use 102 Bands to check the archive.</p>
+      : pending ? <p role="status" className="text-xs text-slate-300">Loading cached sample…</p>
+      : error ? <p role="status" className="text-xs text-amber-200">{error} Use 102 Bands to check the archive.</p>
+      : preview && points.length === 0 ? <p role="status" className="text-xs text-amber-200">The DR1 sky-pixel sample has no usable channels at this position. Use 102 Bands to check the archive.</p>
       : preview && <>
         <p className="text-[11px] text-slate-300">{points.length} of 102 channel slots usable · {102 - points.length} gaps or flagged</p>
-        <svg viewBox="0 0 280 125" className="block w-full" role="img" aria-label={`Cached sky-pixel spectrum with ${points.length} measured channels. Horizontal axis is wavelength in micrometers; vertical axis is surface brightness in megajanskys per steradian. Missing channels have no points.`}>
+        <svg viewBox="0 0 280 125" className="block w-full" role="img" aria-label={`DR1 sky-pixel spectrum with ${points.length} measured channels. Horizontal axis is wavelength in micrometers; vertical axis is surface brightness in megajanskys per steradian. Missing channels have no points.`}>
           <text x="32" y="11" fill="#94a3b8" fontSize="8">Surface brightness (MJy/sr)</text>
           <line x1="32" y1="20" x2="32" y2="95" stroke="#64748b" />
           <line x1="32" y1="95" x2="260" y2="95" stroke="#64748b" />
@@ -78,7 +92,7 @@ export function QuickSkySpectrum({ position, enabled, onOpenCube }: {
           {points.map(point => <circle key={point.channel} cx={x(point.wavelength_um as number)} cy={y(point.surface_brightness_mjy_sr as number)} r="2" fill="#67e8f9" />)}
           <text x="146" y="122" textAnchor="middle" fill="#94a3b8" fontSize="8">Wavelength (µm)</text>
         </svg>
-        <p className="text-[10px] text-slate-400">Cached DR1 sample{preview.preview?.generated_on ? ` · saved ${preview.preview.generated_on}` : ''} · HPX tile {preview.tile}. No variance plane is available.</p>
+        <p className="text-[10px] text-slate-400">{sourceLabel} · HPX tile {preview.tile}. No variance plane is available.</p>
       </>}
     <button type="button" onClick={onOpenCube} className="rounded border border-cyan-700 px-2 py-1 text-xs text-cyan-200 hover:bg-cyan-950">Open 102 Bands</button>
   </section>;

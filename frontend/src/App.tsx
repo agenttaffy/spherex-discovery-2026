@@ -11,6 +11,8 @@ import { AboutPage } from './pages/AboutPage';
 import { GuidedTourModal } from './components/layout/GuidedTourModal';
 import { DiscoveryReportModal } from './components/science/DiscoveryReportModal';
 import { CubeView } from './components/science/CubeView';
+import { ExplorerCubePreview } from './components/science/ExplorerCubePreview';
+import type { CubeData } from './components/science/cubeCsv';
 import { applyCubeSharePosition, parseCubeDeepLink, type SkyPosition } from './components/science/cubeShare';
 import { findRequestedObservation, unavailableObservationMessage } from './services/observationSelection';
 import { OrbitalIntro } from './components/layout/OrbitalIntro';
@@ -24,6 +26,7 @@ import {
   DiscoveryReport,
 } from './types/astronomy';
 import {
+  type ArchiveSearchStatus,
   checkHealth,
   clearFrameCache,
   fetchObservations,
@@ -38,7 +41,7 @@ import {
 
 export const App: React.FC = () => {
   const [initialCubeLink] = useState(() => parseCubeDeepLink(new URLSearchParams(window.location.search)));
-  const [autoLoadCube, setAutoLoadCube] = useState<SkyPosition | null>(initialCubeLink);
+  const [autoLoadCube, setAutoLoadCube] = useState<(SkyPosition & { pinnedCloud?: boolean }) | null>(initialCubeLink);
   const consumeAutoLoadCube = useCallback(() => setAutoLoadCube(null), []);
   const [showIntro] = useState(() => {
     const { search, hash } = window.location;
@@ -97,6 +100,8 @@ export const App: React.FC = () => {
   const [frameError, setFrameError] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [observationWarning, setObservationWarning] = useState<string | null>(null);
+  const [archiveSearchStatus, setArchiveSearchStatus] = useState<ArchiveSearchStatus>('unknown');
+  const [fieldCube, setFieldCube] = useState<CubeData | null>(null);
 
   // Presets
   const [presets, setPresets] = useState<DemoPreset[]>([]);
@@ -114,7 +119,7 @@ export const App: React.FC = () => {
   const workspaceStatus = loadingObs ? 'Searching the archive'
     : loadingFrame ? 'Loading cutout'
       : observations.length > 0 ? `${observations.length} observation${observations.length === 1 ? '' : 's'}${observations.length >= 60 ? ' shown (limit)' : ''}`
-        : searchedTarget ? 'No observations returned; archive may be unavailable' : '';
+        : searchedTarget ? archiveSearchStatus === 'available' ? 'No matching observations' : 'No observations available' : '';
 
   const refreshConnectionStatus = useCallback(() => {
     setIrsaConnected(null);
@@ -217,6 +222,8 @@ export const App: React.FC = () => {
       setLoadingObs(true);
       setErrorMessage(null);
       setObservationWarning(null);
+      setArchiveSearchStatus('unknown');
+      setFieldCube(null);
       setFrameError(null);
       try {
         const res = await fetchObservations(searchRa, searchDec, searchFov, searchColl, searchDetector);
@@ -224,6 +231,7 @@ export const App: React.FC = () => {
         setSearchedTarget({ra: res.target.ra, dec: res.target.dec});
         setSearchedQuery({ra: res.target.ra, dec: res.target.dec, fov: searchFov, collection: searchColl, detector: searchDetector});
         setObservations(res.observations);
+        setArchiveSearchStatus(res.archive_search_status ?? 'unknown');
         let startIdx = 0;
         if (targetObsId) {
           const matchIdx = findRequestedObservation(res.observations, targetObsId, targetObsDetector);
@@ -376,6 +384,11 @@ export const App: React.FC = () => {
     const obs = observations[currentIndex];
     searchWithCoords(searchedQuery.ra, searchedQuery.dec, searchedQuery.fov, searchedQuery.collection,
       obs?.obs_id, searchedQuery.detector, stretch, obs?.detector);
+  };
+
+  const openSearchedCube = (pinnedCloud = fieldCube?.source === 'cloud_dr1_pinned') => {
+    if (searchedQuery) setAutoLoadCube({ ra: searchedQuery.ra, dec: searchedQuery.dec, pinnedCloud });
+    setActiveTab('cube');
   };
 
   // Share URL Deep Link
@@ -560,6 +573,14 @@ export const App: React.FC = () => {
                 {observationWarning && <div role="alert" className="bg-amber-950/70 border-b border-amber-800 text-amber-100 text-xs px-4 py-2 flex items-center justify-between gap-2">
                   <span>{observationWarning}</span><button type="button" onClick={() => setObservationWarning(null)} aria-label="Dismiss observation warning">✕</button>
                 </div>}
+                {searchedQuery && (archiveSearchStatus === 'partial' || (archiveSearchStatus === 'unavailable' && !observations.length)) && (
+                  <div role="status" className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 text-xs text-amber-100 bg-amber-950/40">
+                    <span>{archiveSearchStatus === 'partial'
+                      ? 'Some IRSA collections could not be searched. More observations may be available.'
+                      : 'IRSA image search is unavailable and there are no saved observations for this field.'}</span>
+                    <button type="button" onClick={retryAppliedSearch} className="underline text-cyan-200">Retry this search</button>
+                  </div>
+                )}
                 {frameError && (
                   <div role="alert" className="bg-rose-950/70 border-b border-rose-800 text-rose-200 text-xs px-4 py-2 flex flex-wrap items-center justify-between gap-2">
                     <span>{frameError} Playback paused.</span>
@@ -620,6 +641,9 @@ export const App: React.FC = () => {
                   targetDec={searchedTarget?.dec}
                   targetFov={searchedQuery?.fov ?? fov}
                   targetId={selectedPresetId || undefined}
+                  emptyFieldPreview={searchedQuery && !loadingObs && !observations.length && !demoCacheOnly && archiveSearchStatus !== 'not_checked'
+                    ? <ExplorerCubePreview ra={searchedQuery.ra} dec={searchedQuery.dec} onOpenCube={() => openSearchedCube(true)} onCubeLoaded={setFieldCube} />
+                    : undefined}
                 />
 
                 {/* Bottom Multi-Epoch Timeline & Blink Player */}
@@ -643,7 +667,8 @@ export const App: React.FC = () => {
                   namedTarget={!!selectedPresetId}
                   samplePosition={searchedTarget}
                   analysisEnabled={analysisOpen || mobilePanel === 'telemetry'}
-                  onOpenCube={() => setActiveTab('cube')}
+                  onOpenCube={() => openSearchedCube()}
+                  fieldCube={fieldCube}
                   catalogSources={catalogSources}
                   catalogEnabled={showCatalog}
                   loadingCatalog={loadingCatalog}

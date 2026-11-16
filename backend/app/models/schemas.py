@@ -22,6 +22,7 @@ class ObservationQueryResponse(BaseModel):
     collection: str
     total_found: int
     total_found_is_lower_bound: bool = False
+    archive_search_status: Literal["available", "partial", "unavailable", "not_checked", "unknown"] = "unknown"
     returned_count: int
     observations: List[ObservationRecord]
 

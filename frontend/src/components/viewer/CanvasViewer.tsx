@@ -23,6 +23,7 @@ interface CanvasViewerProps {
   targetDec?: number;
   targetFov?: number;
   targetId?: string;
+  emptyFieldPreview?: React.ReactNode;
 }
 
 export const CanvasViewer: React.FC<CanvasViewerProps> = ({
@@ -43,6 +44,7 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
   targetDec,
   targetFov,
   targetId,
+  emptyFieldPreview,
 }) => {
   const prediction = targetId ? frame?.target_predictions?.[targetId] : undefined;
   const photometry = targetId ? frame?.target_photometry?.[targetId] : undefined;
@@ -395,6 +397,8 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
         />
       ) : viewerMode === 'aladin' ? (
         <div className="flex-1 flex items-center justify-center p-6 text-sm text-slate-300" role="status">Search for coordinates to open sky context.</div>
+      ) : !frame && !loading && emptyFieldPreview ? (
+        emptyFieldPreview
       ) : (
         <>
           {/* Canvas Area with Keyboard Focus & Navigation */}

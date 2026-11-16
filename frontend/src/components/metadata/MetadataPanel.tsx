@@ -4,6 +4,7 @@ import { CatalogSource, FrameResponse, LightCurveSeries, SpectrumResponse } from
 import { LightCurveChart } from '../science/LightCurveChart';
 import { SpectrumChart } from '../science/SpectrumChart';
 import { QuickSkySpectrum } from '../science/QuickSkySpectrum';
+import type { CubeData } from '../science/cubeCsv';
 import { imageProvenanceLabel } from '../../services/imageProvenance';
 
 interface MetadataPanelProps {
@@ -22,6 +23,7 @@ interface MetadataPanelProps {
   onOpenDiscoveryReport?: () => void;
   samplePosition: { ra: number; dec: number } | null;
   analysisEnabled: boolean;
+  fieldCube?: CubeData | null;
   onOpenCube: () => void;
 }
 
@@ -41,6 +43,7 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({
   onOpenDiscoveryReport,
   samplePosition,
   analysisEnabled,
+  fieldCube = null,
   onOpenCube,
 }) => {
   const [telemetryTab, setTelemetryTab] = useState<'cube' | 'lightcurve' | 'spectrum'>('cube');
@@ -140,7 +143,7 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({
 
       {/* Switchable Science Telemetry Chart */}
       {namedTarget && telemetryTab !== 'cube' && <p className="text-xs text-amber-200">Aperture results describe the search field. Target association and variability are unconfirmed.</p>}
-      {telemetryTab === 'cube' ? <QuickSkySpectrum position={samplePosition} enabled={analysisEnabled} onOpenCube={onOpenCube} /> : telemetryTab === 'spectrum' ? (
+      {telemetryTab === 'cube' ? <QuickSkySpectrum position={samplePosition} enabled={analysisEnabled} fieldCube={fieldCube} onOpenCube={onOpenCube} /> : telemetryTab === 'spectrum' ? (
         <SpectrumChart spectrum={spectrum} loading={loadingSpectrum} />
       ) : (
         <LightCurveChart

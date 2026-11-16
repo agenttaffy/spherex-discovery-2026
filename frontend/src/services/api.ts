@@ -29,6 +29,8 @@ export async function checkHealth(): Promise<{ status: string; irsa_connected: b
   return resp.json();
 }
 
+export type ArchiveSearchStatus = 'available' | 'partial' | 'unavailable' | 'not_checked' | 'unknown';
+
 export async function fetchObservations(
   ra: number | string,
   dec: number | string,
@@ -36,7 +38,7 @@ export async function fetchObservations(
   collection: string = 'spherex_dr1',
   detector?: string,
   limit: number = 60
-): Promise<{ target: {ra: number; dec: number; fov: number}; observations: ObservationRecord[]; total_found: number }> {
+): Promise<{ target: {ra: number; dec: number; fov: number}; observations: ObservationRecord[]; total_found: number; archive_search_status?: ArchiveSearchStatus }> {
   const params = new URLSearchParams({
     ra: String(ra),
     dec: String(dec),

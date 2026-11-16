@@ -125,7 +125,7 @@ export const AladinViewer: React.FC<AladinViewerProps> = ({ ra, dec, fov = 0.04,
         if (cancelled) return;
         if (!rendered) throw new Error('Survey tiles are reachable, but the sky image could not be confirmed in this view.');
         setPhase('ready');
-        setMessage('Sky image rendered from the selected context survey.');
+        setMessage('Survey connected; image tiles may still be loading.');
       } catch (error) {
         if (cancelled) return;
         setPhase('error');
