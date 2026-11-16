@@ -13,9 +13,9 @@ from pydantic import BaseModel, Field
 from app.config import MAX_FOV_DEG
 from app.models.schemas import FrameResponse
 from app.services.cache_service import cache_service
-from app.services.cutout_service import cutout_service
+from app.services.cutout_service import cutout_service, cutout_cache_key, validate_cutout_bytes
 from app.services.irsa_client import OBSERVATION_REGISTRY
-from app.services.spectral_calibration_service import load_calibrated_exposure
+from app.services.spectral_calibration_service import load_calibrated_exposure, load_cached_calibrated_exposure
 from app.science.calibrated_comparison import compare_calibrated_pair, coadd_calibrated_exposures
 from app.science.fits_processing import (
     load_fits_cutout,
@@ -40,6 +40,12 @@ class StackRequest(BaseModel):
     fov: float = Field(default=0.04, gt=0, le=MAX_FOV_DEG)
     format: Optional[str] = "png"
     stretch: Optional[str] = "asinh"
+
+
+class CompatiblePartnersRequest(BaseModel):
+    frame_id: str
+    candidate_ids: List[str] = Field(max_length=12)
+    fov: float = Field(default=0.04, gt=0, le=MAX_FOV_DEG)
 
 
 class CatalogProjectionRequest(BaseModel):
@@ -176,6 +182,101 @@ def _validated_comparison(cutouts: list[bytes], metadata: list[dict]) -> dict:
               coadd_calibrated_exposures(exposures, minimum_passband_overlap=MINIMUM_PASSBAND_OVERLAP))
     result["calibrations"] = calibrations
     return result
+
+
+def _cached_partner_cutout(meta: dict, fov: float) -> bytes | None:
+    """Read an already-cached exact cutout, with no image or archive requests."""
+    if checksum := meta.get("cached_cutout_sha256"):
+        return cache_service.get_verified(meta.get("cached_cutout_url", ""), checksum)
+    if meta.get("cached_cutout_url"):
+        cached = cache_service.get(meta["cached_cutout_url"])
+        if cached is not None:
+            return cached
+    try:
+        key = cutout_cache_key(meta["access_url"], meta["ra"], meta["dec"], fov)
+        for candidate in (key, f"cloud-{key}"):
+            data = cache_service.get(candidate)
+            if data:
+                validate_cutout_bytes(data, meta["access_url"])
+                return data
+    except (KeyError, TypeError, ValueError):
+        return None
+    return None
+
+
+def _prepare_cached_partner(data: bytes, meta: dict):
+    """Use the same identity, time and calibration guards as comparison."""
+    with load_fits_cutout(data) as science:
+        header = science["IMAGE"].header
+        obs_id = header["OBSID"]
+        detector = str(header["DETECTOR"]).strip()
+        if obs_id != meta["obs_id"] or f"SPHEREx-D{detector}" != meta["detector"]:
+            raise ValueError("FITS exposure identity mismatch")
+        start, end = float(header["MJD-BEG"]), float(header["MJD-END"])
+        if not np.isfinite([start, end]).all() or start >= end:
+            raise ValueError("Exposure interval unavailable")
+        release = meta["collection"].removeprefix("spherex_").removesuffix("_deep")
+        if release not in {"dr1", "qr3", "qr2"}:
+            raise ValueError("Science release unavailable")
+        exposure, _ = load_cached_calibrated_exposure(science, release)
+        return exposure, (start, end), obs_id
+
+
+def _scan_cached_partners(frame_id: str, candidate_ids: list[str], fov: float) -> dict:
+    reference = OBSERVATION_REGISTRY.get(frame_id)
+    if reference is None:
+        raise HTTPException(404, "Reference observation not found.")
+    candidates = []
+    missing = 0
+    for candidate_id in dict.fromkeys(candidate_ids):
+        if candidate_id == frame_id:
+            continue
+        meta = OBSERVATION_REGISTRY.get(candidate_id)
+        if meta is None:
+            missing += 1
+            continue
+        try:
+            same_center = (abs(float(meta["ra"]) - float(reference["ra"])) < 0.000001 and
+                           abs(float(meta["dec"]) - float(reference["dec"])) < 0.000001)
+        except (KeyError, TypeError, ValueError):
+            missing += 1
+            continue
+        if same_center and meta.get("detector") == reference.get("detector"):
+            candidates.append((candidate_id, meta))
+    checked, unavailable, matches = 0, missing, []
+    try:
+        data = _cached_partner_cutout(reference, fov)
+        if not data:
+            raise ValueError("Reference cutout not cached")
+        prepared, interval, ref_obs = _prepare_cached_partner(data, reference)
+    except Exception:
+        return {"checked": 0, "unavailable": unavailable + len(candidates), "matches": []}
+    for candidate_id, meta in candidates:
+        try:
+            data = _cached_partner_cutout(meta, fov)
+            if not data:
+                raise ValueError("Candidate cutout not cached")
+            candidate, other_interval, obs_id = _prepare_cached_partner(data, meta)
+        except Exception:
+            unavailable += 1
+            continue
+        checked += 1
+        if obs_id == ref_obs or max(interval[0], other_interval[0]) < min(interval[1], other_interval[1]):
+            continue
+        try:
+            result = compare_calibrated_pair(prepared, candidate, minimum_passband_overlap=MINIMUM_PASSBAND_OVERLAP)
+        except (ValueError, NoConvergence, WcsError):
+            continue
+        matches.append({"frame_id": candidate_id, "retained_pixels": result["retained_pixels"],
+                        "reference_pixels": result["reference_pixels"],
+                        "minimum_retained_overlap": result["minimum_retained_overlap"]})
+    return {"checked": checked, "unavailable": unavailable, "matches": matches}
+
+
+@router.post("/frames/compatible-partners")
+async def compatible_partners(req: CompatiblePartnersRequest):
+    """Check up to 12 candidates using already cached images and calibration only."""
+    return await run_in_threadpool(_scan_cached_partners, req.frame_id, req.candidate_ids, req.fov)
 
 
 async def _compare_selected(frame_ids: list[str], fov: float) -> dict:

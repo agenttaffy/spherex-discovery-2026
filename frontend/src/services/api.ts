@@ -9,6 +9,7 @@ import {
   DiscoveryReport,
   SpectrumResponse,
   StackResult,
+  CompatiblePartners,
 } from '../types/astronomy';
 
 const API_BASE = '/api';
@@ -134,6 +135,19 @@ export async function computeDiff(
     throw new Error(err.detail || 'Failed to compute diff');
   }
   return resp.json();
+}
+
+/** Bounded cache-only search; a match is revalidated by the normal comparison. */
+export async function findCompatiblePartners(frameId: string, candidates: string[], fov: number, signal: AbortSignal): Promise<CompatiblePartners> {
+  const response = await fetch(`${API_BASE}/frames/compatible-partners`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, signal,
+    body: JSON.stringify({ frame_id: frameId, candidate_ids: candidates, fov }),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(typeof body.detail === 'string' ? body.detail : 'Could not check cached comparison partners.');
+  }
+  return response.json();
 }
 
 export async function fetchCatalogs(

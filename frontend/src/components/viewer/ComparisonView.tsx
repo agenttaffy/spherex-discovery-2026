@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { ObservationRecord, DiffResult, FrameResponse, AstrometricMotion, StackResult } from '../../types/astronomy';
-import { computeDiff, fetchDemoComparison, fetchFrame, stackFrames } from '../../services/api';
+import React, { useState, useEffect, useRef } from 'react';
+import { ObservationRecord, DiffResult, FrameResponse, AstrometricMotion, StackResult, CompatiblePartners } from '../../types/astronomy';
+import { computeDiff, fetchDemoComparison, fetchFrame, stackFrames, findCompatiblePartners } from '../../services/api';
+import { comparisonCandidates } from '../../services/comparisonCandidates';
 import { imageProvenanceLabel } from '../../services/imageProvenance';
 import { ArrowRight, Sparkles, Loader2, AlertCircle, Move, Layers, Plus, Minus, TrendingUp, Palette, Table } from 'lucide-react';
 
@@ -30,6 +31,11 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations: se
   const [demoPair, setDemoPair] = useState<ObservationRecord[] | null>(null);
   const [demoError, setDemoError] = useState<string | null>(null);
   const [useDemoPair, setUseDemoPair] = useState(false);
+  const [partnerResult, setPartnerResult] = useState<{ context: string; value: CompatiblePartners } | null>(null);
+  const [partnerError, setPartnerError] = useState<string | null>(null);
+  const [findingPartners, setFindingPartners] = useState(false);
+  const partnerRequest = useRef<AbortController | null>(null);
+  const partnerGeneration = useRef(0);
   const curated = useDemoPair && demoPair;
   const observations = curated || searchObservations;
 
@@ -47,6 +53,10 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations: se
 
   const obs1 = observations[safeIndex1];
   const obs2 = observations[safeIndex2];
+  const partnerCandidates = obs1 ? comparisonCandidates(observations, obs1, 12, obs2?.id) : [];
+  const partnerEligible = obs1 ? comparisonCandidates(observations, obs1, Number.MAX_SAFE_INTEGER).length : 0;
+  const partnerContext = `${obs1?.id ?? ''}|${fov}|${!!curated}|${partnerCandidates.map(row => row.id).join('|')}`;
+  const visiblePartners = partnerResult?.context === partnerContext ? partnerResult.value : null;
   const knownRdraFirst = searchObservations.findIndex(o => o.obs_id === '2026W01_1A_0257_4' && o.detector === 'SPHEREx-D6' && Math.abs(o.ra - 248.16722768733652) < 0.00015 && Math.abs(o.dec - 66.75502445923215) < 0.00015);
   const knownRdraSecond = searchObservations.findIndex(o => o.obs_id === '2026W20_1A_0101_1' && o.detector === 'SPHEREx-D6' && Math.abs(o.ra - 248.16722768733652) < 0.00015 && Math.abs(o.dec - 66.75502445923215) < 0.00015);
   const knownRdraThird = searchObservations.findIndex(o => o.obs_id === '2026W17_1B_0434_4' && o.detector === 'SPHEREx-D6' && Math.abs(o.ra - 248.16722768733652) < 0.00015 && Math.abs(o.dec - 66.75502445923215) < 0.00015);
@@ -57,6 +67,37 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations: se
   const extraIds = extraStackIds.filter(id => observations.some(o => o.id === id && o.detector === obs1?.detector) && id !== obs1?.id && id !== obs2?.id);
   const draftIds = draftExtraIds.filter(id => observations.some(o => o.id === id && o.detector === obs1?.detector) && id !== obs1?.id && id !== obs2?.id);
   const extraKey = extraIds.join('|');
+
+  useEffect(() => {
+    setPartnerResult(null);
+    setPartnerError(null);
+    setFindingPartners(false);
+    return () => {
+      partnerGeneration.current += 1;
+      partnerRequest.current?.abort();
+      partnerRequest.current = null;
+    };
+  }, [partnerContext]);
+
+  const checkPartners = async () => {
+    if (!obs1 || !partnerCandidates.length) return;
+    partnerRequest.current?.abort();
+    const controller = new AbortController();
+    partnerRequest.current = controller;
+    const generation = ++partnerGeneration.current;
+    setPartnerResult(null);
+    setPartnerError(null);
+    setFindingPartners(true);
+    try {
+      const result = await findCompatiblePartners(obs1.id, partnerCandidates.map(row => row.id), fov, controller.signal);
+      if (!controller.signal.aborted && generation === partnerGeneration.current) setPartnerResult({ context: partnerContext, value: result });
+    } catch (problem) {
+      if (!controller.signal.aborted && generation === partnerGeneration.current)
+        setPartnerError(problem instanceof Error ? problem.message : 'Could not check cached comparison partners.');
+    } finally {
+      if (!controller.signal.aborted && generation === partnerGeneration.current) setFindingPartners(false);
+    }
+  };
 
   // Prefer a second epoch with the same detector; that alone does not establish compatibility.
   useEffect(() => {
@@ -336,6 +377,34 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({ observations: se
             </select>
           </div>
         </div>
+        {!curated && obs1 && <details className="mt-3 rounded-lg border border-slate-700 bg-slate-950/70 p-3 text-xs text-slate-300">
+          <summary className="cursor-pointer font-medium text-cyan-200">Find compatible cached partners</summary>
+          <p className="mt-2">Anchor: {obs1.obs_id} · {obs1.detector}. This checks up to {partnerCandidates.length} of {partnerEligible} other listed same-detector exposures. The selected second observation is included if eligible; remaining candidates are sampled across time. It reads only cached images and calibrations; unavailable means not checked, not incompatible. Open observations in Explorer to cache their images. Results are not exhaustive.</p>
+          <button type="button" onClick={checkPartners} disabled={findingPartners || partnerCandidates.length === 0}
+            className="mt-2 rounded border border-cyan-700 px-3 py-1.5 text-cyan-100 hover:bg-cyan-950 disabled:opacity-50">
+            {findingPartners ? 'Checking cached data…' : 'Check cached partners'}
+          </button>
+          {partnerCandidates.length === 0 && <p className="mt-2">No other same-detector exposures are listed.</p>}
+          {partnerError && <p role="alert" className="mt-2 text-amber-200">{partnerError}</p>}
+          {visiblePartners && <div className="mt-2 space-y-2">
+            <p role="status">Checked {visiblePartners.checked}; unavailable {visiblePartners.unavailable}; compatible {visiblePartners.matches.length}.</p>
+            {visiblePartners.matches.length === 0 && <p>No compatible partners were found among the completed checks. Unavailable entries may still be compatible.</p>}
+            {visiblePartners.matches.map(match => {
+              const index = observations.findIndex(row => row.id === match.frame_id);
+              const row = observations[index];
+              if (!row || !partnerCandidates.some(candidate => candidate.id === match.frame_id)) return null;
+              return <div key={match.frame_id} className="border-t border-slate-800 pt-2">
+                <p>{row.utc_date?.slice(0, 10) || 'Date unavailable'} · {row.obs_id} · {match.retained_pixels}/{match.reference_pixels} pixels · {(match.minimum_retained_overlap * 100).toFixed(1)}% minimum overlap</p>
+                {index === safeIndex2 ? <p className="mt-1 text-slate-400">Current observation 2</p> : <button type="button" className="mt-1 text-cyan-200 underline" onClick={() => {
+                  setIndex2(index);
+                  setExtraStackIds([]);
+                  setDraftExtraIds([]);
+                }}>Use as observation 2</button>}
+              </div>;
+            })}
+            <p className="text-slate-400">Selecting a match runs the regular strict comparison again; it does not establish a target detection.</p>
+          </div>}
+        </details>}
         {opMode === 'stack' && !curated && obs1 && observations.length > 2 && (
           <details className="mt-3 text-xs text-slate-300">
             <summary className="cursor-pointer">Add exposures from {obs1.detector} ({extraIds.length} applied; maximum 4)</summary>
